@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@700&display=swap');
+@import "tailwindcss";
+
+.font-handwritten {
+  font-family: 'Caveat', cursive;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: #F7F5EC !important;
+  color: #2C3523 !important;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif !important;
+}
