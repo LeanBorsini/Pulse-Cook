@@ -54,8 +54,9 @@ export function RecipeDetailModal({
   // Buscar las instrucciones en cualquier propiedad posible
   const instructionsText = recipe.instructions_es || (recipe as any).instructions || recipe.instructions_en;
 
-  // Verificar si el usuario actual es el autor de la receta
-  const isOwner = user && recipe.user_id === user.id;
+  // Lógica de autor y propietario
+  const authorName = (recipe as any).profiles?.username || 'leanBorsini';
+  const isOwner = user && (recipe.user_id === user.id || recipe.user_id === null);
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
@@ -82,12 +83,12 @@ export function RecipeDetailModal({
               {lang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es}
             </h2>
             <p className="text-xs text-stone-500 font-medium mt-0.5">
-              by @{recipe.profiles?.username || 'comunidad'}
+              by @{authorName}
             </p>
           </div>
           
           <div className="flex items-center gap-1.5 shrink-0">
-            {/* Solo se muestran Editar y Eliminar si el usuario es el creador */}
+            {/* Solo se muestran Editar y Eliminar si el usuario es el creador/admin */}
             {isOwner && (
               <>
                 <button

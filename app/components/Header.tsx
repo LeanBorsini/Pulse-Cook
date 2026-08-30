@@ -25,11 +25,14 @@ export function Header({
   selectedCount,
   onOpenShoppingList,
 }: HeaderProps) {
+  const displayAlias =
+    profileUsername || user?.user_metadata?.username || user?.email?.split('@')[0] || 'usuario';
+
   return (
     <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-stone-800">Pulse&Cook</h1>
-        <p className="text-stone-500 text-sm">Personal & Family Recipe Book</p>
+        <h1 className="text-5xl font-handwritten font-bold text-[#2C3523]">Pulse&Cook</h1>
+        <p className="text-stone-500 text-sm italic mt-0.5">Personal & Family Recipe Book</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -41,7 +44,7 @@ export function Header({
           {lang === 'ES' ? 'EN | ES' : 'ES | EN'}
         </button>
 
-        {/* Lista de compras */}
+        {/* Menú de Compras */}
         {selectedCount > 0 && (
           <button
             onClick={onOpenShoppingList}
@@ -51,25 +54,24 @@ export function Header({
           </button>
         )}
 
-        {/* Botón Crear Receta (solo si está autenticado) */}
-        {user && (
-          <button
-            onClick={onOpenNewRecipe}
-            className="px-4 py-2 bg-[#2b382b] text-white rounded-lg text-sm font-semibold hover:bg-[#1e271e] transition-colors shadow-sm"
-          >
-            + {lang === 'ES' ? 'Añadir Receta' : 'Add Recipe'}
-          </button>
-        )}
+        {/* Botón Crear Receta */}
+        <button
+          onClick={onOpenNewRecipe}
+          className="px-4 py-2 bg-[#2b382b] text-white rounded-lg text-sm font-semibold hover:bg-[#1e271e] transition-colors shadow-sm"
+        >
+          + {lang === 'ES' ? 'Añadir Receta' : 'Add Recipe'}
+        </button>
 
-        {/* Estado del Usuario */}
+        {/* Estado de Autenticación */}
         {user ? (
-          <div className="flex items-center gap-2 bg-stone-200/70 pl-3 pr-1 py-1 rounded-lg">
-            <span className="text-xs font-bold text-stone-700">
-              @{profileUsername || user.email?.split('@')[0]}
+          <div className="flex items-center gap-2 bg-stone-200/80 px-3 py-1.5 rounded-lg border border-stone-300">
+            <span className="text-xs font-bold text-stone-800">
+              @{displayAlias}
             </span>
             <button
               onClick={onSignOut}
-              className="text-xs text-stone-500 hover:text-red-600 font-bold px-2 py-1"
+              className="text-xs text-stone-400 hover:text-red-600 font-bold ml-1 transition-colors"
+              title={lang === 'ES' ? 'Cerrar sesión' : 'Sign out'}
             >
               ✕
             </button>

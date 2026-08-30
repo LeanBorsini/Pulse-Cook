@@ -24,32 +24,26 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setLoading(true);
     setErrorMsg('');
 
-    // Usar signUp con contraseña aleatoria para obligar a Supabase a enviar el token/código OTP de confirmación
-    const dummyPassword = `P_${Math.random().toString(36).slice(-8)}!1A`;
+    const formattedUsername = username.trim().toLowerCase().replace(/\s+/g, '_');
 
-    const { error } = await supabase.auth.signUp({
+    // Enviamos signInWithOtp registrando metadatos por si el usuario es nuevo
+    const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      password: dummyPassword,
+      options: {
+        shouldCreateUser: true,
+        data: {
+          display_name: username.trim() || email.split('@')[0],
+          username: formattedUsername || email.split('@')[0],
+        },
+      },
     });
 
-    // Si el usuario ya existe, recurrimos a signInWithOtp
-    if (error && error.message.includes('already registered')) {
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-      });
-      if (otpError) {
-        setLoading(false);
-        setErrorMsg(otpError.message);
-        return;
-      }
-    } else if (error) {
-      setLoading(false);
-      setErrorMsg(error.message);
-      return;
-    }
-
     setLoading(false);
-    setStep('otp');
+    if (error) {
+      setErrorMsg(error.message);
+    } else {
+      setStep('otp');
+    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -57,19 +51,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setLoading(true);
     setErrorMsg('');
 
-    // Intentar verificar con el tipo 'signup'
+    // Verificamos el OTP enviado
     let { data, error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: otpToken.trim(),
-      type: 'signup',
+      type: 'email',
     });
 
-    // Fallback: Si el usuario ya existía, verificar como 'email'
     if (error) {
+      // Intento de fallback por si Supabase etiquetó la verificación como signup
       const fallback = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otpToken.trim(),
-        type: 'email',
+        type: 'signup',
       });
       data = fallback.data;
       error = fallback.error;
@@ -81,7 +75,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return;
     }
 
-    // Comprobar si el usuario ya tiene perfil
+    // Registrar o actualizar la tabla profiles
+    const userAlias =
+      username.trim().toLowerCase().replace(/\s+/g, '_') ||
+      data.user.user_metadata?.username ||
+      email.split('@')[0];
+
     const { data: existingProfile } = await supabase
       .from('profiles')
       .select('username')
@@ -89,10 +88,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       .single();
 
     if (!existingProfile?.username) {
-      const alias = username.trim() || email.split('@')[0];
       await supabase.from('profiles').upsert({
         id: data.user.id,
-        username: alias.toLowerCase().replace(/\s+/g, '_'),
+        username: userAlias,
       });
     }
 

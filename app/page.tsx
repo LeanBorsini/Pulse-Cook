@@ -1,399 +1,301 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { Recipe, Ingredient, Comment } from './types';
-import { User } from '@supabase/supabase-js';
-
+import { supabase } from '@/lib/supabase';
 import { Header } from './components/Header';
-import { SearchBar } from './components/SearchBar';
 import { RecipeCard } from './components/RecipeCard';
 import { RecipeDetailModal } from './components/RecipeDetailModal';
+import { AuthModal } from './components/AuthModal';
 import { RecipeFormModal } from './components/RecipeFormModal';
 import { ShoppingListModal } from './components/ShoppingListModal';
-import { AuthModal } from './components/AuthModal';
-
-const DEFAULT_FORM: Partial<Recipe> = {
-  title_es: '',
-  title_en: '',
-  category: 'Main Dishes',
-  prep_time: 15,
-  servings: 2,
-  description_es: '',
-  description_en: '',
-  instructions_es: '',
-  instructions_en: '',
-  youtube_url: '',
-  image_url: '',
-  dietary_tags: [],
-};
+import { Recipe, Ingredient, Comment } from './types';
+import { User } from '@supabase/supabase-js';
 
 export default function Home() {
   const [lang, setLang] = useState<'ES' | 'EN'>('ES');
   const [user, setUser] = useState<User | null>(null);
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
 
+  // Estados de datos
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTag, setSelectedTag] = useState<string>('Todas');
+
+  // Estados para Modales
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loadingIngredients, setLoadingIngredients] = useState(false);
-
-  // Estados UI
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedMenuIds, setSelectedMenuIds] = useState<string[]>([]);
-  const [shoppingList, setShoppingList] = useState<Ingredient[]>([]);
-
-  // Modales
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showFormModal, setShowFormModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [showShoppingModal, setShowShoppingModal] = useState(false);
-
-  // Formulario
-  const [formRecipe, setFormRecipe] = useState<Partial<Recipe>>(DEFAULT_FORM);
-  const [formIngredients, setFormIngredients] = useState<Ingredient[]>([]);
+  const [recipeIngredients, setRecipeIngredients] = useState<Ingredient[]>([]);
+  const [loadingIngredients, setLoadingIngredients] = useState<boolean>(false);
 
   // Comentarios
-  const [userName, setUserName] = useState('');
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState<string>('');
+  const [comments, setComments] = useState<Comment[]>([]);
 
-  // 1. Monitorear Sesión de Usuario y Cargar Recetas
+  const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
+
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>([]);
+  const [isShoppingListOpen, setIsShoppingListOpen] = useState<boolean>(false);
+
+  // Carga de Sesión y Perfil
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) fetchUserProfile(currentUser.id);
-    });
+    const fetchSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+    };
+
+    fetchSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        fetchUserProfile(currentUser.id);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchProfile(session.user.id);
       } else {
         setProfileUsername(null);
       }
     });
-
-    fetchRecipes();
 
     return () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
 
-  const fetchUserProfile = async (userId: string) => {
-    const { data } = await supabase.from('profiles').select('username').eq('id', userId).single();
+  const fetchProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', userId)
+      .single();
     if (data?.username) {
       setProfileUsername(data.username);
-      setUserName(data.username);
     }
   };
 
+  // Cargar Recetas desde Supabase
   const fetchRecipes = async () => {
-    // Intenta traer las recetas junto a la tabla profiles
+    setLoading(true);
     const { data, error } = await supabase
       .from('recipes')
-      .select('*, profiles(username)')
+      .select('*, profiles(id, username, avatar_url)')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error cargando recetas con profiles:', error.message);
-      // Fallback: Si falla la relación por permisos RLS, trae solo recetas
-      const { data: fallbackData } = await supabase
-        .from('recipes')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (fallbackData) setRecipes(fallbackData as any);
-    } else if (data) {
-      setRecipes(data as any);
+    if (!error && data) {
+      setRecipes(data as Recipe[]);
     }
+    setLoading(false);
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
+  useEffect(() => {
+    fetchRecipes();
+  }, []);
 
-  const handleOpenNewRecipe = () => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-    setIsEditing(false);
-    setSelectedRecipe(null);
-    setFormRecipe(DEFAULT_FORM);
-    setFormIngredients([]);
-    setShowFormModal(true);
-  };
-
-  const handleOpenDetails = async (recipe: Recipe) => {
+  // Cargar Ingredientes al abrir una receta
+  const handleOpenRecipeDetails = async (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setLoadingIngredients(true);
 
-    const [ingRes, comRes] = await Promise.all([
-      supabase.from('ingredients').select('*').eq('recipe_id', recipe.id),
-      supabase.from('comments').select('*').eq('recipe_id', recipe.id).order('created_at', { ascending: false }),
-    ]);
+    const { data, error } = await supabase
+      .from('ingredients')
+      .select('*')
+      .eq('recipe_id', recipe.id);
 
-    if (ingRes.data) setIngredients(ingRes.data);
-    if (comRes.data) setComments(comRes.data);
+    if (!error && data) {
+      setRecipeIngredients(data);
+    } else {
+      setRecipeIngredients([]);
+    }
     setLoadingIngredients(false);
   };
 
-  const handleStartEdit = async (recipe: Recipe) => {
-    if (!user || user.id !== recipe.user_id) {
-      alert(lang === 'ES' ? 'Solo el autor puede editar esta receta' : 'Only the author can edit this recipe');
-      return;
-    }
+  // Filtros de búsqueda
+  const tags = ['Todas', 'Sin Gluten', 'Sin Lácteos', 'Vegetariano', 'Vegano', 'Sin Frutos Secos'];
 
-    setSelectedRecipe(null);
-    setIsEditing(true);
+  const filteredRecipes = recipes.filter((recipe) => {
+    const title = lang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es;
+    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const { data: current } = await supabase
-      .from('recipes')
-      .select('*')
-      .eq('id', recipe.id)
-      .single();
-
-    if (current) {
-      setFormRecipe({
-        id: current.id,
-        user_id: current.user_id,
-        title_es: current.title_es || '',
-        title_en: current.title_en || '',
-        category: current.category || 'Main Dishes',
-        prep_time: Number(current.prep_time) || 15,
-        servings: Number(current.servings) || 2,
-        description_es: current.description_es || '',
-        description_en: current.description_en || '',
-        instructions_es: current.instructions_es || '',
-        youtube_url: current.youtube_url || '',
-        image_url: current.image_url || '',
-        dietary_tags: current.dietary_tags || [],
-      });
-    }
-
-    const { data: ingData } = await supabase.from('ingredients').select('*').eq('recipe_id', recipe.id);
-    setFormIngredients(ingData || []);
-    setShowFormModal(true);
-  };
-
-  const handleSubmitRecipe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-
-    const payload = {
-      user_id: user.id,
-      title_es: formRecipe.title_es?.trim() || '',
-      title_en: formRecipe.title_en?.trim() || formRecipe.title_es?.trim() || '',
-      category: formRecipe.category || 'Main Dishes',
-      prep_time: Number(formRecipe.prep_time) || 15,
-      servings: Number(formRecipe.servings) || 1,
-      description_es: formRecipe.description_es?.trim() || '',
-      description_en: formRecipe.description_en?.trim() || '',
-      instructions_es: formRecipe.instructions_es?.trim() || '',
-      youtube_url: formRecipe.youtube_url?.trim() || '',
-      image_url: formRecipe.image_url?.trim() || '',
-      dietary_tags: formRecipe.dietary_tags || [],
-    };
-
-    let targetRecipeId = formRecipe.id;
-
-    if (isEditing && targetRecipeId) {
-      const { error } = await supabase.from('recipes').update(payload).eq('id', targetRecipeId);
-      if (error) {
-        alert(`Error: ${error.message}`);
-        return;
-      }
-    } else {
-      const { data, error } = await supabase.from('recipes').insert([payload]).select();
-      if (error || !data || !data[0]) {
-        alert(`Error: ${error?.message || 'Error guardando'}`);
-        return;
-      }
-      targetRecipeId = data[0].id;
-    }
-
-    if (targetRecipeId) {
-      await supabase.from('ingredients').delete().eq('recipe_id', targetRecipeId);
-      if (formIngredients.length > 0) {
-        const ingredientsToInsert = formIngredients.map((ing) => ({
-          name_es: ing.name_es,
-          name_en: ing.name_en || ing.name_es,
-          amount: Number(ing.amount) || 0,
-          unit: ing.unit || 'g',
-          recipe_id: targetRecipeId,
-        }));
-        await supabase.from('ingredients').insert(ingredientsToInsert);
-      }
-    }
-
-    setShowFormModal(false);
-    fetchRecipes();
-  };
-
-  const handleDeleteRecipe = async (recipeId: string) => {
-    if (!user) return;
-    if (!confirm(lang === 'ES' ? '¿Eliminar receta?' : 'Delete recipe?')) return;
-    const { error } = await supabase.from('recipes').delete().eq('id', recipeId);
-    if (error) {
-      alert(error.message);
-      return;
-    }
-    setSelectedRecipe(null);
-    fetchRecipes();
-  };
-
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-    if (!selectedRecipe || !newMessage.trim()) return;
-
-    const authorName = profileUsername || userName || 'Anónimo';
-
-    const { data, error } = await supabase
-      .from('comments')
-      .insert([{ recipe_id: selectedRecipe.id, user_name: authorName, message: newMessage }])
-      .select();
-
-    if (!error && data) {
-      setComments([data[0], ...comments]);
-      setNewMessage('');
-    }
-  };
-
-  const toggleMenuRecipe = (recipeId: string) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-    if (selectedMenuIds.includes(recipeId)) {
-      setSelectedMenuIds(selectedMenuIds.filter((id) => id !== recipeId));
-    } else {
-      setSelectedMenuIds([...selectedMenuIds, recipeId]);
-    }
-  };
-
-  const handleOpenShoppingList = async () => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-    if (selectedMenuIds.length === 0) return;
-    const { data } = await supabase.from('ingredients').select('*').in('recipe_id', selectedMenuIds);
-
-    if (data) {
-      const consolidated: Record<string, Ingredient> = {};
-      data.forEach((item) => {
-        const key = `${item.name_es.toLowerCase()}_${item.unit.toLowerCase()}`;
-        if (consolidated[key]) {
-          consolidated[key].amount += item.amount;
-        } else {
-          consolidated[key] = { ...item };
-        }
-      });
-      setShoppingList(Object.values(consolidated));
-    }
-    setShowShoppingModal(true);
-  };
-
-  const filteredRecipes = recipes.filter((r) => {
-    const title = lang === 'ES' ? r.title_es : (r.title_en || r.title_es);
-    const matchesSearch = title?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTag = selectedTag ? r.dietary_tags?.includes(selectedTag) : true;
-    return matchesSearch && matchesTag;
+    if (selectedTag === 'Todas') return matchesSearch;
+    return matchesSearch && recipe.dietary_tags?.includes(selectedTag);
   });
 
+  // Alternar selección de menú de compras (REQUIERE SESIÓN)
+  const toggleMenuRecipe = (id: string) => {
+    if (!user) {
+      setIsAuthOpen(true);
+      return;
+    }
+    setSelectedRecipeIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // Manejar Borrado de Receta
+  const handleDeleteRecipe = async (id: string) => {
+    if (!confirm(lang === 'ES' ? '¿Deseas eliminar esta receta?' : 'Delete this recipe?')) return;
+
+    const { error } = await supabase.from('recipes').delete().eq('id', id);
+    if (!error) {
+      setSelectedRecipe(null);
+      fetchRecipes();
+    }
+  };
+
+  // Agregar comentario
+  const handleAddComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !user || !selectedRecipe) return;
+
+    const newCommentObj: Comment = {
+      id: Date.now().toString(),
+      recipe_id: selectedRecipe.id,
+      user_name: profileUsername || user.email?.split('@')[0] || 'leanBorsini',
+      message: newMessage,
+      created_at: new Date().toISOString(),
+    };
+
+    setComments((prev) => [...prev, newCommentObj]);
+    setNewMessage('');
+  };
+
   return (
-    <main className="min-h-screen p-6 max-w-4xl mx-auto font-sans">
-      <Header
-        lang={lang}
-        setLang={setLang}
-        user={user}
-        profileUsername={profileUsername}
-        onOpenAuth={() => setShowAuthModal(true)}
-        onSignOut={handleSignOut}
-        onOpenNewRecipe={handleOpenNewRecipe}
-        selectedCount={selectedMenuIds.length}
-        onOpenShoppingList={handleOpenShoppingList}
-      />
-
-      <SearchBar
-        lang={lang}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        selectedTag={selectedTag}
-        setSelectedTag={setSelectedTag}
-      />
-
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredRecipes.map((recipe) => (
-          <RecipeCard
-            key={recipe.id}
-            recipe={recipe}
-            lang={lang}
-            isSelected={selectedMenuIds.includes(recipe.id)}
-            user={user}
-            onOpenDetails={handleOpenDetails}
-            onToggleMenu={toggleMenuRecipe}
-            onOpenAuth={() => setShowAuthModal(true)}
-          />
-        ))}
-      </section>
-
-      {selectedRecipe && (
-        <RecipeDetailModal
-          recipe={selectedRecipe}
+    <div className="min-h-screen bg-[#ece9e1] text-stone-800 p-4 sm:p-8">
+      <div className="max-w-6xl mx-auto">
+        <Header
           lang={lang}
-          ingredients={ingredients}
-          comments={comments}
-          loadingIngredients={loadingIngredients}
-          userName={userName}
-          setUserName={setUserName}
-          newMessage={newMessage}
-          setNewMessage={setNewMessage}
+          setLang={setLang}
           user={user}
-          onClose={() => setSelectedRecipe(null)}
-          onEdit={() => handleStartEdit(selectedRecipe)}
-          onDelete={() => handleDeleteRecipe(selectedRecipe.id)}
-          onAddComment={handleAddComment}
-          onOpenAuth={() => setShowAuthModal(true)}
-        />
-      )}
-
-      {showFormModal && (
-        <RecipeFormModal
-          lang={lang}
-          isEditing={isEditing}
-          formRecipe={formRecipe}
-          setFormRecipe={setFormRecipe}
-          formIngredients={formIngredients}
-          setFormIngredients={setFormIngredients}
-          onClose={() => setShowFormModal(false)}
-          onSubmit={handleSubmitRecipe}
-        />
-      )}
-
-      {showShoppingModal && (
-        <ShoppingListModal
-          lang={lang}
-          shoppingList={shoppingList}
-          onClose={() => setShowShoppingModal(false)}
-          onClearMenu={() => {
-            setSelectedMenuIds([]);
-            setShoppingList([]);
-            setShowShoppingModal(false);
+          profileUsername={profileUsername}
+          onOpenAuth={() => setIsAuthOpen(true)}
+          onSignOut={() => supabase.auth.signOut()}
+          onOpenNewRecipe={() => {
+            if (!user) {
+              setIsAuthOpen(true);
+            } else {
+              setRecipeToEdit(null);
+              setIsFormOpen(true);
+            }
+          }}
+          selectedCount={selectedRecipeIds.length}
+          onOpenShoppingList={() => {
+            if (!user) {
+              setIsAuthOpen(true);
+            } else {
+              setIsShoppingListOpen(true);
+            }
           }}
         />
-      )}
 
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-    </main>
+        <div className="mb-8 space-y-4">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder={lang === 'ES' ? 'Buscar receta o ingrediente...' : 'Search recipe or ingredient...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#f4f2eb] border border-stone-300 rounded-2xl py-3.5 pl-11 pr-4 text-sm shadow-sm outline-none focus:border-stone-500 transition-all"
+            />
+            <span className="absolute left-4 top-3.5 text-stone-400">🔍</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(tag)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  selectedTag === tag
+                    ? 'bg-[#2b382b] text-white'
+                    : 'bg-[#f4f2eb] text-stone-600 border border-stone-300 hover:bg-stone-200'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-12 text-stone-500 text-sm">
+            {lang === 'ES' ? 'Cargando recetas...' : 'Loading recipes...'}
+          </div>
+        ) : filteredRecipes.length === 0 ? (
+          <div className="text-center py-12 text-stone-500 text-sm">
+            {lang === 'ES' ? 'No se encontraron recetas.' : 'No recipes found.'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6">
+            {filteredRecipes.map((recipe) => (
+              <RecipeCard
+                key={recipe.id}
+                recipe={recipe}
+                lang={lang}
+                isSelected={selectedRecipeIds.includes(recipe.id)}
+                user={user}
+                onOpenDetails={handleOpenRecipeDetails}
+                onToggleMenu={toggleMenuRecipe}
+              />
+            ))}
+          </div>
+        )}
+
+        {selectedRecipe && (
+          <RecipeDetailModal
+            recipe={selectedRecipe}
+            ingredients={recipeIngredients}
+            loadingIngredients={loadingIngredients}
+            comments={comments}
+            newMessage={newMessage}
+            setNewMessage={setNewMessage}
+            onAddComment={handleAddComment}
+            lang={lang}
+            user={user}
+            onClose={() => setSelectedRecipe(null)}
+            onEdit={(recipe) => {
+              setSelectedRecipe(null);
+              setRecipeToEdit(recipe);
+              setIsFormOpen(true);
+            }}
+            onDelete={handleDeleteRecipe}
+            onOpenAuth={() => {
+              setSelectedRecipe(null);
+              setIsAuthOpen(true);
+            }}
+          />
+        )}
+
+        <AuthModal 
+          isOpen={isAuthOpen} 
+          onClose={() => setIsAuthOpen(false)} 
+        />
+
+        {isFormOpen && (
+          <RecipeFormModal
+            recipeToEdit={recipeToEdit}
+            lang={lang}
+            user={user}
+            onClose={() => setIsFormOpen(false)}
+            onSuccess={() => {
+              setIsFormOpen(false);
+              fetchRecipes();
+            }}
+          />
+        )}
+
+        {isShoppingListOpen && (
+          <ShoppingListModal
+            selectedRecipeIds={selectedRecipeIds}
+            recipes={recipes}
+            lang={lang}
+            onClose={() => setIsShoppingListOpen(false)}
+          />
+        )}
+      </div>
+    </div>
   );
 }
