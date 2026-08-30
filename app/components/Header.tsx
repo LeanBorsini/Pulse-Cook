@@ -1,10 +1,14 @@
 'use client';
 
-import { Plus, ShoppingBag } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
 
 interface HeaderProps {
   lang: 'ES' | 'EN';
   setLang: (lang: 'ES' | 'EN') => void;
+  user: User | null;
+  profileUsername: string | null;
+  onOpenAuth: () => void;
+  onSignOut: () => void;
   onOpenNewRecipe: () => void;
   selectedCount: number;
   onOpenShoppingList: () => void;
@@ -13,46 +17,71 @@ interface HeaderProps {
 export function Header({
   lang,
   setLang,
+  user,
+  profileUsername,
+  onOpenAuth,
+  onSignOut,
   onOpenNewRecipe,
   selectedCount,
   onOpenShoppingList,
 }: HeaderProps) {
   return (
-    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 pb-4 border-b border-[#D8D3C4]">
+    <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
       <div>
-        <h1 className="text-6xl font-handwritten font-bold text-[#2C3523] -mb-2">
-          Pulse&Cook
-        </h1>
-        <p className="text-sm text-[#5C6650]">
-          {lang === 'ES' ? 'Recetario Personal & Familiar' : 'Personal & Family Recipe Book'}
-        </p>
+        <h1 className="text-3xl font-serif font-bold text-stone-800">Pulse&Cook</h1>
+        <p className="text-stone-500 text-sm">Personal & Family Recipe Book</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        {/* Selector de Idioma */}
         <button
-          onClick={onOpenNewRecipe}
-          className="flex items-center gap-2 bg-[#2C3523] text-[#F7F5EC] px-4 py-2 rounded-full text-sm font-semibold shadow-md hover:bg-[#3D4932] transition-all"
+          onClick={() => setLang(lang === 'ES' ? 'EN' : 'ES')}
+          className="px-3 py-1.5 border border-stone-300 rounded-lg text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 transition-colors"
         >
-          <Plus className="w-4 h-4" />
-          {lang === 'ES' ? 'Nueva Receta' : 'Add Recipe'}
+          {lang === 'ES' ? 'EN | ES' : 'ES | EN'}
         </button>
 
+        {/* Lista de compras */}
         {selectedCount > 0 && (
           <button
             onClick={onOpenShoppingList}
-            className="flex items-center gap-2 bg-[#4A533C] text-[#F7F5EC] px-4 py-2 rounded-full text-sm font-semibold shadow-md hover:bg-[#3D4932] transition-all"
+            className="px-3 py-1.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold hover:bg-amber-200"
           >
-            <ShoppingBag className="w-4 h-4" />
-            {lang === 'ES' ? `Ver Lista (${selectedCount})` : `View List (${selectedCount})`}
+            🛒 Menu ({selectedCount})
           </button>
         )}
 
-        <button
-          onClick={() => setLang(lang === 'ES' ? 'EN' : 'ES')}
-          className="px-4 py-2 text-sm font-semibold border border-[#2C3523] rounded-full hover:bg-[#2C3523] hover:text-[#F7F5EC] transition-all"
-        >
-          {lang === 'ES' ? 'ES | EN' : 'EN | ES'}
-        </button>
+        {/* Botón Crear Receta (solo si está autenticado) */}
+        {user && (
+          <button
+            onClick={onOpenNewRecipe}
+            className="px-4 py-2 bg-[#2b382b] text-white rounded-lg text-sm font-semibold hover:bg-[#1e271e] transition-colors shadow-sm"
+          >
+            + {lang === 'ES' ? 'Añadir Receta' : 'Add Recipe'}
+          </button>
+        )}
+
+        {/* Estado del Usuario */}
+        {user ? (
+          <div className="flex items-center gap-2 bg-stone-200/70 pl-3 pr-1 py-1 rounded-lg">
+            <span className="text-xs font-bold text-stone-700">
+              @{profileUsername || user.email?.split('@')[0]}
+            </span>
+            <button
+              onClick={onSignOut}
+              className="text-xs text-stone-500 hover:text-red-600 font-bold px-2 py-1"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onOpenAuth}
+            className="px-4 py-2 bg-stone-200 text-stone-800 rounded-lg text-sm font-semibold hover:bg-stone-300 transition-colors"
+          >
+            {lang === 'ES' ? 'Ingresar' : 'Sign In'}
+          </button>
+        )}
       </div>
     </header>
   );

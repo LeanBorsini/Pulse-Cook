@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Recipe, Ingredient, Comment } from './types';
+import { User } from '@supabase/supabase-js';
 
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
@@ -10,6 +11,7 @@ import { RecipeCard } from './components/RecipeCard';
 import { RecipeDetailModal } from './components/RecipeDetailModal';
 import { RecipeFormModal } from './components/RecipeFormModal';
 import { ShoppingListModal } from './components/ShoppingListModal';
+import { AuthModal } from './components/AuthModal';
 
 const DEFAULT_FORM: Partial<Recipe> = {
   title_es: '',
@@ -28,45 +30,98 @@ const DEFAULT_FORM: Partial<Recipe> = {
 
 export default function Home() {
   const [lang, setLang] = useState<'ES' | 'EN'>('ES');
+  const [user, setUser] = useState<User | null>(null);
+  const [profileUsername, setProfileUsername] = useState<string | null>(null);
+
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingIngredients, setLoadingIngredients] = useState(false);
 
-  // Estados de interfaz
+  // Estados UI
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedMenuIds, setSelectedMenuIds] = useState<string[]>([]);
   const [shoppingList, setShoppingList] = useState<Ingredient[]>([]);
 
   // Modales
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showShoppingModal, setShowShoppingModal] = useState(false);
 
-  // Formulario Recetas
+  // Formulario
   const [formRecipe, setFormRecipe] = useState<Partial<Recipe>>(DEFAULT_FORM);
   const [formIngredients, setFormIngredients] = useState<Ingredient[]>([]);
 
-  // Formulario Comentarios
+  // Comentarios
   const [userName, setUserName] = useState('');
   const [newMessage, setNewMessage] = useState('');
 
-  // 1. Cargar Recetas iniciales
+  // 1. Monitorear Sesión de Usuario y Cargar Recetas
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) fetchUserProfile(currentUser.id);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        fetchUserProfile(currentUser.id);
+      } else {
+        setProfileUsername(null);
+      }
+    });
+
     fetchRecipes();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  const fetchRecipes = async () => {
-    const { data, error } = await supabase.from('recipes').select('*');
-    if (!error && data) {
-      setRecipes(data);
+  const fetchUserProfile = async (userId: string) => {
+    const { data } = await supabase.from('profiles').select('username').eq('id', userId).single();
+    if (data?.username) {
+      setProfileUsername(data.username);
+      setUserName(data.username);
     }
   };
 
-  // Abrir Modal de Nueva Receta
+  const fetchRecipes = async () => {
+    // Intenta traer las recetas junto a la tabla profiles
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*, profiles(username)')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error cargando recetas con profiles:', error.message);
+      // Fallback: Si falla la relación por permisos RLS, trae solo recetas
+      const { data: fallbackData } = await supabase
+        .from('recipes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (fallbackData) setRecipes(fallbackData as any);
+    } else if (data) {
+      setRecipes(data as any);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   const handleOpenNewRecipe = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setIsEditing(false);
     setSelectedRecipe(null);
     setFormRecipe(DEFAULT_FORM);
@@ -74,7 +129,6 @@ export default function Home() {
     setShowFormModal(true);
   };
 
-  // 2. Abrir Modal Detalles
   const handleOpenDetails = async (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setLoadingIngredients(true);
@@ -89,46 +143,50 @@ export default function Home() {
     setLoadingIngredients(false);
   };
 
-  // 3. Abrir Modal para Editar
   const handleStartEdit = async (recipe: Recipe) => {
+    if (!user || user.id !== recipe.user_id) {
+      alert(lang === 'ES' ? 'Solo el autor puede editar esta receta' : 'Only the author can edit this recipe');
+      return;
+    }
+
     setSelectedRecipe(null);
     setIsEditing(true);
 
-    const { data: fullRecipe } = await supabase
+    const { data: current } = await supabase
       .from('recipes')
       .select('*')
       .eq('id', recipe.id)
       .single();
 
-    const current = fullRecipe || recipe;
-
-    setFormRecipe({
-      id: current.id,
-      title_es: current.title_es || '',
-      title_en: current.title_en || '',
-      category: current.category || 'Main Dishes',
-      prep_time: Number(current.prep_time) || 15,
-      servings: Number(current.servings) || 2,
-      description_es: current.description_es || '',
-      description_en: current.description_en || '',
-      instructions_es: current.instructions_es || (current as any).instructions || '',
-      instructions_en: current.instructions_en || '',
-      youtube_url: current.youtube_url || '',
-      image_url: current.image_url || (current as any).image || '',
-      dietary_tags: current.dietary_tags || [],
-    });
+    if (current) {
+      setFormRecipe({
+        id: current.id,
+        user_id: current.user_id,
+        title_es: current.title_es || '',
+        title_en: current.title_en || '',
+        category: current.category || 'Main Dishes',
+        prep_time: Number(current.prep_time) || 15,
+        servings: Number(current.servings) || 2,
+        description_es: current.description_es || '',
+        description_en: current.description_en || '',
+        instructions_es: current.instructions_es || '',
+        youtube_url: current.youtube_url || '',
+        image_url: current.image_url || '',
+        dietary_tags: current.dietary_tags || [],
+      });
+    }
 
     const { data: ingData } = await supabase.from('ingredients').select('*').eq('recipe_id', recipe.id);
     setFormIngredients(ingData || []);
     setShowFormModal(true);
   };
 
-  // 4. Crear o Guardar Cambios (Payload limpio estricto)
   const handleSubmitRecipe = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
 
-    // Construimos solo las columnas estándar de tu tabla en Supabase
-    const payload: Record<string, any> = {
+    const payload = {
+      user_id: user.id,
       title_es: formRecipe.title_es?.trim() || '',
       title_en: formRecipe.title_en?.trim() || formRecipe.title_es?.trim() || '',
       category: formRecipe.category || 'Main Dishes',
@@ -145,39 +203,28 @@ export default function Home() {
     let targetRecipeId = formRecipe.id;
 
     if (isEditing && targetRecipeId) {
-      const { error } = await supabase
-        .from('recipes')
-        .update(payload)
-        .eq('id', targetRecipeId);
-
+      const { error } = await supabase.from('recipes').update(payload).eq('id', targetRecipeId);
       if (error) {
-        alert(`Error al actualizar: ${error.message}`);
+        alert(`Error: ${error.message}`);
         return;
       }
     } else {
-      const { data, error } = await supabase
-        .from('recipes')
-        .insert([payload])
-        .select();
-
+      const { data, error } = await supabase.from('recipes').insert([payload]).select();
       if (error || !data || !data[0]) {
-        alert(`Error al crear: ${error?.message || 'Error desconocido'}`);
+        alert(`Error: ${error?.message || 'Error guardando'}`);
         return;
       }
       targetRecipeId = data[0].id;
     }
 
-    // Actualización de Ingredientes
     if (targetRecipeId) {
       await supabase.from('ingredients').delete().eq('recipe_id', targetRecipeId);
-
       if (formIngredients.length > 0) {
         const ingredientsToInsert = formIngredients.map((ing) => ({
           name_es: ing.name_es,
           name_en: ing.name_en || ing.name_es,
           amount: Number(ing.amount) || 0,
           unit: ing.unit || 'g',
-          aisle: ing.aisle || 'General',
           recipe_id: targetRecipeId,
         }));
         await supabase.from('ingredients').insert(ingredientsToInsert);
@@ -188,21 +235,31 @@ export default function Home() {
     fetchRecipes();
   };
 
-  // 5. Eliminar Receta
   const handleDeleteRecipe = async (recipeId: string) => {
+    if (!user) return;
     if (!confirm(lang === 'ES' ? '¿Eliminar receta?' : 'Delete recipe?')) return;
-    await supabase.from('recipes').delete().eq('id', recipeId);
+    const { error } = await supabase.from('recipes').delete().eq('id', recipeId);
+    if (error) {
+      alert(error.message);
+      return;
+    }
     setSelectedRecipe(null);
     fetchRecipes();
   };
 
-  // 6. Agregar Comentario
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRecipe || !newMessage.trim() || !userName.trim()) return;
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (!selectedRecipe || !newMessage.trim()) return;
+
+    const authorName = profileUsername || userName || 'Anónimo';
+
     const { data, error } = await supabase
       .from('comments')
-      .insert([{ recipe_id: selectedRecipe.id, user_name: userName, message: newMessage }])
+      .insert([{ recipe_id: selectedRecipe.id, user_name: authorName, message: newMessage }])
       .select();
 
     if (!error && data) {
@@ -211,8 +268,11 @@ export default function Home() {
     }
   };
 
-  // 7. Menú y Lista de compras
   const toggleMenuRecipe = (recipeId: string) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (selectedMenuIds.includes(recipeId)) {
       setSelectedMenuIds(selectedMenuIds.filter((id) => id !== recipeId));
     } else {
@@ -221,6 +281,10 @@ export default function Home() {
   };
 
   const handleOpenShoppingList = async () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (selectedMenuIds.length === 0) return;
     const { data } = await supabase.from('ingredients').select('*').in('recipe_id', selectedMenuIds);
 
@@ -239,7 +303,6 @@ export default function Home() {
     setShowShoppingModal(true);
   };
 
-  // Filtrado
   const filteredRecipes = recipes.filter((r) => {
     const title = lang === 'ES' ? r.title_es : (r.title_en || r.title_es);
     const matchesSearch = title?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -252,6 +315,10 @@ export default function Home() {
       <Header
         lang={lang}
         setLang={setLang}
+        user={user}
+        profileUsername={profileUsername}
+        onOpenAuth={() => setShowAuthModal(true)}
+        onSignOut={handleSignOut}
         onOpenNewRecipe={handleOpenNewRecipe}
         selectedCount={selectedMenuIds.length}
         onOpenShoppingList={handleOpenShoppingList}
@@ -272,8 +339,10 @@ export default function Home() {
             recipe={recipe}
             lang={lang}
             isSelected={selectedMenuIds.includes(recipe.id)}
+            user={user}
             onOpenDetails={handleOpenDetails}
             onToggleMenu={toggleMenuRecipe}
+            onOpenAuth={() => setShowAuthModal(true)}
           />
         ))}
       </section>
@@ -289,10 +358,12 @@ export default function Home() {
           setUserName={setUserName}
           newMessage={newMessage}
           setNewMessage={setNewMessage}
+          user={user}
           onClose={() => setSelectedRecipe(null)}
-          onEdit={handleStartEdit}
-          onDelete={handleDeleteRecipe}
+          onEdit={() => handleStartEdit(selectedRecipe)}
+          onDelete={() => handleDeleteRecipe(selectedRecipe.id)}
           onAddComment={handleAddComment}
+          onOpenAuth={() => setShowAuthModal(true)}
         />
       )}
 
@@ -321,6 +392,8 @@ export default function Home() {
           }}
         />
       )}
+
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </main>
   );
 }

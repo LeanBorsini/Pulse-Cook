@@ -2,6 +2,7 @@
 
 import { X, Clock, Users, Edit, Trash2, Video, MessageSquare, Send } from 'lucide-react';
 import { Recipe, Ingredient } from '../types';
+import { User } from '@supabase/supabase-js';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -13,10 +14,12 @@ interface RecipeDetailModalProps {
   newMessage?: string;
   setNewMessage?: (val: string) => void;
   lang: 'ES' | 'EN';
+  user: User | null;
   onClose: () => void;
   onEdit: (recipe: Recipe) => void;
   onDelete: (id: string) => void;
   onAddComment?: (e: React.FormEvent) => void;
+  onOpenAuth: () => void;
 }
 
 export function RecipeDetailModal({
@@ -29,10 +32,12 @@ export function RecipeDetailModal({
   newMessage = '',
   setNewMessage,
   lang,
+  user,
   onClose,
   onEdit,
   onDelete,
   onAddComment,
+  onOpenAuth,
 }: RecipeDetailModalProps) {
   const getEmbedYoutubeUrl = (url?: string) => {
     if (!url) return null;
@@ -49,6 +54,9 @@ export function RecipeDetailModal({
   // Buscar las instrucciones en cualquier propiedad posible
   const instructionsText = recipe.instructions_es || (recipe as any).instructions || recipe.instructions_en;
 
+  // Verificar si el usuario actual es el autor de la receta
+  const isOwner = user && recipe.user_id === user.id;
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-[#F7F5EC] border border-[#D8D3C4]/80 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -61,7 +69,6 @@ export function RecipeDetailModal({
               alt={recipe.title_es || 'Receta'}
               className="w-full h-full object-cover"
               onError={(e) => {
-                // Si la imagen falla al cargar (URL rota), ocultar el contenedor
                 (e.target as HTMLElement).parentElement!.style.display = 'none';
               }}
             />
@@ -70,25 +77,35 @@ export function RecipeDetailModal({
 
         {/* Encabezado con botones alineados */}
         <div className="flex items-start justify-between gap-4 mb-3">
-          <h2 className="text-2xl font-serif font-bold text-[#2C3523]">
-            {lang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es}
-          </h2>
+          <div>
+            <h2 className="text-2xl font-serif font-bold text-[#2C3523]">
+              {lang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es}
+            </h2>
+            <p className="text-xs text-stone-500 font-medium mt-0.5">
+              by @{recipe.profiles?.username || 'comunidad'}
+            </p>
+          </div>
           
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              onClick={() => onEdit(recipe)}
-              title="Editar"
-              className="p-1.5 rounded-lg bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => onDelete(recipe.id)}
-              title="Eliminar"
-              className="p-1.5 rounded-lg bg-red-100 border border-red-300 text-red-700 hover:bg-red-200 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {/* Solo se muestran Editar y Eliminar si el usuario es el creador */}
+            {isOwner && (
+              <>
+                <button
+                  onClick={() => onEdit(recipe)}
+                  title="Editar"
+                  className="p-1.5 rounded-lg bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => onDelete(recipe.id)}
+                  title="Eliminar"
+                  className="p-1.5 rounded-lg bg-red-100 border border-red-300 text-red-700 hover:bg-red-200 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </>
+            )}
             <button
               onClick={onClose}
               title="Cerrar"
@@ -158,7 +175,7 @@ export function RecipeDetailModal({
           )}
         </div>
 
-        {/* Instrucciones Garantizadas */}
+        {/* Instrucciones */}
         {instructionsText ? (
           <div className="mb-5 border-t border-[#D8D3C4] pt-4">
             <h3 className="font-serif font-bold text-[#2C3523] mb-2 text-xs">
@@ -179,23 +196,15 @@ export function RecipeDetailModal({
           </div>
         )}
 
-        {/* Comentarios */}
-        {onAddComment && (
-          <div className="border-t border-[#D8D3C4] pt-4">
-            <h3 className="font-serif font-bold text-[#2C3523] mb-3 text-xs flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5" />
-              {lang === 'ES' ? 'Comentarios' : 'Comments'}
-            </h3>
+        {/* Sección Comentarios */}
+        <div className="border-t border-[#D8D3C4] pt-4">
+          <h3 className="font-serif font-bold text-[#2C3523] mb-3 text-xs flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5" />
+            {lang === 'ES' ? 'Comentarios' : 'Comments'}
+          </h3>
 
+          {user ? (
             <form onSubmit={onAddComment} className="space-y-2 mb-4">
-              <input
-                type="text"
-                placeholder={lang === 'ES' ? 'Tu nombre' : 'Your name'}
-                value={userName}
-                onChange={(e) => setUserName && setUserName(e.target.value)}
-                required
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] px-3 py-1.5 rounded-lg text-xs outline-none"
-              />
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -213,17 +222,24 @@ export function RecipeDetailModal({
                 </button>
               </div>
             </form>
-
-            <div className="space-y-2 max-h-36 overflow-y-auto">
-              {comments.map((c, i) => (
-                <div key={i} className="bg-[#EFECE1]/60 p-2.5 rounded-lg border border-[#D8D3C4] text-xs">
-                  <span className="font-bold text-[#2C3523]">{c.user_name || 'Anónimo'}: </span>
-                  <span className="text-[#5C6650]">{c.message}</span>
-                </div>
-              ))}
+          ) : (
+            <div className="mb-4 p-3 bg-[#EFECE1]/80 rounded-lg text-center text-xs text-stone-600 border border-[#D8D3C4]">
+              <button onClick={onOpenAuth} className="font-bold text-[#2C3523] underline">
+                {lang === 'ES' ? 'Inicia sesión' : 'Sign in'}
+              </button> {lang === 'ES' ? 'para dejar un comentario.' : 'to leave a comment.'}
             </div>
+          )}
+
+          <div className="space-y-2 max-h-36 overflow-y-auto">
+            {comments.map((c, i) => (
+              <div key={i} className="bg-[#EFECE1]/60 p-2.5 rounded-lg border border-[#D8D3C4] text-xs">
+                <span className="font-bold text-[#2C3523]">{c.user_name || 'Anónimo'}: </span>
+                <span className="text-[#5C6650]">{c.message}</span>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+
       </div>
     </div>
   );
