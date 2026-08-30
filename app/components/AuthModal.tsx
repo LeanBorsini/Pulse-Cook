@@ -24,22 +24,32 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setLoading(true);
     setErrorMsg('');
 
-    // Al usar signUp con un password temporal o signInWithOtp sin redirección,
-    // se fuerza a Supabase a generar el código de 6 dígitos para verificar el correo.
-    const { error } = await supabase.auth.signInWithOtp({
+    // Usar signUp con contraseña aleatoria para obligar a Supabase a enviar el token/código OTP de confirmación
+    const dummyPassword = `P_${Math.random().toString(36).slice(-8)}!1A`;
+
+    const { error } = await supabase.auth.signUp({
       email: email.trim(),
-      options: {
-        shouldCreateUser: true,
-        // Al NO enviar emailRedirectTo, Supabase prioriza el código OTP de 6 dígitos
-      },
+      password: dummyPassword,
     });
 
-    setLoading(false);
-    if (error) {
+    // Si el usuario ya existe, recurrimos a signInWithOtp
+    if (error && error.message.includes('already registered')) {
+      const { error: otpError } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+      });
+      if (otpError) {
+        setLoading(false);
+        setErrorMsg(otpError.message);
+        return;
+      }
+    } else if (error) {
+      setLoading(false);
       setErrorMsg(error.message);
-    } else {
-      setStep('otp');
+      return;
     }
+
+    setLoading(false);
+    setStep('otp');
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -47,19 +57,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setLoading(true);
     setErrorMsg('');
 
-    // Probamos primero con el tipo 'email' (OTP de inicio de sesión)
+    // Intentar verificar con el tipo 'signup'
     let { data, error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: otpToken.trim(),
-      type: 'email',
+      type: 'signup',
     });
 
-    // Si falla, probamos con 'signup' por si el usuario se está registrando por primera vez
+    // Fallback: Si el usuario ya existía, verificar como 'email'
     if (error) {
       const fallback = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otpToken.trim(),
-        type: 'signup',
+        type: 'email',
       });
       data = fallback.data;
       error = fallback.error;
@@ -71,7 +81,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       return;
     }
 
-    // Comprobar si el usuario ya tiene perfil registrado
+    // Comprobar si el usuario ya tiene perfil
     const { data: existingProfile } = await supabase
       .from('profiles')
       .select('username')
@@ -79,7 +89,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
       .single();
 
     if (!existingProfile?.username) {
-      // Es usuario nuevo: guardar el alias permanentemente
       const alias = username.trim() || email.split('@')[0];
       await supabase.from('profiles').upsert({
         id: data.user.id,
@@ -143,13 +152,12 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         {step === 'otp' && (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <p className="text-sm text-stone-600">Enviamos un código de 6 dígitos a <strong>{email}</strong>.</p>
+            <p className="text-sm text-stone-600">Enviamos un código a <strong>{email}</strong>.</p>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Código de 6 dígitos</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-1">Código de verificación</label>
               <input
                 type="text"
                 placeholder="123456"
-                maxLength={6}
                 value={otpToken}
                 onChange={(e) => setOtpToken(e.target.value)}
                 className="w-full p-2.5 rounded-lg border border-stone-300 bg-white text-center text-xl tracking-widest font-mono"
