@@ -6,6 +6,7 @@ import { Ingredient, Recipe } from '../types';
 import { supabase } from '../../lib/supabase';
 import { SAMPLE_INGREDIENTS } from '../../lib/sampleData';
 import { translateIngredientName } from '../../lib/culinaryDictionary';
+import { consolidateIngredients, CATEGORY_NAMES, ConsolidatedItem } from '../../lib/groceryConsolidator';
 import { ShoppingListPrintView } from './ShoppingListPrintView';
 
 interface ShoppingListModalProps {
@@ -83,13 +84,25 @@ export function ShoppingListModal({
     setCheckedMap((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Group ingredients by aisle
-  const groupedByAisle = items.reduce<Record<string, Ingredient[]>>((acc, item) => {
-    const aisle = item.aisle || (lang === 'ES' ? 'General' : 'General');
-    if (!acc[aisle]) acc[aisle] = [];
-    acc[aisle].push(item);
-    return acc;
-  }, {});
+  // Group ingredients by aisle using the intelligent consolidator
+  const consolidated = consolidateIngredients(items, recipes, lang);
+  
+  // Transform the new consolidated structure into the expected format for rendering
+  const groupedByAisle: Record<string, { amount: number; unit: string; name_es: string; name_en: string; aisle: string; recipes?: string[] }[]> = {};
+  
+  Object.entries(consolidated).forEach(([catKey, catItems]) => {
+    if (catItems.length > 0) {
+      const categoryName = CATEGORY_NAMES[catKey as keyof typeof CATEGORY_NAMES][lang.toLowerCase() as 'es' | 'en'];
+      groupedByAisle[categoryName] = catItems.map(item => ({
+        amount: item.amount,
+        unit: item.unit,
+        name_es: item.name_es,
+        name_en: item.name_en,
+        aisle: categoryName,
+        recipes: item.recipes
+      }));
+    }
+  });
 
   const selectedRecipes = recipes.filter((r) => selectedRecipeIds.includes(r.id));
   const selectedRecipesNames = selectedRecipes.map((r) =>
@@ -128,7 +141,7 @@ export function ShoppingListModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:block print:static print:bg-transparent print:p-0">
       {/* Vista Exclusiva de Impresión */}
       <ShoppingListPrintView
         selectedRecipes={selectedRecipes}

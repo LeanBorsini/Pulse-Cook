@@ -194,8 +194,8 @@ create policy "Users can update or delete their own recipe images."
 
 ### ✅ Fase 7: Estabilidad, Offline Fallbacks y Consolidación (COMPLETADA)
 - [x] **Manejo de Errores y Fallbacks (`chefRemyOffline.ts`, `recipeTranslator.ts`)**:
-  - Sistema de respaldo local inteligente en caso de que falte la API Key de Gemini o se alcance el límite de cuotas.
-  - El Chef Remy devuelve recetas de contingencia pre-calculadas y sustitutos comunes para que la UI no se bloquee.
+  - Sistema de respaldo local inteligente en caso de que falte la API Key de Gemini, se alcance el límite de cuotas, o **existan picos de demanda (Error 503)**.
+  - El motor captura los fallos de la API silenciosamente y el Chef Remy devuelve recetas de contingencia pre-calculadas o sustitutos para evitar que la UI se rompa mostrando un JSON de error crudo.
   - Traducción por diccionario Regex offline como respaldo al traductor IA.
 - [x] **Lista de Compras Robusta (`groceryConsolidator.ts`)**:
   - Corrección de tipado (`Ingredient`) y lógica para extraer y consolidar correctamente los ingredientes de las recetas pasadas al modal.

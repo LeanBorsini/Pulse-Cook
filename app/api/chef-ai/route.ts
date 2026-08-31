@@ -22,8 +22,61 @@ function checkRateLimit(identifier: string): boolean {
   return true;
 }
 
+function getFallbackResponse(mode: string, missingIngredient: string, lang: 'ES'|'EN', ingredients: string | string[], servings: string, timeLimit: string, dietaryPreference: string) {
+  const isEs = lang === 'ES';
+  if (mode === 'substitute') {
+    const fallback = generateRemyFallbackSubstitute(missingIngredient || '', lang);
+    return NextResponse.json({
+      type: 'substitute',
+      data: {
+        substitutions: [
+          {
+            name: fallback.substitute,
+            ratio: fallback.ratio,
+            notes: fallback.explanation,
+            bestFor: isEs ? 'Cocina diaria y repostería' : 'Daily cooking & baking',
+          },
+        ],
+        chefTip: isEs
+          ? 'Prueba siempre una pequeña porción antes de hornear o servir.'
+          : 'Always taste-test a small batch before serving.',
+      },
+    });
+  }
+
+  const ingArr = Array.isArray(ingredients) ? ingredients : [ingredients || 'ingredientes'];
+  const fallbackRecipe = generateRemyFallbackRecipe(ingArr, Number(servings) || 2, Number(timeLimit) || 30, dietaryPreference, lang);
+
+  return NextResponse.json({
+    type: 'fridge',
+    data: {
+      recipes: [
+        {
+          title: fallbackRecipe.title,
+          description: fallbackRecipe.description,
+          prepTime: fallbackRecipe.prepTime,
+          difficulty: isEs ? 'Fácil' : 'Easy',
+          usedIngredients: ingArr,
+          extraPantryItems: [isEs ? 'Aceite de oliva' : 'Olive oil', isEs ? 'Sal y pimienta' : 'Salt & pepper'],
+          ingredientsList: fallbackRecipe.ingredients.map((ing) => ({
+            name: isEs ? ing.name_es : ing.name_en,
+            amount: ing.amount,
+            unit: ing.unit,
+          })),
+          steps: fallbackRecipe.instructions,
+          dietaryTags: fallbackRecipe.dietaryTags,
+          chefAdvice: fallbackRecipe.chefTip,
+        },
+      ],
+    },
+  });
+}
+
 export async function POST(req: NextRequest) {
+  let requestParams: any = {};
+  
   try {
+    requestParams = await req.json();
     const {
       mode, // 'fridge' | 'substitute' | 'pairing'
       ingredients,
@@ -34,7 +87,7 @@ export async function POST(req: NextRequest) {
       targetDish,
       lang = 'ES',
       userId = 'guest',
-    } = await req.json();
+    } = requestParams;
 
     // 1. Verificar Rate Limit para no saturar la cuota gratuita
     const clientIp = req.headers.get('x-forwarded-for') || userId || 'anon';
@@ -55,52 +108,7 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      if (mode === 'substitute') {
-        const fallback = generateRemyFallbackSubstitute(missingIngredient || '', lang);
-        return NextResponse.json({
-          type: 'substitute',
-          data: {
-            substitutions: [
-              {
-                name: fallback.substitute,
-                ratio: fallback.ratio,
-                notes: fallback.explanation,
-                bestFor: isEs ? 'Cocina diaria y repostería' : 'Daily cooking & baking',
-              },
-            ],
-            chefTip: isEs
-              ? 'Prueba siempre una pequeña porción antes de hornear o servir.'
-              : 'Always taste-test a small batch before serving.',
-          },
-        });
-      }
-
-      const ingArr = Array.isArray(ingredients) ? ingredients : [ingredients || 'ingredientes'];
-      const fallbackRecipe = generateRemyFallbackRecipe(ingArr, servings, timeLimit, dietaryPreference, lang);
-
-      return NextResponse.json({
-        type: 'fridge',
-        data: {
-          recipes: [
-            {
-              title: fallbackRecipe.title,
-              description: fallbackRecipe.description,
-              prepTime: fallbackRecipe.prepTime,
-              difficulty: isEs ? 'Fácil' : 'Easy',
-              usedIngredients: ingArr,
-              extraPantryItems: [isEs ? 'Aceite de oliva' : 'Olive oil', isEs ? 'Sal y pimienta' : 'Salt & pepper'],
-              ingredientsList: fallbackRecipe.ingredients.map((ing) => ({
-                name: isEs ? ing.name_es : ing.name_en,
-                amount: ing.amount,
-                unit: ing.unit,
-              })),
-              steps: fallbackRecipe.instructions,
-              dietaryTags: fallbackRecipe.dietaryTags,
-              chefAdvice: fallbackRecipe.chefTip,
-            },
-          ],
-        },
-      });
+      return getFallbackResponse(mode, missingIngredient, lang, ingredients, servings, timeLimit, dietaryPreference);
     }
 
     const ai = new GoogleGenAI({
@@ -240,10 +248,27 @@ For each recipe, provide full details so the user could directly save it or cook
     const parsed = JSON.parse(response.text || '{}');
     return NextResponse.json({ type: 'fridge', data: parsed });
   } catch (error: unknown) {
-    console.error('[Pulse&Cook] Chef AI API error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error generating recipes from Chef AI' },
-      { status: 500 }
+    console.error('[Pulse&Cook] Chef AI API error, using fallback:', error);
+    
+    // Instead of failing and showing the ugly 503 JSON, we use the fallback engine!
+    const {
+      mode,
+      ingredients,
+      servings,
+      dietaryPreference,
+      timeLimit,
+      missingIngredient,
+      lang = 'ES',
+    } = requestParams || {};
+
+    return getFallbackResponse(
+      mode || 'fridge', 
+      missingIngredient || '', 
+      lang, 
+      ingredients || [], 
+      servings || '', 
+      timeLimit || '', 
+      dietaryPreference || ''
     );
   }
 }

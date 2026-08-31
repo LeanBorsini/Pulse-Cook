@@ -4,6 +4,7 @@ import React from 'react';
 import { Recipe, Ingredient } from '../types';
 import { RemyIcon } from './RemyIcon';
 import { translateIngredientName } from '../../lib/culinaryDictionary';
+import { consolidateIngredients, CATEGORY_NAMES } from '../../lib/groceryConsolidator';
 
 interface ShoppingListPrintViewProps {
   selectedRecipes: Recipe[];
@@ -18,24 +19,17 @@ export function ShoppingListPrintView({
 }: ShoppingListPrintViewProps) {
   const isEs = lang === 'ES';
 
-  // Consolidar ingredientes con la misma unidad y nombre
-  const consolidated = items.reduce<Record<string, { amount: number; unit: string; name_es: string; name_en: string; aisle?: string }>>((acc, item) => {
-    const key = `${(item.name_es || '').toLowerCase().trim()}_${(item.unit || '').toLowerCase().trim()}`;
-    if (!acc[key]) {
-      acc[key] = {
-        amount: Number(item.amount) || 0,
-        unit: item.unit || '',
-        name_es: item.name_es,
-        name_en: item.name_en || item.name_es,
-        aisle: item.aisle,
-      };
-    } else {
-      acc[key].amount += Number(item.amount) || 0;
-    }
-    return acc;
-  }, {});
-
-  const ingredientsList = Object.values(consolidated);
+  // Consolidar usando el motor inteligente
+  const consolidated = consolidateIngredients(items, selectedRecipes, lang);
+  
+  // Aplanar las categorías para la vista de cuadrícula en impresión, pero manteniendo un orden lógico
+  const ingredientsList = [
+    ...consolidated.produce,
+    ...consolidated.meat,
+    ...consolidated.dairy,
+    ...consolidated.pantry,
+    ...consolidated.other,
+  ];
 
   return (
     <div id="shopping-list-print-area" className="hidden print:block text-[#2C3523] bg-white p-6 max-w-[800px] mx-auto">

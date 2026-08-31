@@ -6,6 +6,7 @@ import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
 import { RecipePrintView } from './RecipePrintView';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
+import { translateTextSmart } from '../../lib/recipeTranslator';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -76,17 +77,19 @@ export function RecipeDetailModal({
   // Content text depending on language
   const displayedTitle =
     translatedContent?.title ||
-    (dynamicLang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es);
+    (dynamicLang === 'ES' ? recipe.title_es : recipe.title_en || translateTextSmart(recipe.title_es, 'ES', 'EN'));
 
   const displayedDesc =
     translatedContent?.description ||
-    (dynamicLang === 'ES' ? recipe.description_es : recipe.description_en || recipe.description_es);
+    (dynamicLang === 'ES' 
+      ? recipe.description_es 
+      : recipe.description_en || translateTextSmart(recipe.description_es, 'ES', 'EN'));
 
   const displayedInstructions =
     translatedContent?.instructions ||
     (dynamicLang === 'ES'
-      ? recipe.instructions_es || recipe.instructions_en
-      : recipe.instructions_en || recipe.instructions_es);
+      ? recipe.instructions_es || recipe.instructions_en || (recipe.instructions_en ? '' : recipe.instructions_es)
+      : recipe.instructions_en || translateTextSmart(recipe.instructions_es, 'ES', 'EN'));
 
   const handleInstantTranslate = async () => {
     const target = dynamicLang === 'ES' ? 'EN' : 'ES';
@@ -179,7 +182,7 @@ export function RecipeDetailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn print:block print:static print:bg-transparent print:p-0">
       {/* Vista Exclusiva para Impresión y PDF */}
       <RecipePrintView
         recipe={recipe}
