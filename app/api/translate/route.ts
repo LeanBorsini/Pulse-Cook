@@ -3,17 +3,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { translateTextSmart } from '@/lib/recipeTranslator';
 
 export async function POST(req: NextRequest) {
+  let title = '';
+  let description = '';
+  let instructions = '';
+  let sourceLang: 'ES' | 'EN' = 'ES';
+  let targetLang: 'ES' | 'EN' = 'EN';
+  let fallbackTitle = '';
+  let fallbackDesc = '';
+  let fallbackInst = '';
+
   try {
-    const { title, description, instructions, sourceLang, targetLang } = await req.json();
+    const body = await req.json();
+    title = body.title;
+    description = body.description;
+    instructions = body.instructions;
+    sourceLang = body.sourceLang;
+    targetLang = body.targetLang;
 
     if (!title && !description && !instructions) {
       return NextResponse.json({ error: 'No content provided to translate' }, { status: 400 });
     }
 
     const isTargetEn = targetLang === 'EN';
-    const fallbackTitle = translateTextSmart(title, sourceLang, targetLang);
-    const fallbackDesc = translateTextSmart(description, sourceLang, targetLang);
-    const fallbackInst = translateTextSmart(instructions, sourceLang, targetLang);
+    fallbackTitle = translateTextSmart(title, sourceLang, targetLang);
+    fallbackDesc = translateTextSmart(description, sourceLang, targetLang);
+    fallbackInst = translateTextSmart(instructions, sourceLang, targetLang);
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {

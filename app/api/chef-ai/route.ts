@@ -112,9 +112,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const isEs = lang === 'ES';
-    const outputLanguage = isEs ? 'Spanish (Español)' : 'English';
-
     if (mode === 'substitute') {
       // Modo Sustitución de Ingredientes
       const prompt = `You are an expert culinary chef. The user wants to replace an ingredient in a dish.

@@ -1,4 +1,4 @@
-import { Recipe } from '../types';
+import { Recipe, Ingredient } from '../app/types';
 import { translateIngredientName } from './culinaryDictionary';
 
 export interface ConsolidatedItem {
@@ -85,38 +85,45 @@ export function detectAisle(name: string): 'produce' | 'meat' | 'dairy' | 'pantr
 
 // Consolidación y suma matemática de ingredientes
 export function consolidateIngredients(
+  items: Ingredient[],
   recipes: Recipe[],
   lang: 'ES' | 'EN' = 'ES'
 ): Record<'produce' | 'meat' | 'dairy' | 'pantry' | 'other', ConsolidatedItem[]> {
   const map: Record<string, ConsolidatedItem> = {};
 
-  recipes.forEach((recipe) => {
-    const recipeTitle = lang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es;
-    const ingredients = recipe.ingredients || [];
+  const recipeMap = new Map(recipes.map(r => [r.id, r]));
 
-    ingredients.forEach((ing) => {
-      const key = normalizeIngredientKey(ing.name_es || ing.name_en || '');
-      const parsedAmount = Number(ing.amount) || 0;
-      const unit = ing.unit ? ing.unit.trim() : '';
+  items.forEach((ing: Ingredient) => {
+    const recipe = ing.recipe_id ? recipeMap.get(ing.recipe_id) : undefined;
+    const recipeTitle = recipe 
+      ? (lang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es)
+      : 'General';
 
-      if (!map[key]) {
-        map[key] = {
-          key,
-          name_es: ing.name_es || ing.name_en,
-          name_en: ing.name_en || ing.name_es,
-          amount: parsedAmount,
-          unit: unit,
-          category: detectAisle(ing.name_es || ing.name_en),
-          recipes: [recipeTitle],
-        };
-      } else {
-        // Sumar si la unidad coincide o si no hay unidad
-        map[key].amount += parsedAmount;
-        if (!map[key].recipes.includes(recipeTitle)) {
-          map[key].recipes.push(recipeTitle);
-        }
+    const nameEs = ing.name_es || '';
+    const nameEn = ing.name_en || '';
+    const nameToUse = nameEs || nameEn || '';
+    
+    const key = normalizeIngredientKey(nameToUse);
+    const parsedAmount = Number(ing.amount) || 0;
+    const unit = ing.unit ? ing.unit.trim() : '';
+
+    if (!map[key]) {
+      map[key] = {
+        key,
+        name_es: nameEs || nameEn,
+        name_en: nameEn || nameEs,
+        amount: parsedAmount,
+        unit: unit,
+        category: detectAisle(nameToUse),
+        recipes: [recipeTitle],
+      };
+    } else {
+      // Sumar si la unidad coincide o si no hay unidad
+      map[key].amount += parsedAmount;
+      if (!map[key].recipes.includes(recipeTitle)) {
+        map[key].recipes.push(recipeTitle);
       }
-    });
+    }
   });
 
   // Agrupar por categoría
