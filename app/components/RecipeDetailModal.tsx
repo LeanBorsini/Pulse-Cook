@@ -5,6 +5,7 @@ import { X, Clock, Users, Edit, Trash2, Video, MessageSquare, Send, Sparkles, Lo
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
 import { RecipePrintView } from './RecipePrintView';
+import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -369,7 +370,7 @@ export function RecipeDetailModal({
                 key={tag}
                 className="text-[10px] bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] px-2.5 py-0.5 rounded-full font-medium"
               >
-                {tag}
+                {translateTag(tag, dynamicLang)}
               </span>
             ))}
           </div>
@@ -441,7 +442,7 @@ export function RecipeDetailModal({
             <ul className="list-disc list-inside space-y-1 text-xs text-[#2C3523]">
               {ingredients.map((ing, i) => (
                 <li key={i}>
-                  <span className="font-semibold">{ing.amount} {ing.unit}</span> - {lang === 'ES' ? ing.name_es : ing.name_en || ing.name_es}
+                  <span className="font-semibold">{ing.amount} {ing.unit}</span> - {translateIngredientName(ing.name_es, ing.name_en, dynamicLang)}
                 </li>
               ))}
             </ul>

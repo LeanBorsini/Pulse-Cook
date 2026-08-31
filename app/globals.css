@@ -14,3 +14,31 @@ body {
   color: #2C3523 !important;
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif !important;
 }
+
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+  
+  html, body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  header, footer, nav, button {
+    display: none !important;
+  }
+
+  #recipe-print-area, #shopping-list-print-area {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+}

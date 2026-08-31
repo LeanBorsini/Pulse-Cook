@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Check, ShoppingCart, Loader2 } from 'lucide-react';
+import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle } from 'lucide-react';
 import { Ingredient, Recipe } from '../types';
 import { supabase } from '../../lib/supabase';
 import { SAMPLE_INGREDIENTS } from '../../lib/sampleData';
+import { translateIngredientName } from '../../lib/culinaryDictionary';
+import { ShoppingListPrintView } from './ShoppingListPrintView';
 
 interface ShoppingListModalProps {
   lang: 'ES' | 'EN';
@@ -89,13 +91,52 @@ export function ShoppingListModal({
     return acc;
   }, {});
 
-  const selectedRecipesNames = recipes
-    .filter((r) => selectedRecipeIds.includes(r.id))
-    .map((r) => (lang === 'ES' ? r.title_es : r.title_en || r.title_es));
+  const selectedRecipes = recipes.filter((r) => selectedRecipeIds.includes(r.id));
+  const selectedRecipesNames = selectedRecipes.map((r) =>
+    lang === 'ES' ? r.title_es : r.title_en || r.title_es
+  );
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleWhatsAppShare = () => {
+    const isEs = lang === 'ES';
+    let message = isEs
+      ? `🛒 *LISTA DE COMPRAS - Pulse & Cook*\n\n`
+      : `🛒 *GROCERY SHOPPING LIST - Pulse & Cook*\n\n`;
+
+    if (selectedRecipesNames.length > 0) {
+      message += isEs ? `📋 *Recetas Seleccionadas:*\n` : `📋 *Selected Recipes:*\n`;
+      selectedRecipesNames.forEach((name) => {
+        message += `• ${name}\n`;
+      });
+      message += `\n`;
+    }
+
+    message += isEs ? `🥬 *Ingredientes Necesarios:*\n` : `🥬 *Required Ingredients:*\n`;
+    items.forEach((item) => {
+      const ingName = translateIngredientName(item.name_es, item.name_en, lang);
+      const amountStr = item.amount > 0 ? `${Number(item.amount)} ${item.unit || ''} ` : '';
+      message += `▫️ ${amountStr}${ingName}\n`;
+    });
+
+    message += `\n👨‍🍳 *Pulse & Cook* • _«Cualquiera puede cocinar»_`;
+
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank');
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-[#F7F5EC] border border-[#D8D3C4]/80 rounded-2xl max-w-lg w-full p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative max-h-[90vh] overflow-y-auto">
+      {/* Vista Exclusiva de Impresión */}
+      <ShoppingListPrintView
+        selectedRecipes={selectedRecipes}
+        items={items}
+        lang={lang}
+      />
+
+      <div className="bg-[#F7F5EC] border border-[#D8D3C4]/80 rounded-2xl max-w-lg w-full p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative max-h-[90vh] overflow-y-auto print:hidden">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1 rounded-full text-[#2C3523] hover:bg-[#EFECE1] transition-colors"
@@ -104,17 +145,41 @@ export function ShoppingListModal({
           <X className="w-6 h-6" />
         </button>
 
-        <div className="flex items-center gap-2 mb-1">
-          <ShoppingCart className="w-6 h-6 text-[#2C3523]" />
-          <h2 className="text-2xl font-serif font-bold text-[#2C3523]">
-            {lang === 'ES' ? 'Lista de Compras' : 'Shopping List'}
-          </h2>
+        <div className="flex items-center justify-between mb-1 pr-8">
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="w-6 h-6 text-[#2C3523]" />
+            <h2 className="text-2xl font-serif font-bold text-[#2C3523]">
+              {lang === 'ES' ? 'Lista de Compras' : 'Shopping List'}
+            </h2>
+          </div>
         </div>
         <p className="text-xs text-[#5C6650] mb-4">
           {lang === 'ES'
             ? 'Ingredientes consolidados para tus recetas seleccionadas'
             : 'Consolidated ingredients for your selected recipes'}
         </p>
+
+        {/* Botones de acción rápida: WhatsApp y PDF */}
+        {items.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={handleWhatsAppShare}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+              title={lang === 'ES' ? 'Enviar por WhatsApp' : 'Send via WhatsApp'}
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>{lang === 'ES' ? 'WhatsApp' : 'WhatsApp'}</span>
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#EFECE1] hover:bg-[#E2DEC2] text-[#2C3523] border border-[#D8D3C4] rounded-xl text-xs font-bold transition-all shadow-xs"
+              title={lang === 'ES' ? 'Imprimir o Guardar en PDF' : 'Print or Save as PDF'}
+            >
+              <Printer className="w-4 h-4 text-[#425035]" />
+              <span>{lang === 'ES' ? 'Imprimir / PDF' : 'Print / PDF'}</span>
+            </button>
+          </div>
+        )}
 
         {selectedRecipesNames.length > 0 && (
           <div className="mb-4 p-2.5 bg-[#EFECE1] rounded-xl border border-[#D8D3C4] text-xs text-[#5C6650]">
