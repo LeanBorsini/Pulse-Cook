@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
+import { generateRemyFallbackRecipe, generateRemyFallbackSubstitute } from '@/lib/chefRemyOffline';
 
 // Rate limiting simple en memoria por IP/User (máx 10 peticiones cada 5 minutos)
 const rateLimitMap = new Map<string, { count: number; expiresAt: number }>();
@@ -49,12 +50,57 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isEs = lang === 'ES';
+    const outputLanguage = isEs ? 'Spanish (Español)' : 'English';
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'Gemini API key is not configured' },
-        { status: 500 }
-      );
+      if (mode === 'substitute') {
+        const fallback = generateRemyFallbackSubstitute(missingIngredient || '', lang);
+        return NextResponse.json({
+          type: 'substitute',
+          data: {
+            substitutions: [
+              {
+                name: fallback.substitute,
+                ratio: fallback.ratio,
+                notes: fallback.explanation,
+                bestFor: isEs ? 'Cocina diaria y repostería' : 'Daily cooking & baking',
+              },
+            ],
+            chefTip: isEs
+              ? 'Prueba siempre una pequeña porción antes de hornear o servir.'
+              : 'Always taste-test a small batch before serving.',
+          },
+        });
+      }
+
+      const ingArr = Array.isArray(ingredients) ? ingredients : [ingredients || 'ingredientes'];
+      const fallbackRecipe = generateRemyFallbackRecipe(ingArr, servings, timeLimit, dietaryPreference, lang);
+
+      return NextResponse.json({
+        type: 'fridge',
+        data: {
+          recipes: [
+            {
+              title: fallbackRecipe.title,
+              description: fallbackRecipe.description,
+              prepTime: fallbackRecipe.prepTime,
+              difficulty: isEs ? 'Fácil' : 'Easy',
+              usedIngredients: ingArr,
+              extraPantryItems: [isEs ? 'Aceite de oliva' : 'Olive oil', isEs ? 'Sal y pimienta' : 'Salt & pepper'],
+              ingredientsList: fallbackRecipe.ingredients.map((ing) => ({
+                name: isEs ? ing.name_es : ing.name_en,
+                amount: ing.amount,
+                unit: ing.unit,
+              })),
+              steps: fallbackRecipe.instructions,
+              dietaryTags: fallbackRecipe.dietaryTags,
+              chefAdvice: fallbackRecipe.chefTip,
+            },
+          ],
+        },
+      });
     }
 
     const ai = new GoogleGenAI({
