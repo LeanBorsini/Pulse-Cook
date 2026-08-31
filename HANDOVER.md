@@ -180,3 +180,14 @@ create policy "Users can update or delete their own recipe images."
   - Búsqueda culinaria de sustitutos ante ingredientes faltantes (ej. qué usar si no tengo huevos, polvo de hornear o crema) con ratios de conversión exactos y consejos del chef.
 - [x] **Acceso Directo**: Botón destacado **Chef IA** integrado en la cabecera principal (`Header.tsx`).
 
+---
+
+### ✅ Fase 6: Exportación a PDF & Compartir Recetas (COMPLETADA)
+- [x] **Ficha Imprimible y Exportación a PDF (`RecipePrintView.tsx`)**:
+  - Diseño gourmet limpio y corporativo (*Pulse & Cook • Anyone can cook!*) adaptado para tamaño de hoja A4 y Carta.
+  - Sello e icono del Chef Remy, tabla de ingredientes con cantidades escaladas según las porciones calculadas, casillas de verificación e instrucciones paso a paso numeradas.
+  - Estilos CSS `@media print` dedicados para ocultar botones o fondos de UI innecesarios al imprimir.
+- [x] **Compartir Recetas en Redes y WhatsApp**:
+  - Botón integrado en `RecipeDetailModal.tsx` con integración a `navigator.share` y copia formateada automática para WhatsApp o mensajería.
+
+

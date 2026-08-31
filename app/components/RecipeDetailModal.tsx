@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Clock, Users, Edit, Trash2, Video, MessageSquare, Send, Sparkles, Loader2, Star } from 'lucide-react';
+import { X, Clock, Users, Edit, Trash2, Video, MessageSquare, Send, Sparkles, Loader2, Star, Printer, Share2, Check } from 'lucide-react';
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
+import { RecipePrintView } from './RecipePrintView';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -133,6 +134,39 @@ export function RecipeDetailModal({
   const authorName = recipe.profiles?.username || 'leanBorsini';
   const isOwner = user && (recipe.user_id === user.id || recipe.user_id === null || !recipe.user_id);
 
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: `${displayedTitle} - Pulse & Cook`,
+      text: `${displayedTitle} - ${displayedDesc || '¡Mira esta deliciosa receta en Pulse & Cook!'}`,
+      url: window.location.href,
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch {
+        // User cancelled or fallback to clipboard
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        `🍽️ *${displayedTitle}* (Pulse & Cook)\n⏱️ ${recipe.prep_time || 15} min | 👥 ${recipe.servings || 1} porciones\n\n${displayedDesc || ''}\n\n👉 Mira la receta completa aquí: ${window.location.href}`
+      );
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    } catch {
+      // Fallback
+    }
+  };
+
   const handleStarClick = (starValue: number) => {
     if (!user) {
       onOpenAuth();
@@ -145,7 +179,16 @@ export function RecipeDetailModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-      <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-[#2C3523]">
+      {/* Vista Exclusiva para Impresión y PDF */}
+      <RecipePrintView
+        recipe={recipe}
+        lang={dynamicLang}
+        servings={recipe.servings || 1}
+        ingredients={ingredients}
+        currentImage={currentImage}
+      />
+
+      <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-[#2C3523] print:hidden">
         
         {/* Renderizado de Galería de Imágenes */}
         {recipeImages.length > 0 && currentImage && (
@@ -219,6 +262,26 @@ export function RecipeDetailModal({
           </div>
           
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Botón Compartir / WhatsApp */}
+            <button
+              onClick={handleShare}
+              title={lang === 'ES' ? 'Compartir receta' : 'Share recipe'}
+              className="p-1.5 px-2 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold"
+            >
+              {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
+              <span className="hidden sm:inline">{copiedLink ? (lang === 'ES' ? '¡Copiado!' : 'Copied!') : (lang === 'ES' ? 'Compartir' : 'Share')}</span>
+            </button>
+
+            {/* Botón Imprimir / PDF */}
+            <button
+              onClick={handlePrint}
+              title={lang === 'ES' ? 'Imprimir / Guardar en PDF' : 'Print / Save as PDF'}
+              className="p-1.5 px-2 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold"
+            >
+              <Printer className="w-4 h-4 text-[#425035]" />
+              <span className="hidden sm:inline">{lang === 'ES' ? 'PDF' : 'PDF'}</span>
+            </button>
+
             {isOwner && (
               <>
                 <button
