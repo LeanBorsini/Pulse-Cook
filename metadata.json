@@ -1,0 +1,6 @@
+{
+  "name": "Pulse&Cook",
+  "description": "Personal & family recipe book with weekly meal planning and shopping list manager",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

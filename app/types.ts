@@ -4,6 +4,30 @@ export interface Profile {
   avatar_url?: string;
 }
 
+export interface VideoLink {
+  id: string;
+  title: string;
+  url: string;
+}
+
+export interface Rating {
+  id: string;
+  recipe_id: string;
+  user_id: string;
+  stars: number; // 1 to 5
+  created_at?: string;
+}
+
+export interface Comment {
+  id: string;
+  recipe_id: string;
+  user_id?: string;
+  user_name: string;
+  avatar_url?: string;
+  message: string;
+  created_at: string;
+}
+
 export interface Recipe {
   id: string;
   user_id?: string;
@@ -18,8 +42,13 @@ export interface Recipe {
   instructions_es?: string;
   instructions_en?: string;
   youtube_url?: string;
+  video_links?: VideoLink[];
   image_url?: string;
+  images?: string[];
   dietary_tags: string[];
+  avg_rating?: number;
+  ratings_count?: number;
+  user_rating?: number; // Calificación dada por el usuario actual
   created_at?: string;
 }
 
@@ -31,12 +60,4 @@ export interface Ingredient {
   amount: number;
   unit: string;
   aisle?: string;
-}
-
-export interface Comment {
-  id: string;
-  recipe_id: string;
-  user_name: string;
-  message: string;
-  created_at: string;
 }
