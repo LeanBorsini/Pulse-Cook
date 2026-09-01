@@ -22,7 +22,15 @@ function checkRateLimit(identifier: string): boolean {
   return true;
 }
 
-function getFallbackResponse(mode: string, missingIngredient: string, lang: 'ES'|'EN', ingredients: string | string[], servings: string, timeLimit: string, dietaryPreference: string) {
+function getFallbackResponse(
+  mode?: string,
+  missingIngredient?: string,
+  lang: 'ES' | 'EN' = 'ES',
+  ingredients?: string | string[],
+  servings?: number | string,
+  timeLimit?: number | string,
+  dietaryPreference?: string
+) {
   const isEs = lang === 'ES';
   if (mode === 'substitute') {
     const fallback = generateRemyFallbackSubstitute(missingIngredient || '', lang);
@@ -72,11 +80,23 @@ function getFallbackResponse(mode: string, missingIngredient: string, lang: 'ES'
   });
 }
 
+interface ChefAIRequestParams {
+  mode?: 'fridge' | 'substitute' | 'pairing';
+  ingredients?: string[];
+  servings?: number;
+  dietaryPreference?: string;
+  timeLimit?: number;
+  missingIngredient?: string;
+  targetDish?: string;
+  lang?: 'ES' | 'EN';
+  userId?: string;
+}
+
 export async function POST(req: NextRequest) {
-  let requestParams: any = {};
+  let requestParams: ChefAIRequestParams = {};
   
   try {
-    requestParams = await req.json();
+    requestParams = (await req.json()) as ChefAIRequestParams;
     const {
       mode, // 'fridge' | 'substitute' | 'pairing'
       ingredients,

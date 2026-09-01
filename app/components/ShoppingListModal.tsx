@@ -6,7 +6,7 @@ import { Ingredient, Recipe } from '../types';
 import { supabase } from '../../lib/supabase';
 import { SAMPLE_INGREDIENTS } from '../../lib/sampleData';
 import { translateIngredientName } from '../../lib/culinaryDictionary';
-import { consolidateIngredients, CATEGORY_NAMES, ConsolidatedItem } from '../../lib/groceryConsolidator';
+import { consolidateIngredients, CATEGORY_NAMES } from '../../lib/groceryConsolidator';
 import { ShoppingListPrintView } from './ShoppingListPrintView';
 
 interface ShoppingListModalProps {
@@ -128,10 +128,14 @@ export function ShoppingListModal({
     }
 
     message += isEs ? `🥬 *Ingredientes Necesarios:*\n` : `🥬 *Required Ingredients:*\n`;
-    items.forEach((item) => {
-      const ingName = translateIngredientName(item.name_es, item.name_en, lang);
-      const amountStr = item.amount > 0 ? `${Number(item.amount)} ${item.unit || ''} ` : '';
-      message += `▫️ ${amountStr}${ingName}\n`;
+    
+    Object.entries(groupedByAisle).forEach(([aisleName, aisleItems]) => {
+      message += `\n*${aisleName}*\n`;
+      aisleItems.forEach((item) => {
+        const ingName = translateIngredientName(item.name_es, item.name_en, lang);
+        const amountStr = item.amount > 0 ? `${Number(item.amount.toFixed(2))} ${item.unit || ''} ` : '';
+        message += `▫️ ${amountStr}${ingName}\n`;
+      });
     });
 
     message += `\n👨‍🍳 *Pulse & Cook* • _«Cualquiera puede cocinar»_`;
@@ -227,6 +231,7 @@ export function ShoppingListModal({
                   {aisleItems.map((item, idx) => {
                     const itemKey = `${aisle}-${idx}-${item.name_es}`;
                     const isChecked = !!checkedMap[itemKey];
+                    const ingName = translateIngredientName(item.name_es, item.name_en, lang);
 
                     return (
                       <li
@@ -247,11 +252,11 @@ export function ShoppingListModal({
                             {isChecked && <Check className="w-3 h-3" />}
                           </div>
                           <span className={`font-medium ${isChecked ? 'text-stone-500' : 'text-[#2C3523]'}`}>
-                            {lang === 'ES' ? item.name_es : item.name_en || item.name_es}
+                            {ingName}
                           </span>
                         </div>
-                        <span className="text-xs font-mono bg-[#D8D3C4] text-[#2C3523] px-2 py-0.5 rounded ml-2">
-                          {item.amount} {item.unit}
+                        <span className="text-xs font-bold bg-[#D8D3C4] text-[#2C3523] px-2.5 py-0.5 rounded-md ml-2 shrink-0">
+                          {item.amount > 0 ? `${Number(item.amount.toFixed(2))} ${item.unit || ''}`.trim() : item.unit || ''}
                         </span>
                       </li>
                     );

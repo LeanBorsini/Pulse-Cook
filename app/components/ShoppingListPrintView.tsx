@@ -4,7 +4,7 @@ import React from 'react';
 import { Recipe, Ingredient } from '../types';
 import { RemyIcon } from './RemyIcon';
 import { translateIngredientName } from '../../lib/culinaryDictionary';
-import { consolidateIngredients, CATEGORY_NAMES } from '../../lib/groceryConsolidator';
+import { consolidateIngredients } from '../../lib/groceryConsolidator';
 
 interface ShoppingListPrintViewProps {
   selectedRecipes: Recipe[];
