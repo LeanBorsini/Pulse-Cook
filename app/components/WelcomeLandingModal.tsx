@@ -86,7 +86,10 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
         cta: 'Start exploring recipes',
       };
 
-  const handleStart = () => {
+  const handleStart = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
     try {
       localStorage.setItem('pulse_cook_welcome_seen', 'true');
     } catch {
@@ -95,21 +98,31 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
     onClose();
   };
 
+  const toggleLang = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onLanguageChange(isEs ? 'en' : 'es');
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-fadeIn">
-      <div className="relative w-full max-w-2xl bg-[#FDFBF7] text-[#2C3523] rounded-2xl shadow-2xl border border-[#D8D3C4] overflow-hidden my-6">
-        
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+      onClick={handleStart}
+    >
+      <div 
+        className="relative w-full max-w-2xl bg-[#FDFBF7] text-[#2C3523] rounded-2xl shadow-2xl border border-[#D8D3C4] overflow-hidden my-6 select-none"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Barra superior con selector de idioma y cerrar */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#EFECE1] bg-[#FAF8F2]">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onLanguageChange(isEs ? 'en' : 'es')}
+              onClick={toggleLang}
               className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-[#5C6650] bg-[#EFECE1] hover:bg-[#E5E0D0] rounded-full transition-colors cursor-pointer"
-              title={isEs ? 'Switch to English' : 'Cambiar a Español'}
+              title={isEs ? 'Cambiar a Inglés' : 'Switch to Spanish'}
             >
               <Globe2 className="w-3.5 h-3.5" />
-              <span>{isEs ? 'EN (English)' : 'ES (Español)'}</span>
+              <span>{isEs ? 'ES (Español) ➔ EN' : 'EN (English) ➔ ES'}</span>
             </button>
           </div>
           <button
