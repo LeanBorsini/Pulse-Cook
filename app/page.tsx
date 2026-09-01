@@ -14,6 +14,7 @@ import { ShoppingListModal } from './components/ShoppingListModal';
 import { AuthModal } from './components/AuthModal';
 import { UsernameSetupModal } from './components/UsernameSetupModal';
 import ChefAssistantModal from './components/ChefAssistantModal';
+import { WelcomeLandingModal } from './components/WelcomeLandingModal';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown } from 'lucide-react';
 
 interface SupabaseRecipeRow {
@@ -72,6 +73,16 @@ export default function Home() {
   const [showChefAI, setShowChefAI] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showUsernameSetup, setShowUsernameSetup] = useState<boolean>(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('pulse_cook_welcome_seen') !== 'true';
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
 
   // Active Recipe Details (Ingredients & Comments)
   const [activeIngredients, setActiveIngredients] = useState<Ingredient[]>([]);
@@ -521,6 +532,7 @@ export default function Home() {
         selectedCount={selectedRecipeIds.length}
         onOpenShoppingList={() => setShowShoppingList(true)}
         onOpenChefAI={() => setShowChefAI(true)}
+        onOpenWelcome={() => setShowWelcomeModal(true)}
       />
 
       {/* Buscador & Etiquetas Gastronómicas */}
@@ -727,6 +739,14 @@ export default function Home() {
           }}
         />
       )}
+
+      {/* Modal / Pantalla de Bienvenida y Landing Guía */}
+      <WelcomeLandingModal
+        isOpen={showWelcomeModal}
+        onClose={() => setShowWelcomeModal(false)}
+        lang={lang === 'ES' ? 'es' : 'en'}
+        onLanguageChange={(newLang) => handleSetLang(newLang === 'es' ? 'ES' : 'EN')}
+      />
     </main>
   );
 }

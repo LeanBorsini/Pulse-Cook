@@ -1,7 +1,7 @@
 'use client';
 
 import { User } from '@supabase/supabase-js';
-import { LogOut, Plus, ShoppingCart, Globe, UserCheck } from 'lucide-react';
+import { LogOut, Plus, ShoppingCart, Globe, UserCheck, HelpCircle } from 'lucide-react';
 import { RemyIcon } from './RemyIcon';
 
 interface HeaderProps {
@@ -15,6 +15,7 @@ interface HeaderProps {
   selectedCount: number;
   onOpenShoppingList: () => void;
   onOpenChefAI: () => void;
+  onOpenWelcome?: () => void;
 }
 
 export function Header({
@@ -28,6 +29,7 @@ export function Header({
   selectedCount,
   onOpenShoppingList,
   onOpenChefAI,
+  onOpenWelcome,
 }: HeaderProps) {
   const displayAlias = profileUsername || (user?.email ? user.email.split('@')[0] : 'chef');
 
@@ -45,6 +47,18 @@ export function Header({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        {/* Botón de Ayuda / Info de la App */}
+        {onOpenWelcome && (
+          <button
+            onClick={onOpenWelcome}
+            className="flex items-center gap-1 px-2.5 py-2 border border-[#D8D3C4] rounded-xl text-xs font-semibold text-[#5C6650] bg-[#EFECE1] hover:bg-[#E2DEC2] transition-colors"
+            title={lang === 'ES' ? '¿Cómo funciona Pulse & Cook?' : 'How Pulse & Cook works'}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{lang === 'ES' ? 'Guía' : 'Guide'}</span>
+          </button>
+        )}
+
         {/* Selector de Idioma */}
         <button
           onClick={() => setLang(lang === 'ES' ? 'EN' : 'ES')}

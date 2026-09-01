@@ -1,11 +1,23 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Recipe, VideoLink } from '../types';
 import { User } from '@supabase/supabase-js';
+import { Recipe, VideoLink } from '../types';
+import {
+  X,
+  Plus,
+  Trash2,
+  Sparkles,
+  Loader2,
+  Image as ImageIcon,
+  Link,
+  Video,
+  UploadCloud,
+  Check,
+  Globe,
+} from 'lucide-react';
 import { uploadRecipeImage } from '@/lib/storage';
-import { Sparkles, Loader2, Plus, Trash2, Video, X, Upload, Image as ImageIcon, Star, Link } from 'lucide-react';
 
 interface RecipeFormModalProps {
   recipeToEdit?: Recipe | null;
@@ -16,15 +28,18 @@ interface RecipeFormModalProps {
 }
 
 const COMMON_TAGS = [
-  'Sin Gluten',
-  'Sin Lácteos',
   'Vegetariano',
   'Vegano',
-  'Sin Frutos Secos',
-  'Keto / Low Carb',
-  'Rápido (<20m)',
-  'Postre',
-  'Almuerzo / Cena',
+  'Sin Gluten',
+  'Keto',
+  'Bajo en Carbohidratos',
+  'Rápido (<30min)',
+  'Fácil',
+  'Repostería',
+  'Pasta',
+  'Carne',
+  'Pescado',
+  'Saludable',
 ];
 
 export function RecipeFormModal({
@@ -34,121 +49,71 @@ export function RecipeFormModal({
   onClose,
   onSuccess,
 }: RecipeFormModalProps) {
-  const [titleEs, setTitleEs] = useState(recipeToEdit?.title_es || '');
-  const [titleEn, setTitleEn] = useState(recipeToEdit?.title_en || '');
+  const isEs = lang === 'ES';
+
+  // Identificar el idioma inicial en el que se redactará la receta
+  const [formInputLang, setFormInputLang] = useState<'ES' | 'EN'>(lang);
+
+  // Un solo campo de texto principal espacioso para el usuario
+  const [title, setTitle] = useState(() => {
+    if (!recipeToEdit) return '';
+    return isEs
+      ? recipeToEdit.title_es || recipeToEdit.title_en || ''
+      : recipeToEdit.title_en || recipeToEdit.title_es || '';
+  });
+
+  const [description, setDescription] = useState(() => {
+    if (!recipeToEdit) return '';
+    return isEs
+      ? recipeToEdit.description_es || recipeToEdit.description_en || ''
+      : recipeToEdit.description_en || recipeToEdit.description_es || '';
+  });
+
+  const [instructions, setInstructions] = useState(() => {
+    if (!recipeToEdit) return '';
+    return isEs
+      ? recipeToEdit.instructions_es || recipeToEdit.instructions_en || ''
+      : recipeToEdit.instructions_en || recipeToEdit.instructions_es || '';
+  });
+
+  // Campos complementarios
   const [category, setCategory] = useState(recipeToEdit?.category || 'General');
-  const [prepTime, setPrepTime] = useState(recipeToEdit?.prep_time || 15);
-  const [servings, setServings] = useState(recipeToEdit?.servings || 1);
-  const [descEs, setDescEs] = useState(recipeToEdit?.description_es || '');
-  const [descEn, setDescEn] = useState(recipeToEdit?.description_en || '');
-  const [instEs, setInstEs] = useState(recipeToEdit?.instructions_es || '');
-  const [instEn, setInstEn] = useState(recipeToEdit?.instructions_en || '');
+  const [prepTime, setPrepTime] = useState<number>(recipeToEdit?.prep_time || 25);
+  const [servings, setServings] = useState<number>(recipeToEdit?.servings || 4);
 
-  // Manejo de Imágenes (Límite máximo 3)
-  const initialImages: string[] =
-    recipeToEdit?.images && recipeToEdit.images.length > 0
-      ? recipeToEdit.images
-      : recipeToEdit?.image_url
-      ? [recipeToEdit.image_url]
-      : [];
+  // Imágenes (hasta 3 fotos)
+  const [images, setImages] = useState<string[]>(() => {
+    if (recipeToEdit?.images && recipeToEdit.images.length > 0) {
+      return recipeToEdit.images;
+    }
+    if (recipeToEdit?.image_url && recipeToEdit.image_url.trim() !== '') {
+      return [recipeToEdit.image_url];
+    }
+    return [];
+  });
+  const [customImageUrl, setCustomImageUrl] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [images, setImages] = useState<string[]>(initialImages);
-  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
-  const [customImageUrl, setCustomImageUrl] = useState<string>('');
-  const [showUrlInput, setShowUrlInput] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Manejo de múltiples videos
-  const initialVideos: VideoLink[] =
+  // Videos
+  const [videos, setVideos] = useState<VideoLink[]>(
     recipeToEdit?.video_links && recipeToEdit.video_links.length > 0
       ? recipeToEdit.video_links
       : recipeToEdit?.youtube_url
-      ? [{ id: '1', title: 'Video Tutorial', url: recipeToEdit.youtube_url }]
-      : [];
+      ? [{ id: '1', title: 'Video', url: recipeToEdit.youtube_url }]
+      : []
+  );
 
-  const [videos, setVideos] = useState<VideoLink[]>(initialVideos);
-
-  // Manejo de etiquetas gastronómicas dinámicas
+  // Etiquetas
   const [selectedTags, setSelectedTags] = useState<string[]>(recipeToEdit?.dietary_tags || []);
   const [customTagInput, setCustomTagInput] = useState('');
 
-  // Estados de IA y guardado
-  const [translating, setTranslating] = useState(false);
-  const [translationSuccess, setTranslationSuccess] = useState(false);
+  // Estados de guardado y auto-traducción en segundo plano
   const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // Auto-traducción inteligente con Gemini
-  const handleAutoTranslate = async (source: 'ES' | 'EN') => {
-    const isSourceEs = source === 'ES';
-    const sourceTitle = isSourceEs ? titleEs : titleEn;
-    const sourceDesc = isSourceEs ? descEs : descEn;
-    const sourceInst = isSourceEs ? instEs : instEn;
-
-    if (!sourceTitle && !sourceDesc && !sourceInst) {
-      alert(
-        lang === 'ES'
-          ? 'Por favor escribe al menos el título o las instrucciones antes de traducir.'
-          : 'Please write at least the title or instructions before translating.'
-      );
-      return;
-    }
-
-    setTranslating(true);
-    setTranslationSuccess(false);
-
-    try {
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: sourceTitle,
-          description: sourceDesc,
-          instructions: sourceInst,
-          sourceLang: isSourceEs ? 'ES' : 'EN',
-          targetLang: isSourceEs ? 'EN' : 'ES',
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok && data) {
-        if (isSourceEs) {
-          if (data.translatedTitle) setTitleEn(data.translatedTitle);
-          if (data.translatedDescription) setDescEn(data.translatedDescription);
-          if (data.translatedInstructions) setInstEn(data.translatedInstructions);
-        } else {
-          if (data.translatedTitle) setTitleEs(data.translatedTitle);
-          if (data.translatedDescription) setDescEs(data.translatedDescription);
-          if (data.translatedInstructions) setInstEs(data.translatedInstructions);
-        }
-
-        // Si la IA sugiere tags no incluidos, agregarlos opcionalmente
-        if (data.suggestedTags && Array.isArray(data.suggestedTags)) {
-          setSelectedTags((prev) => {
-            const combined = [...prev];
-            data.suggestedTags.forEach((tag: string) => {
-              if (tag && !combined.includes(tag) && combined.length < 8) {
-                combined.push(tag);
-              }
-            });
-            return combined;
-          });
-        }
-
-        setTranslationSuccess(true);
-        setTimeout(() => setTranslationSuccess(false), 3000);
-      } else {
-        alert(data.error || 'Error en la traducción con IA');
-      }
-    } catch (err) {
-      console.error('Translation call failed:', err);
-      alert('No se pudo conectar con el servicio de traducción.');
-    } finally {
-      setTranslating(false);
-    }
-  };
-
-  // Video Management
+  // Videos Management
   const addVideoField = () => {
     setVideos((prev) => [
       ...prev,
@@ -183,20 +148,16 @@ export function RecipeFormModal({
     }
   };
 
-  const removeTag = (tag: string) => {
-    setSelectedTags((prev) => prev.filter((t) => t !== tag));
-  };
-
-  // Manejo de carga de fotos (Máximo 3 imágenes)
+  // Manejo de carga de imágenes
   const handleFilesSelected = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     const availableSlots = 3 - images.length;
     if (availableSlots <= 0) {
       alert(
-        lang === 'ES'
-          ? 'Límite alcanzado: Máximo 3 imágenes por receta para optimizar el rendimiento.'
-          : 'Limit reached: Maximum 3 images per recipe to keep the app lightweight.'
+        isEs
+          ? 'Límite alcanzado: Máximo 3 imágenes por receta.'
+          : 'Limit reached: Maximum 3 images per recipe.'
       );
       return;
     }
@@ -214,7 +175,7 @@ export function RecipeFormModal({
       setImages((prev) => [...prev, ...validUrls].slice(0, 3));
     } catch (err) {
       console.warn('Error uploading files:', err);
-      alert(lang === 'ES' ? 'Error al subir una o más imágenes.' : 'Error uploading images.');
+      alert(isEs ? 'Error al subir una o más imágenes.' : 'Error uploading images.');
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) {
@@ -229,7 +190,7 @@ export function RecipeFormModal({
 
     if (images.length >= 3) {
       alert(
-        lang === 'ES'
+        isEs
           ? 'Límite alcanzado: Máximo 3 imágenes por receta.'
           : 'Limit reached: Maximum 3 images per recipe.'
       );
@@ -245,31 +206,99 @@ export function RecipeFormModal({
     setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  const handleSetCoverImage = (indexToCover: number) => {
-    if (indexToCover === 0) return;
-    setImages((prev) => {
-      const copy = [...prev];
-      const [selected] = copy.splice(indexToCover, 1);
-      return [selected, ...copy];
-    });
-  };
-
+  // Guardar receta con Auto-Traducción transparente en segundo plano
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!title.trim()) {
+      alert(isEs ? 'Por favor introduce un título para la receta.' : 'Please provide a recipe title.');
+      return;
+    }
+
     setSaving(true);
+    setStatusMessage(isEs ? 'Sincronizando y auto-traduciendo receta...' : 'Syncing & auto-translating recipe...');
 
     const validVideos = videos.filter((v) => v.url.trim() !== '');
 
+    // Valores iniciales según el idioma en el que redactó el usuario
+    let title_es = formInputLang === 'ES' ? title : '';
+    let title_en = formInputLang === 'EN' ? title : '';
+    let desc_es = formInputLang === 'ES' ? description : '';
+    let desc_en = formInputLang === 'EN' ? description : '';
+    let inst_es = formInputLang === 'ES' ? instructions : '';
+    let inst_en = formInputLang === 'EN' ? instructions : '';
+
+    // Llamada automática al motor Gemini para traducir el idioma faltante
+    try {
+      const sourceLang = formInputLang;
+      const targetLang = formInputLang === 'ES' ? 'EN' : 'ES';
+
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          instructions,
+          sourceLang,
+          targetLang,
+        }),
+      });
+
+      if (res.ok) {
+        const translated = await res.json();
+        if (sourceLang === 'ES') {
+          title_en = translated.translatedTitle || title;
+          desc_en = translated.translatedDescription || description;
+          inst_en = translated.translatedInstructions || instructions;
+        } else {
+          title_es = translated.translatedTitle || title;
+          desc_es = translated.translatedDescription || description;
+          inst_es = translated.translatedInstructions || instructions;
+        }
+
+        // Si la IA sugiere nuevas etiquetas que enriquezcan la receta
+        if (translated.suggestedTags && Array.isArray(translated.suggestedTags)) {
+          translated.suggestedTags.forEach((t: string) => {
+            if (t && !selectedTags.includes(t) && selectedTags.length < 8) {
+              selectedTags.push(t);
+            }
+          });
+        }
+      } else {
+        // Fallback: usar el mismo texto si la API de traducción no responde
+        if (sourceLang === 'ES') {
+          title_en = title;
+          desc_en = description;
+          inst_en = instructions;
+        } else {
+          title_es = title;
+          desc_es = description;
+          inst_es = instructions;
+        }
+      }
+    } catch (err) {
+      console.warn('Auto-translation failed during save, falling back to original text:', err);
+      if (formInputLang === 'ES') {
+        title_en = title;
+        desc_en = description;
+        inst_en = instructions;
+      } else {
+        title_es = title;
+        desc_es = description;
+        inst_es = instructions;
+      }
+    }
+
     const recipeData = {
-      title_es: titleEs,
-      title_en: titleEn || titleEs,
-      category,
-      prep_time: Number(prepTime),
-      servings: Number(servings),
-      description_es: descEs,
-      description_en: descEn || descEs,
-      instructions_es: instEs,
-      instructions_en: instEn || instEs,
+      title_es,
+      title_en,
+      category: category || 'General',
+      prep_time: Number(prepTime) || 20,
+      servings: Number(servings) || 4,
+      description_es: desc_es,
+      description_en: desc_en,
+      instructions_es: inst_es,
+      instructions_en: inst_en,
       image_url: images[0] || '',
       images: images,
       youtube_url: validVideos[0]?.url || '',
@@ -291,194 +320,169 @@ export function RecipeFormModal({
     }
 
     setSaving(false);
+    setStatusMessage(null);
+
     if (!error) {
       onSuccess();
     } else {
-      alert('Error guardando la receta: ' + error.message);
+      alert(isEs ? 'Error guardando la receta: ' + error.message : 'Error saving recipe: ' + error.message);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-      <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-[#2C3523]">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn overflow-y-auto">
+      <div className="bg-[#FDFBF7] border border-[#D8D3C4] rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl relative max-h-[92vh] overflow-y-auto text-[#2C3523] my-6">
+        
+        {/* Botón Cerrar */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-full text-[#5C6650] hover:bg-[#EFECE1] hover:text-[#2C3523] transition-colors"
-          title={lang === 'ES' ? 'Cerrar' : 'Close'}
+          disabled={saving}
+          className="absolute top-4 right-4 p-1.5 rounded-full text-[#737D67] hover:bg-[#EFECE1] hover:text-[#2C3523] transition-colors"
+          title={isEs ? 'Cerrar' : 'Close'}
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center justify-between gap-2 mb-4 border-b border-[#D8D3C4]/60 pb-3">
-          <h2 className="text-xl font-serif font-bold text-[#2C3523]">
-            {recipeToEdit
-              ? lang === 'ES' ? 'Editar Receta' : 'Edit Recipe'
-              : lang === 'ES' ? 'Crear Nueva Receta' : 'Create New Recipe'}
-          </h2>
-          
-          {/* Botón de Auto-traducción con IA */}
-          <button
-            type="button"
-            onClick={() => handleAutoTranslate(titleEs ? 'ES' : 'EN')}
-            disabled={translating}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2C3523] text-[#F7F5EC] text-xs font-semibold rounded-xl hover:bg-[#3D4932] disabled:opacity-50 transition-all shadow-sm"
-          >
-            {translating ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>{lang === 'ES' ? 'Traduciendo...' : 'Translating...'}</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>{lang === 'ES' ? 'Auto-Traducir con IA' : 'Auto-Translate with AI'}</span>
-              </>
-            )}
-          </button>
+        {/* Encabezado del Formulario */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-[#EFECE1] pb-3.5">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-serif font-bold text-[#2C3523]">
+              {recipeToEdit
+                ? isEs ? 'Editar Receta' : 'Edit Recipe'
+                : isEs ? 'Añadir Nueva Receta' : 'Add New Recipe'}
+            </h2>
+            <p className="text-xs text-[#737D67] mt-0.5">
+              {isEs
+                ? 'Escribe tu receta cómodamente. Se auto-traducirá en segundo plano al guardar.'
+                : 'Write your recipe easily. It will automatically translate in the background when saved.'}
+            </p>
+          </div>
+
+          {/* Selector de idioma de redacción */}
+          <div className="flex items-center gap-1.5 bg-[#EFECE1] px-2.5 py-1 rounded-xl border border-[#D8D3C4]">
+            <Globe className="w-3.5 h-3.5 text-[#5C6650]" />
+            <span className="text-[11px] font-bold text-[#5C6650]">
+              {isEs ? 'Redactando en:' : 'Writing in:'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setFormInputLang(formInputLang === 'ES' ? 'EN' : 'ES')}
+              className="text-[11px] font-bold text-[#2C3523] bg-white px-2 py-0.5 rounded-md shadow-2xs hover:bg-[#FAF8F5]"
+            >
+              {formInputLang === 'ES' ? 'Español (ES)' : 'English (EN)'}
+            </button>
+          </div>
         </div>
 
-        {translationSuccess && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-2.5 rounded-xl mb-4 font-medium flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-600" />
-            {lang === 'ES' ? '¡Traducción completada con éxito!' : 'Translation completed successfully!'}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs font-medium">
-          {/* Títulos bilingües */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Título en Español' : 'Title in Spanish'} *
-              </label>
-              <input
-                type="text"
-                required
-                value={titleEs}
-                onChange={(e) => setTitleEs(e.target.value)}
-                placeholder="Ej. Tarta de Manzana Casera"
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Título en Inglés (o autotraducir)' : 'Title in English'}
-              </label>
-              <input
-                type="text"
-                value={titleEn}
-                onChange={(e) => setTitleEn(e.target.value)}
-                placeholder="e.g. Homemade Apple Pie"
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* 1. TÍTULO UNIFICADO Y ESPACIOSO */}
+          <div>
+            <label className="block text-xs font-bold text-[#2C3523] mb-1.5">
+              {isEs ? 'Título de la receta' : 'Recipe Title'} *
+            </label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={
+                formInputLang === 'ES'
+                  ? 'Ej. Risotto cremoso de setas y parmesano'
+                  : 'e.g. Creamy Mushroom and Parmesan Risotto'
+              }
+              className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3.5 py-2.5 rounded-xl text-sm font-medium text-[#2C3523] placeholder-[#8C987E] outline-none focus:border-[#2C3523] focus:ring-1 focus:ring-[#2C3523] transition-all"
+            />
           </div>
 
-          {/* Categoría, Tiempo y Porciones */}
+          {/* 2. Categoría, Tiempo y Porciones */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Categoría' : 'Category'}
+              <label className="block text-xs font-bold text-[#2C3523] mb-1">
+                {isEs ? 'Categoría' : 'Category'}
               </label>
               <input
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ej. Postres, Pastas"
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all"
+                placeholder={isEs ? 'Ej. Pastas, Postres' : 'e.g. Pasta, Desserts'}
+                className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-2 rounded-xl text-xs font-medium outline-none focus:border-[#2C3523] transition-all"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Tiempo Prep (min)' : 'Prep Time (min)'}
+              <label className="block text-xs font-bold text-[#2C3523] mb-1">
+                {isEs ? 'Tiempo Prep (min)' : 'Prep Time (min)'}
               </label>
               <input
                 type="number"
                 min="1"
                 value={prepTime}
                 onChange={(e) => setPrepTime(Number(e.target.value))}
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all"
+                className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-2 rounded-xl text-xs font-medium outline-none focus:border-[#2C3523] transition-all"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Porciones' : 'Servings'}
+              <label className="block text-xs font-bold text-[#2C3523] mb-1">
+                {isEs ? 'Porciones' : 'Servings'}
               </label>
               <input
                 type="number"
                 min="1"
                 value={servings}
                 onChange={(e) => setServings(Number(e.target.value))}
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all"
+                className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-2 rounded-xl text-xs font-medium outline-none focus:border-[#2C3523] transition-all"
               />
             </div>
           </div>
 
-          {/* Descripciones Bilingües */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Descripción (Español)' : 'Description (Spanish)'}
-              </label>
-              <textarea
-                rows={2}
-                value={descEs}
-                onChange={(e) => setDescEs(e.target.value)}
-                placeholder="Breve reseña del plato..."
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Descripción (Inglés)' : 'Description (English)'}
-              </label>
-              <textarea
-                rows={2}
-                value={descEn}
-                onChange={(e) => setDescEn(e.target.value)}
-                placeholder="Short description in English..."
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all"
-              />
-            </div>
+          {/* 3. DESCRIPCIÓN UNIFICADA */}
+          <div>
+            <label className="block text-xs font-bold text-[#2C3523] mb-1.5">
+              {isEs ? 'Breve descripción o historia del plato' : 'Short description or story'}
+            </label>
+            <textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={
+                formInputLang === 'ES'
+                  ? 'Un clásico reconfortante ideal para cenas especiales...'
+                  : 'A comforting classic perfect for cozy dinner nights...'
+              }
+              className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3.5 py-2.5 rounded-xl text-xs font-medium text-[#2C3523] placeholder-[#8C987E] outline-none focus:border-[#2C3523] focus:ring-1 focus:ring-[#2C3523] transition-all"
+            />
           </div>
 
-          {/* Instrucciones Bilingües */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Paso a paso (Español)' : 'Step by step (Spanish)'}
-              </label>
-              <textarea
-                rows={4}
-                value={instEs}
-                onChange={(e) => setInstEs(e.target.value)}
-                placeholder="1. Mezclar los ingredientes...&#10;2. Hornear a 180°C..."
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all font-mono"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#2C3523] mb-1">
-                {lang === 'ES' ? 'Paso a paso (Inglés)' : 'Step by step (English)'}
-              </label>
-              <textarea
-                rows={4}
-                value={instEn}
-                onChange={(e) => setInstEn(e.target.value)}
-                placeholder="1. Mix the ingredients...&#10;2. Bake at 350°F..."
-                className="w-full bg-[#EFECE1] border border-[#D8D3C4] p-2.5 rounded-xl text-xs outline-none focus:border-[#2C3523] transition-all font-mono"
-              />
-            </div>
+          {/* 4. INSTRUCCIONES PASO A PASO UNIFICADAS Y AMPLIAS */}
+          <div>
+            <label className="block text-xs font-bold text-[#2C3523] mb-1.5 flex items-center justify-between">
+              <span>{isEs ? 'Instrucciones paso a paso' : 'Step-by-step Instructions'}</span>
+              <span className="text-[10px] font-normal text-[#737D67]">
+                {isEs ? 'Escribe los pasos numerados o con guiones' : 'Numbered steps or bullet points'}
+              </span>
+            </label>
+            <textarea
+              rows={5}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder={
+                formInputLang === 'ES'
+                  ? '1. En una sartén honda, dorar la cebolla y el ajo picados finamente con un chorrito de aceite de oliva.\n2. Añadir las setas laminadas y cocinar a fuego medio hasta que suelten su agua.\n3. Incorporar el arroz, tostar 1 minuto y verter el caldo poco a poco removiendo constantemente.\n4. Terminar con mantequilla y parmesano rallado.'
+                  : '1. In a deep pan, sauté finely chopped onion and garlic in olive oil until translucent.\n2. Add sliced mushrooms and cook over medium heat until golden.\n3. Add the rice, toast for 1 minute, then pour warm broth gradually while stirring.\n4. Finish with butter and freshly grated parmesan.'
+              }
+              className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3.5 py-2.5 rounded-xl text-xs font-mono text-[#2C3523] placeholder-[#8C987E] outline-none focus:border-[#2C3523] focus:ring-1 focus:ring-[#2C3523] transition-all leading-relaxed"
+            />
           </div>
 
-          {/* Gestor de Fotos de la Receta (Hasta 3 fotos) */}
-          <div className="bg-[#EFECE1]/60 p-3.5 rounded-xl border border-[#D8D3C4] space-y-3">
+          {/* 5. GESTOR DE FOTOS (Hasta 3 imágenes) */}
+          <div className="bg-[#FAF8F2] p-4 rounded-xl border border-[#E5DFD0] space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-[#2C3523] flex items-center gap-1.5">
                 <ImageIcon className="w-4 h-4 text-emerald-700" />
-                {lang === 'ES' ? 'Fotos de la Receta' : 'Recipe Photos'}
-                <span className="text-[11px] font-normal text-[#5C6650]">
-                  ({images.length}/3 {lang === 'ES' ? 'máx' : 'max'})
+                <span>{isEs ? 'Fotos de la Receta' : 'Recipe Photos'}</span>
+                <span className="text-[11px] font-normal text-[#737D67]">
+                  ({images.length}/3 {isEs ? 'máx' : 'max'})
                 </span>
               </label>
 
@@ -490,197 +494,138 @@ export function RecipeFormModal({
                     className="text-[11px] font-semibold text-[#5C6650] hover:text-[#2C3523] flex items-center gap-1"
                   >
                     <Link className="w-3 h-3" />
-                    {lang === 'ES' ? 'Por URL' : 'By URL'}
+                    {isEs ? 'Por URL' : 'By URL'}
                   </button>
                   <button
                     type="button"
                     disabled={uploadingImage}
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-[11px] font-semibold text-[#2C3523] hover:underline flex items-center gap-1 bg-[#F7F5EC] px-2.5 py-1 rounded-lg border border-[#D8D3C4]"
+                    className="text-[11px] font-semibold text-[#2C3523] flex items-center gap-1 bg-[#EFECE1] px-2.5 py-1 rounded-lg border border-[#D8D3C4] hover:bg-[#E5E0D0] transition-colors"
                   >
                     {uploadingImage ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Loader2 className="w-3 h-3 animate-spin text-emerald-700" />
                     ) : (
-                      <Upload className="w-3 h-3" />
+                      <UploadCloud className="w-3 h-3 text-emerald-700" />
                     )}
-                    {lang === 'ES' ? 'Subir Foto' : 'Upload Photo'}
+                    <span>{isEs ? 'Subir Foto' : 'Upload Photo'}</span>
                   </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleFilesSelected(e.target.files)}
+                  />
                 </div>
               )}
             </div>
 
-            {/* Input oculto para subir archivos */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFilesSelected(e.target.files)}
-            />
-
-            {/* Formulario desplegable para agregar por URL */}
+            {/* Input para URL manual */}
             {showUrlInput && images.length < 3 && (
-              <div className="flex gap-2 p-2 bg-[#F7F5EC] rounded-xl border border-[#D8D3C4] animate-fadeIn">
+              <div className="flex gap-2">
                 <input
                   type="url"
+                  placeholder="https://ejemplo.com/foto-receta.jpg"
                   value={customImageUrl}
                   onChange={(e) => setCustomImageUrl(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="flex-1 bg-transparent text-xs outline-none px-2"
+                  className="flex-1 bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-1.5 rounded-lg text-xs outline-none focus:border-[#2C3523]"
                 />
                 <button
                   type="button"
                   onClick={handleAddImageUrl}
-                  className="px-3 py-1 bg-[#2C3523] text-[#F7F5EC] text-xs font-semibold rounded-lg hover:bg-[#3D4932]"
+                  className="px-3 py-1.5 bg-[#2C3523] text-white rounded-lg text-xs font-semibold hover:bg-[#3D4932]"
                 >
-                  {lang === 'ES' ? 'Añadir' : 'Add'}
+                  {isEs ? 'Añadir' : 'Add'}
                 </button>
               </div>
             )}
 
-            {/* Galería de Miniaturas */}
-            {images.length > 0 ? (
+            {/* Galería de miniaturas */}
+            {images.length > 0 && (
               <div className="grid grid-cols-3 gap-2.5 pt-1">
-                {images.map((imgSrc, idx) => (
+                {images.map((img, idx) => (
                   <div
                     key={idx}
-                    className="relative group rounded-xl overflow-hidden border border-[#D8D3C4] bg-stone-200 aspect-video shadow-sm"
+                    className="relative group rounded-lg overflow-hidden border border-[#D8D3C4] aspect-video bg-[#EAE5D6]"
                   >
                     <img
-                      src={imgSrc}
+                      src={img}
                       alt={`Foto ${idx + 1}`}
                       className="w-full h-full object-cover"
                     />
-
-                    {/* Badge de Portada */}
-                    {idx === 0 ? (
-                      <div className="absolute top-1.5 left-1.5 bg-[#2C3523]/90 backdrop-blur-sm text-[#F7F5EC] text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
-                        <Star className="w-2.5 h-2.5 text-amber-300 fill-amber-300" />
-                        <span>{lang === 'ES' ? 'Portada' : 'Cover'}</span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleSetCoverImage(idx)}
-                        className="absolute top-1.5 left-1.5 bg-black/60 hover:bg-black/80 text-white text-[9px] font-medium px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                        title={lang === 'ES' ? 'Hacer foto principal' : 'Make cover'}
-                      >
-                        {lang === 'ES' ? 'Hacer Portada' : 'Make Cover'}
-                      </button>
+                    {idx === 0 && (
+                      <span className="absolute top-1 left-1 bg-[#2C3523] text-[#FDFBF7] text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                        {isEs ? 'Portada' : 'Cover'}
+                      </span>
                     )}
-
-                    {/* Botón para eliminar foto */}
                     <button
                       type="button"
                       onClick={() => handleRemoveImage(idx)}
-                      className="absolute top-1.5 right-1.5 bg-red-600/90 hover:bg-red-700 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                      title={lang === 'ES' ? 'Eliminar foto' : 'Delete photo'}
+                      className="absolute top-1 right-1 p-1 bg-red-600/90 text-white rounded-full opacity-90 hover:opacity-100 transition-opacity"
+                      title={isEs ? 'Eliminar foto' : 'Delete photo'}
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
-
-                {/* Slot para añadir más si hay espacio */}
-                {images.length < 3 && (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded-xl border-2 border-dashed border-[#D8D3C4] hover:border-[#2C3523] bg-[#F7F5EC]/60 hover:bg-[#F7F5EC] flex flex-col items-center justify-center p-2 cursor-pointer transition-colors aspect-video text-[#5C6650] hover:text-[#2C3523]"
-                  >
-                    {uploadingImage ? (
-                      <Loader2 className="w-4 h-4 animate-spin mb-1 text-[#2C3523]" />
-                    ) : (
-                      <Upload className="w-4 h-4 mb-1" />
-                    )}
-                    <span className="text-[10px] font-medium">
-                      {uploadingImage
-                        ? lang === 'ES' ? 'Subiendo...' : 'Uploading...'
-                        : lang === 'ES' ? '+ Añadir foto' : '+ Add photo'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  handleFilesSelected(e.dataTransfer.files);
-                }}
-                className="rounded-xl border-2 border-dashed border-[#D8D3C4] hover:border-[#2C3523] bg-[#F7F5EC] p-4 text-center cursor-pointer transition-colors"
-              >
-                <Upload className="w-6 h-6 text-[#5C6650] mx-auto mb-1.5" />
-                <p className="text-xs font-semibold text-[#2C3523]">
-                  {lang === 'ES' ? 'Haz clic o arrastra hasta 3 fotos aquí' : 'Click or drop up to 3 photos here'}
-                </p>
-                <p className="text-[11px] text-[#5C6650] mt-0.5">
-                  {lang === 'ES' ? 'JPG, PNG o WebP (Comprimidas automáticamente)' : 'JPG, PNG or WebP (Auto compressed)'}
-                </p>
               </div>
             )}
           </div>
 
-          {/* Múltiples Links de Video (YouTube / Tutoriales) */}
-          <div className="bg-[#EFECE1]/60 p-3.5 rounded-xl border border-[#D8D3C4]">
-            <div className="flex items-center justify-between mb-2">
+          {/* 6. Videos Multimedia */}
+          <div className="bg-[#FAF8F2] p-4 rounded-xl border border-[#E5DFD0] space-y-3">
+            <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-[#2C3523] flex items-center gap-1.5">
                 <Video className="w-4 h-4 text-red-600" />
-                {lang === 'ES' ? 'Videos & Tutoriales (Múltiples Enlaces)' : 'Videos & Tutorials (Multiple Links)'}
+                <span>{isEs ? 'Videos Culinarios' : 'Cooking Videos'}</span>
+                <span className="text-[11px] font-normal text-[#737D67]">
+                  (YouTube / Reels)
+                </span>
               </label>
               <button
                 type="button"
                 onClick={addVideoField}
-                className="text-[11px] font-semibold text-[#2C3523] hover:underline flex items-center gap-1"
+                className="text-[11px] font-semibold text-[#2C3523] flex items-center gap-1 bg-[#EFECE1] px-2.5 py-1 rounded-lg border border-[#D8D3C4] hover:bg-[#E5E0D0] transition-colors"
               >
                 <Plus className="w-3 h-3" />
-                {lang === 'ES' ? 'Añadir Video' : 'Add Video'}
+                <span>{isEs ? 'Añadir Video' : 'Add Video'}</span>
               </button>
             </div>
 
-            {videos.length === 0 ? (
-              <p className="text-[11px] text-[#5C6650] italic">
-                {lang === 'ES' ? 'Sin enlaces de video añadidos.' : 'No video links added.'}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {videos.map((vid) => (
-                  <div key={vid.id} className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={vid.title}
-                      onChange={(e) => updateVideoField(vid.id, 'title', e.target.value)}
-                      placeholder="Título del video (ej. Masa, Horneado)"
-                      className="w-1/3 bg-[#F7F5EC] border border-[#D8D3C4] p-2 rounded-lg text-xs"
-                    />
-                    <input
-                      type="url"
-                      value={vid.url}
-                      onChange={(e) => updateVideoField(vid.id, 'url', e.target.value)}
-                      placeholder="https://youtube.com/watch?v=..."
-                      className="flex-1 bg-[#F7F5EC] border border-[#D8D3C4] p-2 rounded-lg text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeVideoField(vid.id)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                      title={lang === 'ES' ? 'Eliminar enlace' : 'Delete link'}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+            {videos.map((vid) => (
+              <div key={vid.id} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder={isEs ? 'Título ej. Paso a Paso' : 'Title e.g. Step by Step'}
+                  value={vid.title}
+                  onChange={(e) => updateVideoField(vid.id, 'title', e.target.value)}
+                  className="w-1/3 bg-[#F4F1EA] border border-[#D8D3C4] px-2.5 py-1.5 rounded-lg text-xs outline-none"
+                />
+                <input
+                  type="url"
+                  placeholder="https://youtube.com/watch?v=..."
+                  value={vid.url}
+                  onChange={(e) => updateVideoField(vid.id, 'url', e.target.value)}
+                  className="flex-1 bg-[#F4F1EA] border border-[#D8D3C4] px-2.5 py-1.5 rounded-lg text-xs outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeVideoField(vid.id)}
+                  className="p-1.5 text-[#737D67] hover:text-red-700 rounded-lg hover:bg-red-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
-            )}
+            ))}
           </div>
 
-          {/* Etiquetas Gastronómicas Dinámicas */}
+          {/* 7. Etiquetas Gastronómicas */}
           <div>
-            <label className="block text-xs font-semibold text-[#2C3523] mb-1.5">
-              {lang === 'ES' ? 'Etiquetas Gastronómicas & Dietarias' : 'Dietary & Culinary Tags'}
+            <label className="block text-xs font-bold text-[#2C3523] mb-1.5">
+              {isEs ? 'Etiquetas Culinarias' : 'Dietary Tags & Filters'}
             </label>
-            <div className="flex flex-wrap gap-1.5 mb-2.5">
+            <div className="flex flex-wrap gap-1.5 mb-2">
               {COMMON_TAGS.map((tag) => {
                 const active = selectedTags.includes(tag);
                 return (
@@ -688,10 +633,10 @@ export function RecipeFormModal({
                     key={tag}
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors border ${
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-all ${
                       active
-                        ? 'bg-[#2C3523] text-[#F7F5EC] border-[#2C3523]'
-                        : 'bg-[#EFECE1] text-[#5C6650] border-[#D8D3C4] hover:bg-[#E2DEC2]'
+                        ? 'bg-[#2C3523] text-[#FDFBF7] border-[#2C3523]'
+                        : 'bg-[#F4F1EA] text-[#5C6650] border-[#D8D3C4] hover:bg-[#EAE5D6]'
                     }`}
                   >
                     {tag}
@@ -700,60 +645,59 @@ export function RecipeFormModal({
               })}
             </div>
 
-            {/* Tags seleccionados actuales y agregar personalizados */}
-            <div className="flex flex-wrap items-center gap-1.5 p-2 bg-[#EFECE1] border border-[#D8D3C4] rounded-xl">
-              {selectedTags.map((t) => (
-                <span
-                  key={t}
-                  className="bg-[#2C3523] text-[#F7F5EC] px-2.5 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1"
-                >
-                  {t}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    className="hover:text-amber-300 font-bold"
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              <div className="flex-1 min-w-[120px] flex items-center gap-1">
-                <input
-                  type="text"
-                  placeholder={lang === 'ES' ? 'Nuevo tag...' : 'New tag...'}
-                  value={customTagInput}
-                  onChange={(e) => setCustomTagInput(e.target.value)}
-                  onKeyDown={addCustomTag}
-                  className="w-full bg-transparent text-xs outline-none text-[#2C3523] px-1"
-                />
-                <button
-                  type="button"
-                  onClick={addCustomTag}
-                  className="px-2 py-0.5 bg-[#D8D3C4] hover:bg-[#C5BEAD] text-[#2C3523] rounded text-[10px] font-bold"
-                >
-                  +
-                </button>
-              </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customTagInput}
+                onChange={(e) => setCustomTagInput(e.target.value)}
+                onKeyDown={addCustomTag}
+                placeholder={isEs ? 'Añadir etiqueta personalizada...' : 'Add custom tag...'}
+                className="flex-1 bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-1.5 rounded-lg text-xs outline-none"
+              />
+              <button
+                type="button"
+                onClick={addCustomTag}
+                className="px-3 py-1.5 bg-[#EFECE1] hover:bg-[#E5E0D0] text-[#2C3523] font-semibold text-xs rounded-lg border border-[#D8D3C4]"
+              >
+                {isEs ? 'Añadir' : 'Add'}
+              </button>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-[#D8D3C4]/60 flex justify-end gap-2">
+          {/* Estado de carga durante el guardado */}
+          {statusMessage && (
+            <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold animate-pulse">
+              <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{statusMessage}</span>
+            </div>
+          )}
+
+          {/* Botones de acción finales */}
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EFECE1]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 bg-[#EFECE1] hover:bg-[#E2DEC2] text-[#2C3523] rounded-xl font-semibold text-xs border border-[#D8D3C4] transition-colors"
+              disabled={saving}
+              className="px-4 py-2 text-xs font-semibold text-[#5C6650] hover:text-[#2C3523] rounded-xl hover:bg-[#EFECE1] transition-colors"
             >
-              {lang === 'ES' ? 'Cancelar' : 'Cancel'}
+              {isEs ? 'Cancelar' : 'Cancel'}
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 bg-[#2C3523] text-[#F7F5EC] rounded-xl font-semibold text-xs hover:bg-[#3D4932] disabled:opacity-50 transition-all shadow-sm flex items-center gap-2"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#2C3523] hover:bg-[#3D4932] text-[#FDFBF7] font-semibold text-xs shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
             >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {saving
-                ? lang === 'ES' ? 'Guardando receta...' : 'Saving recipe...'
-                : lang === 'ES' ? 'Guardar Receta' : 'Save Recipe'}
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{isEs ? 'Guardando...' : 'Saving...'}</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>{isEs ? 'Guardar Receta' : 'Save Recipe'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

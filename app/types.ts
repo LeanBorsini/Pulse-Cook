@@ -1,3 +1,5 @@
+export type Language = 'es' | 'en' | 'ES' | 'EN';
+
 export interface Profile {
   id: string;
   username: string;

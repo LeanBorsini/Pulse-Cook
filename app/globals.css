@@ -15,6 +15,7 @@ body {
   font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif !important;
 }
 
+/* Reglas de Impresión y Generación de PDF Limpia */
 @media print {
   @page {
     margin: 1cm;
@@ -26,19 +27,39 @@ body {
     color: #000000 !important;
     height: auto !important;
     overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
-  header, footer, nav, button {
+  /* Ocultar toda la interfaz visual interactiva */
+  header, footer, nav, button, input, textarea, select, .no-print, [role="dialog"]:not(:has(#recipe-print-area)):not(:has(#shopping-list-print-area)) {
     display: none !important;
   }
 
-  #recipe-print-area, #shopping-list-print-area {
+  /* Forzar visibilidad y maquetación única del área de impresión activa */
+  #recipe-print-area {
     display: block !important;
+    visibility: visible !important;
     width: 100% !important;
     max-width: 100% !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
+    background: #ffffff !important;
+    color: #2C3523 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+  }
+
+  #shopping-list-print-area {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #2C3523 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
   }
 }

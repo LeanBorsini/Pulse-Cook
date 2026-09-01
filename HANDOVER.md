@@ -202,4 +202,30 @@ create policy "Users can update or delete their own recipe images."
 - [x] **Corrección de Build y Tipado**:
   - Solución de errores en `route.ts` de `chef-ai` (redeclaraciones) y `translate` (scope del bloque `try/catch`).
 
+---
+
+### ✅ Fase 8: Infraestructura de Autenticación SMTP & Plantillas Bilingües (COMPLETADA)
+- [x] **Configuración SMTP Personalizado para Códigos OTP de 6 Dígitos**:
+  - Transición documentada del mailer predeterminado de Supabase a proveedor SMTP dedicado (**Brevo** / `smtp-relay.brevo.com`) para evitar rate limits y habilitar entrega instantánea sin costo.
+  - Compatibilidad de remitente verificado con cuentas `@gmail.com` sin requerir dominios comerciales de pago.
+- [x] **Plantilla de Correo Bilingüe (ES / EN) de Alta Fidelidad**:
+  - Diseño HTML responsivo alineado con la identidad visual de Pulse & Cook (paleta cálida `#F4F1EA`, `#2C3523`, tarjeta con código OTP destacado y aviso de expiración a 10 min).
+  - Integración nativa con la variable `{{ .Token }}` de Supabase Auth para login sin contraseñas (Passwordless OTP).
+
+---
+
+### ✅ Fase 9: Landing de Bienvenida, Carga Unificada & Correcciones Chef Remy / PDF (COMPLETADA)
+- [x] **Pantalla / Modal de Bienvenida (`WelcomeLandingModal.tsx`)**:
+  - Presentación editorial bilingüe (ES / EN) que explica el propósito de Pulse & Cook, los 4 pilares clave (IA, Chef Remy, Modo Cocina Guiado, Lista de Compras Inteligente) y botón directo para continuar a las recetas.
+  - Persistencia de primer acceso en `localStorage` (`pulse_cook_welcome_seen`) y botón de acceso rápido `"Guía"` en el encabezado (`Header.tsx`).
+- [x] **Formulario Unificado de Recetas (`RecipeFormModal.tsx`)**:
+  - Eliminación de la duplicidad de cajas de texto divididas en pantalla pequeña.
+  - El usuario redacta cómodamente en un solo Título espacioso, una sola Descripción y una sola área de Instrucciones numeradas en su idioma preferido.
+  - Al hacer clic en Guardar, el motor invoca transparentemente a Gemini para traducir al segundo idioma en segundo plano y enriquecer con tags antes de almacenar en Supabase.
+- [x] **Estabilidad y Resiliencia del Chef Remy IA (`ChefAssistantModal.tsx` & `/api/chef-ai`)**:
+  - Garantizada la comunicación con el modelo `gemini-3.7-flash` con fallback culinario inmediato ante interrupciones o cuotas.
+- [x] **Corrección de Impresión PDF Limpia (`RecipePrintView.tsx` & `globals.css`)**:
+  - Aislamiento estricto del selector `@media print` para eliminar duplicados del DOM y renderizar la ficha culinaria en el idioma activo.
+
+
 
