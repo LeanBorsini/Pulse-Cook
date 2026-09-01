@@ -22,12 +22,22 @@ import ChefAssistantModal from './components/ChefAssistantModal';
 import { WelcomeLandingModal } from './components/WelcomeLandingModal';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 
+interface SupabaseRatingRow {
+  recipe_id?: string;
+  stars: number;
+  user_id: string;
+}
+
 interface SupabaseRecipeRow {
   id: string;
   user_id?: string;
+  author_name?: string;
   profiles?: { id: string; username: string; avatar_url?: string } | null;
-  ratings?: { stars: number; user_id: string }[];
-  title_es: string;
+  ratings?: SupabaseRatingRow[];
+  avg_rating?: number;
+  ratings_count?: number;
+  title?: string;
+  title_es?: string;
   title_en?: string;
   category?: string;
   prep_time?: number;
@@ -40,7 +50,7 @@ interface SupabaseRecipeRow {
   video_links?: { id: string; title: string; url: string }[];
   image_url?: string;
   images?: string[];
-  dietary_tags?: string[];
+  dietary_tags?: string[] | string;
   created_at?: string;
 }
 
@@ -129,72 +139,151 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch Recipes: Prioriza el almacén local persistente y combina con Supabase
+  // Fetch Recipes: Prioriza la base de datos de Supabase y combina con el almacén local
   const fetchRecipes = useCallback(async () => {
+    setLoadingRecipes(true);
     const localList = getLocalRecipes();
     setRecipes(localList);
 
     try {
+      // 1. Consulta directa a la tabla 'recipes' (siempre compatible sin depender de claves foráneas)
       const { data, error } = await supabase
         .from('recipes')
-        .select(`
-          *,
-          profiles:user_id (id, username, avatar_url),
-          ratings (stars, user_id)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        const rows = data as unknown as SupabaseRecipeRow[];
-        const formatted: Recipe[] = rows.map((item) => {
-          const allRatings = item.ratings || [];
+      if (error) {
+        console.warn('Supabase recipes fetch warning:', error.message);
+      }
+
+      if (data && data.length > 0) {
+        const rawRecipes = data as unknown as SupabaseRecipeRow[];
+
+        // 2. Obtener perfiles de autor si existen
+        const profileMap = new Map<string, { id: string; username: string; avatar_url?: string }>();
+        try {
+          const userIds = Array.from(
+            new Set(rawRecipes.map((r) => r.user_id).filter((id): id is string => Boolean(id)))
+          );
+          if (userIds.length > 0) {
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .in('id', userIds);
+
+            if (profilesData) {
+              profilesData.forEach((p) => {
+                profileMap.set(p.id, p);
+              });
+            }
+          }
+        } catch (profErr) {
+          console.warn('Profiles lookup optional note:', profErr);
+        }
+
+        // 3. Obtener valoraciones si la tabla ratings existe
+        const ratingsMap = new Map<string, { stars: number; user_id: string }[]>();
+        try {
+          const recipeIds = rawRecipes.map((r) => r.id);
+          const { data: ratingsData } = await supabase
+            .from('ratings')
+            .select('recipe_id, stars, user_id')
+            .in('recipe_id', recipeIds);
+
+          if (ratingsData) {
+            ratingsData.forEach((rt: SupabaseRatingRow) => {
+              if (rt.recipe_id) {
+                const list = ratingsMap.get(rt.recipe_id) || [];
+                list.push({ stars: rt.stars, user_id: rt.user_id });
+                ratingsMap.set(rt.recipe_id, list);
+              }
+            });
+          }
+        } catch {
+          // ratings table might be optional
+        }
+
+        // 4. Formatear y normalizar cada receta
+        const formatted: Recipe[] = rawRecipes.map((item) => {
+          const allRatings = ratingsMap.get(item.id) || item.ratings || [];
           const count = allRatings.length;
           const avg = count > 0 
-            ? allRatings.reduce((acc: number, r) => acc + (r.stars || 0), 0) / count 
-            : 0;
+            ? allRatings.reduce((acc: number, r: SupabaseRatingRow) => acc + (r.stars || 0), 0) / count 
+            : (typeof item.avg_rating === 'number' ? item.avg_rating : 0);
           
           let myRating = 0;
-          if (user) {
-            const userRat = allRatings.find((r) => r.user_id === user.id);
+          if (user && allRatings.length > 0) {
+            const userRat = allRatings.find((r: SupabaseRatingRow) => r.user_id === user.id);
             if (userRat) myRating = userRat.stars;
           }
 
+          // Resolver autor
+          const authorProfile = item.user_id ? profileMap.get(item.user_id) : null;
+          const resolvedProfiles =
+            authorProfile ||
+            item.profiles ||
+            (item.author_name ? { id: item.user_id || 'author', username: item.author_name } : null);
+
+          // Normalizar imágenes
+          let imagesList: string[] = [];
+          if (Array.isArray(item.images) && item.images.length > 0) {
+            imagesList = item.images;
+          } else if (item.image_url) {
+            imagesList = [item.image_url];
+          }
+
+          // Normalizar etiquetas dietéticas
+          let tags: string[] = [];
+          if (Array.isArray(item.dietary_tags)) {
+            tags = item.dietary_tags;
+          } else if (typeof item.dietary_tags === 'string') {
+            try {
+              tags = JSON.parse(item.dietary_tags);
+            } catch {
+              tags = [item.dietary_tags];
+            }
+          }
+
           return {
-            id: item.id,
+            id: String(item.id),
             user_id: item.user_id,
-            profiles: item.profiles || null,
-            title_es: item.title_es || '',
-            title_en: item.title_en || '',
-            category: item.category || 'General',
+            profiles: resolvedProfiles,
+            title_es: item.title_es || item.title_en || item.title || '',
+            title_en: item.title_en || item.title_es || item.title || '',
+            category: item.category || 'Main Dishes',
             prep_time: item.prep_time || 15,
             servings: item.servings || 1,
-            description_es: item.description_es || '',
-            description_en: item.description_en || '',
-            instructions_es: item.instructions_es || '',
-            instructions_en: item.instructions_en || '',
+            description_es: item.description_es || item.description_en || '',
+            description_en: item.description_en || item.description_es || '',
+            instructions_es: item.instructions_es || item.instructions_en || '',
+            instructions_en: item.instructions_en || item.instructions_es || '',
             youtube_url: item.youtube_url || '',
-            video_links: item.video_links || [],
-            image_url: item.image_url || '',
-            images: item.images || (item.image_url ? [item.image_url] : []),
-            dietary_tags: item.dietary_tags || [],
+            video_links: Array.isArray(item.video_links) ? item.video_links : [],
+            image_url: item.image_url || (imagesList.length > 0 ? imagesList[0] : ''),
+            images: imagesList,
+            dietary_tags: tags,
             avg_rating: avg > 0 ? Number(avg.toFixed(1)) : undefined,
-            ratings_count: count,
+            ratings_count: count || (item.ratings_count || 0),
             user_rating: myRating > 0 ? myRating : undefined,
             created_at: item.created_at,
           };
         });
 
-        // Combinar recetas locales con las de la nube sin duplicados
+        // Combinar recetas locales con las de Supabase sin duplicados
         const combined = [...localList];
         formatted.forEach((remoteRecipe) => {
-          if (!combined.some((r) => r.id === remoteRecipe.id)) {
+          const existsIndex = combined.findIndex((r) => r.id === remoteRecipe.id);
+          if (existsIndex === -1) {
             combined.push(remoteRecipe);
+          } else {
+            // Actualizar datos con los remotos
+            combined[existsIndex] = { ...combined[existsIndex], ...remoteRecipe };
           }
         });
         setRecipes(combined);
       }
     } catch (err) {
-      console.warn('Using local persistent recipes store:', err);
+      console.warn('Error fetching Supabase recipes:', err);
     } finally {
       setLoadingRecipes(false);
     }
