@@ -227,5 +227,25 @@ create policy "Users can update or delete their own recipe images."
 - [x] **Corrección de Impresión PDF Limpia (`RecipePrintView.tsx` & `globals.css`)**:
   - Aislamiento estricto del selector `@media print` para eliminar duplicados del DOM y renderizar la ficha culinaria en el idioma activo.
 
+---
+
+### ✅ Fase 10: Modo Cocina con Comandos por Voz, Menú Directo, Importador & Footer Lean Borsini
+- [x] **Modo Cocina con Comandos de Voz Manos Libres (`CookingModeModal.tsx`)**:
+  - Interfaz de lectura a pantalla completa, limpia y libre de distracciones (sin temporizadores invasivos).
+  - **Control por Voz Nativo (Web Speech Recognition)**: Activa el botón de micrófono y controla la receta diciendo:
+    - 🗣️ *"Siguiente"* / *"Next"* -> Avanza de paso automáticamente.
+    - 🗣️ *"Anterior"* / *"Atrás"* / *"Back"* -> Vuelve al paso previo.
+    - 🗣️ *"Leer"* / *"Repetir"* / *"Read"* -> Lee el paso en voz alta.
+    - 🗣️ *"Ingredientes"* -> Despliega la lista de ingredientes y porciones.
+  - Escalado dinámico de porciones (`+` / `-`) que recalcula los ingredientes en vivo.
+- [x] **Botón "Añadir al Menú" directo desde la Receta Abierta (`RecipeDetailModal.tsx`)**:
+  - Sume o retire la receta de la lista de compras sin cerrar la vista.
+- [x] **Pie de Página Minimalista (`Footer.tsx`)**:
+  - Autoría: *"Pulse & Cook • Diseñado & Creado por Lean Borsini"* con acceso a la guía.
+- [x] **Importador de Recetas por Link / URL (`/api/import-recipe` & `RecipeFormModal.tsx`)**:
+  - Extracción automática con IA segura frente a SSRF.
+- [x] **Planificador Semanal Pragmático (`WeeklyPlannerModal.tsx`)**:
+  - Asignación compacta de almuerzos y cenas sincronizada a la lista de compras.
+
 
 

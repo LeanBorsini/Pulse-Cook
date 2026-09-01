@@ -1,10 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Clock, Users, Edit, Trash2, Video, MessageSquare, Send, Sparkles, Loader2, Star, Printer, Share2, Check } from 'lucide-react';
+import {
+  X,
+  Clock,
+  Users,
+  Edit,
+  Trash2,
+  Video,
+  MessageSquare,
+  Send,
+  Sparkles,
+  Loader2,
+  Star,
+  Printer,
+  Share2,
+  Check,
+  ChefHat,
+  ShoppingCart,
+} from 'lucide-react';
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
 import { RecipePrintView } from './RecipePrintView';
+import { CookingModeModal } from './CookingModeModal';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
 import { translateTextSmart } from '../../lib/recipeTranslator';
 
@@ -25,6 +43,9 @@ interface RecipeDetailModalProps {
   onDelete: (id: string) => void;
   onAddComment?: (e: React.FormEvent) => void;
   onOpenAuth: () => void;
+  isInMenu?: boolean;
+  onToggleMenu?: (id: string) => void;
+  onToggleFavorite?: (id: string, isFav: boolean) => void;
 }
 
 export function RecipeDetailModal({
@@ -44,7 +65,11 @@ export function RecipeDetailModal({
   onDelete,
   onAddComment,
   onOpenAuth,
+  isInMenu = false,
+  onToggleMenu,
+  onToggleFavorite,
 }: RecipeDetailModalProps) {
+  const [isCookingMode, setIsCookingMode] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [dynamicLang, setDynamicLang] = useState<'ES' | 'EN'>(lang);
   const [translatingView, setTranslatingView] = useState(false);
@@ -266,11 +291,37 @@ export function RecipeDetailModal({
           </div>
           
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Botón Cocinar Paso a Paso */}
+            <button
+              onClick={() => setIsCookingMode(true)}
+              title={lang === 'ES' ? 'Modo Cocina Paso a Paso' : 'Step-by-Step Cooking Mode'}
+              className="p-1.5 px-3 rounded-xl bg-[#2C3523] text-white hover:bg-[#3D4932] transition-colors flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer"
+            >
+              <ChefHat className="w-4 h-4 text-amber-300" />
+              <span>{lang === 'ES' ? 'Cocinar' : 'Cook'}</span>
+            </button>
+
+            {/* Botón Añadir al Menú */}
+            {onToggleMenu && (
+              <button
+                onClick={() => onToggleMenu(recipe.id)}
+                title={isInMenu ? (lang === 'ES' ? 'Quitar del Menú' : 'Remove from Menu') : (lang === 'ES' ? 'Añadir al Menú' : 'Add to Menu')}
+                className={`p-1.5 px-2.5 rounded-xl border transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer ${
+                  isInMenu
+                    ? 'bg-[#EAE5D6] text-[#2C3523] border-[#2C3523] font-bold'
+                    : 'bg-[#EFECE1] border-[#D8D3C4] text-[#5C6650] hover:bg-[#E2DEC2]'
+                }`}
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span className="hidden sm:inline">{isInMenu ? (lang === 'ES' ? 'En Menú ✓' : 'In Menu ✓') : (lang === 'ES' ? '+ Menú' : '+ Menu')}</span>
+              </button>
+            )}
+
             {/* Botón Compartir / WhatsApp */}
             <button
               onClick={handleShare}
               title={lang === 'ES' ? 'Compartir receta' : 'Share recipe'}
-              className="p-1.5 px-2 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold"
+              className="p-1.5 px-2 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
             >
               {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
               <span className="hidden sm:inline">{copiedLink ? (lang === 'ES' ? '¡Copiado!' : 'Copied!') : (lang === 'ES' ? 'Compartir' : 'Share')}</span>
@@ -280,7 +331,7 @@ export function RecipeDetailModal({
             <button
               onClick={handlePrint}
               title={lang === 'ES' ? 'Imprimir / Guardar en PDF' : 'Print / Save as PDF'}
-              className="p-1.5 px-2 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold"
+              className="p-1.5 px-2 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
             >
               <Printer className="w-4 h-4 text-[#425035]" />
               <span className="hidden sm:inline">{lang === 'ES' ? 'PDF' : 'PDF'}</span>
@@ -291,14 +342,14 @@ export function RecipeDetailModal({
                 <button
                   onClick={() => onEdit(recipe)}
                   title={lang === 'ES' ? 'Editar' : 'Edit'}
-                  className="p-1.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors"
+                  className="p-1.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors cursor-pointer"
                 >
                   <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => onDelete(recipe.id)}
                   title={lang === 'ES' ? 'Eliminar' : 'Delete'}
-                  className="p-1.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors"
+                  className="p-1.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -307,7 +358,7 @@ export function RecipeDetailModal({
             <button
               onClick={onClose}
               title={lang === 'ES' ? 'Cerrar' : 'Close'}
-              className="p-1.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors"
+              className="p-1.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -545,6 +596,17 @@ export function RecipeDetailModal({
         </div>
 
       </div>
+
+      {/* Modo Cocina Sin Temporizadores (Paso a paso, pantalla limpia, porciones y voz) */}
+      <CookingModeModal
+        isOpen={isCookingMode}
+        onClose={() => setIsCookingMode(false)}
+        recipe={recipe}
+        ingredients={ingredients}
+        lang={dynamicLang}
+        displayedTitle={displayedTitle || ''}
+        displayedInstructions={displayedInstructions || ''}
+      />
     </div>
   );
 }
