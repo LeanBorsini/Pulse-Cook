@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle } from 'lucide-react';
 import { Ingredient, Recipe } from '../types';
 import { supabase } from '../../lib/supabase';
-import { SAMPLE_INGREDIENTS } from '../../lib/sampleData';
+import { getLocalIngredients } from '../../lib/recipeStore';
 import { translateIngredientName } from '../../lib/culinaryDictionary';
 import { consolidateIngredients, CATEGORY_NAMES } from '../../lib/groceryConsolidator';
 import { ShoppingListPrintView } from './ShoppingListPrintView';
@@ -40,37 +40,36 @@ export function ShoppingListModal({
     let isMounted = true;
     const loadIngredients = async () => {
       setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('ingredients')
-          .select('*')
-          .in('recipe_id', selectedRecipeIds);
+      const consolidated: Ingredient[] = [];
+      const pendingRemoteIds: string[] = [];
 
-        if (!isMounted) return;
-
-        if (!error && data && data.length > 0) {
-          setFetchedItems(data);
+      for (const id of selectedRecipeIds) {
+        const localList = getLocalIngredients(id);
+        if (localList && localList.length > 0) {
+          consolidated.push(...localList);
         } else {
-          // Fallback to sample data for each selected recipe
-          const consolidated: Ingredient[] = [];
-          for (const id of selectedRecipeIds) {
-            const sampleList = SAMPLE_INGREDIENTS[id] || [];
-            consolidated.push(...sampleList);
+          pendingRemoteIds.push(id);
+        }
+      }
+
+      if (pendingRemoteIds.length > 0) {
+        try {
+          const { data, error } = await supabase
+            .from('ingredients')
+            .select('*')
+            .in('recipe_id', pendingRemoteIds);
+
+          if (!error && data && data.length > 0) {
+            consolidated.push(...data);
           }
-          setFetchedItems(consolidated);
+        } catch {
+          // ignore
         }
-      } catch {
-        if (!isMounted) return;
-        const consolidated: Ingredient[] = [];
-        for (const id of selectedRecipeIds) {
-          const sampleList = SAMPLE_INGREDIENTS[id] || [];
-          consolidated.push(...sampleList);
-        }
+      }
+
+      if (isMounted) {
         setFetchedItems(consolidated);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     };
 

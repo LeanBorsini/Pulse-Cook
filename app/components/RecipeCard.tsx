@@ -9,7 +9,7 @@ interface RecipeCardProps {
   recipe: Recipe;
   lang: 'ES' | 'EN';
   isSelected: boolean;
-  user: User | null;
+  user?: User | null;
   onOpenDetails: (recipe: Recipe) => void;
   onToggleMenu: (recipeId: string) => void;
   onOpenAuth?: () => void;
@@ -19,10 +19,8 @@ export function RecipeCard({
   recipe,
   lang,
   isSelected,
-  user,
   onOpenDetails,
   onToggleMenu,
-  onOpenAuth,
 }: RecipeCardProps) {
   const title = lang === 'ES' ? recipe.title_es : recipe.title_en || translateTextSmart(recipe.title_es, 'ES', 'EN');
   const description =
@@ -31,10 +29,6 @@ export function RecipeCard({
 
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user && onOpenAuth) {
-      onOpenAuth();
-      return;
-    }
     onToggleMenu(recipe.id);
   };
 

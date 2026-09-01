@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, Utensils, BookOpen, ShoppingCart, Globe2, ChefHat, ArrowRight, X, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Utensils, ShoppingCart, Globe2, ChefHat, ArrowRight, X, CheckCircle2 } from 'lucide-react';
 import { Language } from '../types';
 
 interface WelcomeLandingModalProps {

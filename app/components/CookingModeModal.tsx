@@ -16,6 +16,42 @@ import {
 } from 'lucide-react';
 import { translateIngredientName } from '@/lib/culinaryDictionary';
 
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+    };
+    length: number;
+  };
+}
+
+interface ISpeechRecognitionInstance {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+interface ISpeechRecognitionConstructor {
+  new (): ISpeechRecognitionInstance;
+}
+
+interface IWindowWithSpeech extends Window {
+  SpeechRecognition?: ISpeechRecognitionConstructor;
+  webkitSpeechRecognition?: ISpeechRecognitionConstructor;
+}
+
 interface CookingModeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -60,25 +96,21 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
   // Control por Voz Manos Libres
   const [isListening, setIsListening] = useState<boolean>(false);
   const [lastVoiceCommand, setLastVoiceCommand] = useState<string | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<{ stop: () => void; start: () => void } | null>(null);
 
   // Referencias para que el callback del recognition acceda al estado actual sin stale closures
   const currentStepRef = useRef(currentStepIndex);
-  currentStepRef.current = currentStepIndex;
   const stepsCountRef = useRef(steps.length);
-  stepsCountRef.current = steps.length;
   const isSpeakingRef = useRef(isSpeaking);
-  isSpeakingRef.current = isSpeaking;
 
   useEffect(() => {
-    if (isOpen) {
-      setCurrentStepIndex(0);
-      setCompletedSteps({});
-      setServingsMultiplier(1);
-      setCurrentServings(recipe.servings || 2);
-      setLastVoiceCommand(null);
-    }
-    // Cancel any ongoing speech and recognition when closing
+    currentStepRef.current = currentStepIndex;
+    stepsCountRef.current = steps.length;
+    isSpeakingRef.current = isSpeaking;
+  }, [currentStepIndex, steps.length, isSpeaking]);
+
+  useEffect(() => {
+    // Cancel any ongoing speech and recognition on unmount or close
     return () => {
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
@@ -91,7 +123,7 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
         }
       }
     };
-  }, [isOpen, recipe.servings]);
+  }, []);
 
   // Manejo de Comandos de Voz
   const handleVoiceCommand = (rawTranscript: string) => {
@@ -175,7 +207,8 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
   const toggleVoiceRecognition = () => {
     if (typeof window === 'undefined') return;
 
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const win = window as unknown as IWindowWithSpeech;
+    const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
     if (!SpeechRec) {
       alert(
         isEs
@@ -205,7 +238,7 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
         setIsListening(true);
       };
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         const lastResult = event.results[event.results.length - 1];
         if (lastResult && lastResult[0]) {
           const transcript = lastResult[0].transcript;
@@ -213,7 +246,7 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
         }
       };
 
-      recognition.onerror = (err: any) => {
+      recognition.onerror = (err: SpeechRecognitionErrorEvent) => {
         console.warn('Speech recognition notice:', err.error);
         if (err.error === 'not-allowed') {
           alert(

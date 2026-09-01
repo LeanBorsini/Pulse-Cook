@@ -4,7 +4,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { Recipe, Ingredient, Comment } from './types';
-import { INITIAL_RECIPES, SAMPLE_INGREDIENTS } from '@/lib/sampleData';
+import {
+  getLocalRecipes,
+  saveLocalRecipe,
+  deleteLocalRecipe,
+  getLocalIngredients,
+} from '@/lib/recipeStore';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { RecipeCard } from './components/RecipeCard';
@@ -15,7 +20,7 @@ import { AuthModal } from './components/AuthModal';
 import { UsernameSetupModal } from './components/UsernameSetupModal';
 import ChefAssistantModal from './components/ChefAssistantModal';
 import { WelcomeLandingModal } from './components/WelcomeLandingModal';
-import { UtensilsCrossed, Clock, Star, ArrowUpDown } from 'lucide-react';
+import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 
 interface SupabaseRecipeRow {
   id: string;
@@ -54,7 +59,12 @@ export default function Home() {
 
   const [user, setUser] = useState<User | null>(null);
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
-  const [recipes, setRecipes] = useState<Recipe[]>(INITIAL_RECIPES);
+  const [recipes, setRecipes] = useState<Recipe[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getLocalRecipes();
+    }
+    return [];
+  });
   const [loadingRecipes, setLoadingRecipes] = useState<boolean>(true);
 
   // Search, Filters & Sorting
@@ -119,8 +129,11 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch Recipes from Supabase (with fallback to INITIAL_RECIPES)
+  // Fetch Recipes: Prioriza el almacén local persistente y combina con Supabase
   const fetchRecipes = useCallback(async () => {
+    const localList = getLocalRecipes();
+    setRecipes(localList);
+
     try {
       const { data, error } = await supabase
         .from('recipes')
@@ -131,9 +144,7 @@ export default function Home() {
         `)
         .order('created_at', { ascending: false });
 
-      if (error || !data || data.length === 0) {
-        setRecipes(INITIAL_RECIPES);
-      } else {
+      if (!error && data && data.length > 0) {
         const rows = data as unknown as SupabaseRecipeRow[];
         const formatted: Recipe[] = rows.map((item) => {
           const allRatings = item.ratings || [];
@@ -173,11 +184,17 @@ export default function Home() {
           };
         });
 
-        setRecipes(formatted);
+        // Combinar recetas locales con las de la nube sin duplicados
+        const combined = [...localList];
+        formatted.forEach((remoteRecipe) => {
+          if (!combined.some((r) => r.id === remoteRecipe.id)) {
+            combined.push(remoteRecipe);
+          }
+        });
+        setRecipes(combined);
       }
     } catch (err) {
-      console.warn('Using initial recipe fallback:', err);
-      setRecipes(INITIAL_RECIPES);
+      console.warn('Using local persistent recipes store:', err);
     } finally {
       setLoadingRecipes(false);
     }
@@ -240,27 +257,33 @@ export default function Home() {
       // User rating check
       setCurrentUserRating(activeRecipe.user_rating || 0);
 
-      // Load Ingredients
-      try {
-        const { data, error } = await supabase
-          .from('ingredients')
-          .select('*')
-          .eq('recipe_id', activeRecipe.id);
-
-        if (!isMounted) return;
-
-        if (!error && data && data.length > 0) {
-          setActiveIngredients(data);
-        } else {
-          const sampleList = SAMPLE_INGREDIENTS[activeRecipe.id] || [];
-          setActiveIngredients(sampleList);
+      // Load Ingredients (check local persistent store first, then Supabase)
+      const localIngs = getLocalIngredients(activeRecipe.id);
+      if (localIngs && localIngs.length > 0) {
+        if (isMounted) {
+          setActiveIngredients(localIngs);
+          setLoadingIngredients(false);
         }
-      } catch {
-        if (!isMounted) return;
-        const sampleList = SAMPLE_INGREDIENTS[activeRecipe.id] || [];
-        setActiveIngredients(sampleList);
-      } finally {
-        if (isMounted) setLoadingIngredients(false);
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('ingredients')
+            .select('*')
+            .eq('recipe_id', activeRecipe.id);
+
+          if (!isMounted) return;
+
+          if (!error && data && data.length > 0) {
+            setActiveIngredients(data);
+          } else {
+            setActiveIngredients([]);
+          }
+        } catch {
+          if (!isMounted) return;
+          setActiveIngredients([]);
+        } finally {
+          if (isMounted) setLoadingIngredients(false);
+        }
       }
 
       // Load Comments
@@ -279,7 +302,7 @@ export default function Home() {
           setActiveComments([]);
         }
       } catch {
-        if (isMounted) setActiveComments([]);
+        if (!isMounted) setActiveComments([]);
       } finally {
         if (isMounted) setLoadingComments(false);
       }
@@ -372,84 +395,81 @@ export default function Home() {
   const handleDeleteRecipe = async (recipeId: string) => {
     try {
       await supabase.from('recipes').delete().eq('id', recipeId);
-      setRecipes((prev) => prev.filter((r) => r.id !== recipeId));
-      setSelectedRecipeIds((prev) => prev.filter((id) => id !== recipeId));
-      setActiveRecipe(null);
     } catch (err) {
-      console.warn('Delete recipe error:', err);
+      console.warn('Delete recipe remote error:', err);
     }
+    const updated = deleteLocalRecipe(recipeId);
+    setRecipes(updated);
+    setSelectedRecipeIds((prev) => prev.filter((id) => id !== recipeId));
+    setActiveRecipe(null);
   };
 
   // Save generated recipe from Chef AI Assistant
   const handleSaveChefRecipe = async (
     newRecipe: Partial<Recipe> & { generatedIngredients?: Ingredient[] }
   ) => {
+    const localNewRecipe: Recipe = {
+      id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      user_id: user?.id || 'local_user',
+      profiles: profileUsername
+        ? { id: user?.id || 'local_user', username: profileUsername }
+        : { id: 'local_user', username: user?.email?.split('@')[0] || 'Mi Cocina' },
+      title_es: newRecipe.title_es || 'Nueva Receta',
+      title_en: newRecipe.title_en || '',
+      category: newRecipe.category || 'General',
+      prep_time: newRecipe.prep_time || 20,
+      servings: newRecipe.servings || 2,
+      description_es: newRecipe.description_es || '',
+      description_en: newRecipe.description_en || '',
+      instructions_es: newRecipe.instructions_es || '',
+      instructions_en: newRecipe.instructions_en || '',
+      image_url: newRecipe.image_url || '',
+      images: newRecipe.images || (newRecipe.image_url ? [newRecipe.image_url] : []),
+      dietary_tags: newRecipe.dietary_tags || [],
+      created_at: new Date().toISOString(),
+    };
+
+    saveLocalRecipe(localNewRecipe, newRecipe.generatedIngredients || []);
+    setRecipes(getLocalRecipes());
+    setShowChefAI(false);
+
     try {
-      const recipeToInsert = {
-        user_id: user?.id || null,
-        title_es: newRecipe.title_es || 'Nueva Receta del Chef',
-        title_en: newRecipe.title_en || '',
-        category: newRecipe.category || 'General',
-        prep_time: newRecipe.prep_time || 20,
-        servings: newRecipe.servings || 2,
-        description_es: newRecipe.description_es || '',
-        description_en: newRecipe.description_en || '',
-        instructions_es: newRecipe.instructions_es || '',
-        instructions_en: newRecipe.instructions_en || '',
-        image_url: newRecipe.image_url || '',
-        images: newRecipe.images || (newRecipe.image_url ? [newRecipe.image_url] : []),
-        dietary_tags: newRecipe.dietary_tags || [],
-      };
+      if (user) {
+        const { data: supaRec } = await supabase
+          .from('recipes')
+          .insert([
+            {
+              user_id: user.id,
+              title_es: localNewRecipe.title_es,
+              title_en: localNewRecipe.title_en,
+              category: localNewRecipe.category,
+              prep_time: localNewRecipe.prep_time,
+              servings: localNewRecipe.servings,
+              description_es: localNewRecipe.description_es,
+              description_en: localNewRecipe.description_en,
+              instructions_es: localNewRecipe.instructions_es,
+              instructions_en: localNewRecipe.instructions_en,
+              image_url: localNewRecipe.image_url,
+              images: localNewRecipe.images,
+              dietary_tags: localNewRecipe.dietary_tags,
+            },
+          ])
+          .select()
+          .single();
 
-      const { data, error } = await supabase
-        .from('recipes')
-        .insert(recipeToInsert)
-        .select()
-        .single();
-
-      if (!error && data) {
-        if (newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
-          const ingredientsToInsert = newRecipe.generatedIngredients.map((ing) => ({
-            recipe_id: data.id,
+        if (supaRec && newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
+          const ingPayload = newRecipe.generatedIngredients.map((ing) => ({
+            recipe_id: supaRec.id,
             name_es: ing.name_es,
             name_en: ing.name_en || ing.name_es,
             amount: ing.amount || 1,
             unit: ing.unit || '',
           }));
-          await supabase.from('ingredients').insert(ingredientsToInsert);
+          await supabase.from('ingredients').insert(ingPayload);
         }
-
-        await fetchRecipes();
-        setShowChefAI(false);
-      } else {
-        const localNewRecipe: Recipe = {
-          id: `local-${Date.now()}`,
-          user_id: user?.id,
-          profiles: profileUsername ? { id: user?.id || '', username: profileUsername } : null,
-          title_es: newRecipe.title_es || 'Nueva Receta',
-          title_en: newRecipe.title_en || '',
-          category: newRecipe.category || 'General',
-          prep_time: newRecipe.prep_time || 20,
-          servings: newRecipe.servings || 2,
-          description_es: newRecipe.description_es || '',
-          description_en: newRecipe.description_en || '',
-          instructions_es: newRecipe.instructions_es || '',
-          instructions_en: newRecipe.instructions_en || '',
-          image_url: newRecipe.image_url || '',
-          images: newRecipe.images || [],
-          dietary_tags: newRecipe.dietary_tags || [],
-          created_at: new Date().toISOString(),
-        };
-
-        if (newRecipe.generatedIngredients) {
-          SAMPLE_INGREDIENTS[localNewRecipe.id] = newRecipe.generatedIngredients;
-        }
-
-        setRecipes((prev) => [localNewRecipe, ...prev]);
-        setShowChefAI(false);
       }
     } catch (err) {
-      console.warn('Save chef recipe error:', err);
+      console.warn('Chef recipe remote sync skipped:', err);
     }
   };
 
@@ -522,13 +542,7 @@ export default function Home() {
           setUser(null);
           setProfileUsername(null);
         }}
-        onOpenNewRecipe={() => {
-          if (!user) {
-            setShowAuthModal(true);
-          } else {
-            setIsCreatingRecipe(true);
-          }
-        }}
+        onOpenNewRecipe={() => setIsCreatingRecipe(true)}
         selectedCount={selectedRecipeIds.length}
         onOpenShoppingList={() => setShowShoppingList(true)}
         onOpenChefAI={() => setShowChefAI(true)}
@@ -546,14 +560,16 @@ export default function Home() {
 
       {/* Controles de Ordenamiento & Total de Recetas */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-2 border-b border-[#D8D3C4]/60">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#5C6650]">
-          <UtensilsCrossed className="w-4 h-4 text-[#2C3523]" />
-          <span>
-            {filteredRecipes.length}{' '}
-            {isEs
-              ? filteredRecipes.length === 1 ? 'receta encontrada' : 'recetas encontradas'
-              : filteredRecipes.length === 1 ? 'recipe found' : 'recipes found'}
-          </span>
+        <div className="flex items-center gap-3 text-xs font-semibold text-[#5C6650]">
+          <div className="flex items-center gap-1.5">
+            <UtensilsCrossed className="w-4 h-4 text-[#2C3523]" />
+            <span>
+              {filteredRecipes.length}{' '}
+              {isEs
+                ? filteredRecipes.length === 1 ? 'receta de la comunidad' : 'recetas de la comunidad'
+                : filteredRecipes.length === 1 ? 'community recipe' : 'community recipes'}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 text-xs font-semibold">
@@ -606,25 +622,52 @@ export default function Home() {
           ))}
         </div>
       ) : filteredRecipes.length === 0 ? (
-        <div className="text-center py-16 bg-[#EFECE1]/50 border border-dashed border-[#D8D3C4] rounded-2xl p-8">
+        <div className="text-center py-16 bg-[#EFECE1]/50 border border-dashed border-[#D8D3C4] rounded-2xl p-8 max-w-xl mx-auto">
           <UtensilsCrossed className="w-12 h-12 text-[#5C6650] mx-auto mb-3 opacity-60" />
-          <h3 className="text-base font-bold text-[#2C3523] mb-1">
-            {isEs ? 'No se encontraron recetas' : 'No recipes found'}
+          <h3 className="text-base font-bold text-[#2C3523] mb-1.5">
+            {searchTerm || selectedTag
+              ? (isEs ? 'No se encontraron recetas con estos filtros' : 'No recipes found with these filters')
+              : (isEs ? 'Aún no hay recetas publicadas' : 'No recipes published yet')}
           </h3>
-          <p className="text-xs text-[#5C6650] max-w-sm mx-auto mb-4">
-            {isEs
-              ? 'Prueba con otro término de búsqueda o añade una nueva receta a tu recetario.'
-              : 'Try searching with another keyword or add a new recipe to your collection.'}
+          <p className="text-xs text-[#5C6650] max-w-md mx-auto mb-6 leading-relaxed">
+            {searchTerm || selectedTag
+              ? (isEs
+                  ? 'Prueba a cambiar el término de búsqueda o quitar las etiquetas seleccionadas.'
+                  : 'Try changing your search keywords or clearing selected tags.')
+              : (isEs
+                  ? '¡Sé el primero en compartir una receta con la comunidad o crea una con la ayuda del Chef IA!'
+                  : 'Be the first to share a recipe with the community or generate one with the AI Chef!')}
           </p>
-          <button
-            onClick={() => {
-              setSearchTerm('');
-              setSelectedTag(null);
-            }}
-            className="px-4 py-2 bg-[#2C3523] text-white rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-colors"
-          >
-            {isEs ? 'Restablecer filtros' : 'Reset filters'}
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {searchTerm || selectedTag ? (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedTag(null);
+                }}
+                className="px-4 py-2 bg-[#2C3523] text-white rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-colors"
+              >
+                {isEs ? 'Restablecer filtros' : 'Reset filters'}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIsCreatingRecipe(true)}
+                  className="px-4 py-2 bg-[#2C3523] text-[#FAF8F2] rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-all flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isEs ? 'Crear Receta' : 'Create Recipe'}</span>
+                </button>
+                <button
+                  onClick={() => setShowChefAI(true)}
+                  className="px-4 py-2 bg-[#EFECE1] text-[#2C3523] border border-[#D8D3C4] hover:bg-[#E5E0D0] rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{isEs ? 'Chef Asistente IA' : 'AI Chef Assistant'}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

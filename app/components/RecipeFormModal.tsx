@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
-import { Recipe, VideoLink } from '../types';
+import { Recipe, VideoLink, Ingredient } from '../types';
 import {
   X,
   Plus,
@@ -16,8 +16,10 @@ import {
   UploadCloud,
   Check,
   Globe,
+  Utensils,
 } from 'lucide-react';
 import { uploadRecipeImage } from '@/lib/storage';
+import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
 
 interface RecipeFormModalProps {
   recipeToEdit?: Recipe | null;
@@ -76,6 +78,16 @@ export function RecipeFormModal({
       : recipeToEdit.instructions_en || recipeToEdit.instructions_es || '';
   });
 
+  // Ingredientes
+  const [ingredients, setIngredients] = useState<Ingredient[]>(() => {
+    if (recipeToEdit?.id) {
+      return getLocalIngredients(recipeToEdit.id);
+    }
+    return [
+      { name_es: '', name_en: '', amount: 1, unit: '' }
+    ];
+  });
+
   // Campos complementarios
   const [category, setCategory] = useState(recipeToEdit?.category || 'General');
   const [prepTime, setPrepTime] = useState<number>(recipeToEdit?.prep_time || 25);
@@ -112,6 +124,30 @@ export function RecipeFormModal({
   // Estados de guardado y auto-traducción en segundo plano
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // Ingredients Management
+  const addIngredientField = () => {
+    setIngredients((prev) => [
+      ...prev,
+      { name_es: '', name_en: '', amount: 1, unit: '' }
+    ]);
+  };
+
+  const removeIngredientField = (index: number) => {
+    setIngredients((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const updateIngredientField = (
+    index: number,
+    field: keyof Ingredient,
+    value: string | number
+  ) => {
+    setIngredients((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
 
   // Videos Management
   const addVideoField = () => {
@@ -289,7 +325,22 @@ export function RecipeFormModal({
       }
     }
 
-    const recipeData = {
+    // Filtrar ingredientes válidos (con nombre)
+    const validIngredients: Ingredient[] = ingredients
+      .filter((ing) => (ing.name_es && ing.name_es.trim() !== '') || (ing.name_en && ing.name_en.trim() !== ''))
+      .map((ing) => ({
+        recipe_id: recipeToEdit?.id || '',
+        name_es: ing.name_es?.trim() || ing.name_en?.trim() || '',
+        name_en: ing.name_en?.trim() || ing.name_es?.trim() || '',
+        amount: Number(ing.amount) || 1,
+        unit: ing.unit?.trim() || '',
+        aisle: ing.aisle || 'General',
+      }));
+
+    const recipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    const recipeData: Recipe = {
+      id: recipeId,
       title_es,
       title_en,
       category: category || 'General',
@@ -303,30 +354,72 @@ export function RecipeFormModal({
       images: images,
       youtube_url: validVideos[0]?.url || '',
       video_links: validVideos,
-      user_id: user?.id,
+      user_id: user?.id || 'local_user',
+      profiles: {
+        id: user?.id || 'local_user',
+        username: user?.email ? user.email.split('@')[0] : 'Mi Cocina',
+        avatar_url: '',
+      },
       dietary_tags: selectedTags,
+      avg_rating: recipeToEdit?.avg_rating,
+      ratings_count: recipeToEdit?.ratings_count,
+      user_rating: recipeToEdit?.user_rating,
+      created_at: recipeToEdit?.created_at || new Date().toISOString(),
     };
 
-    let error;
-    if (recipeToEdit?.id) {
-      const { error: err } = await supabase
-        .from('recipes')
-        .update(recipeData)
-        .eq('id', recipeToEdit.id);
-      error = err;
-    } else {
-      const { error: err } = await supabase.from('recipes').insert([recipeData]);
-      error = err;
+    // 1. Guardar de forma 100% persistente en el almacenamiento local
+    saveLocalRecipe(recipeData, validIngredients);
+
+    // 2. Intentar guardar en Supabase en segundo plano si está disponible
+    try {
+      const supabasePayload = {
+        title_es,
+        title_en,
+        category: category || 'General',
+        prep_time: Number(prepTime) || 20,
+        servings: Number(servings) || 4,
+        description_es: desc_es,
+        description_en: desc_en,
+        instructions_es: inst_es,
+        instructions_en: inst_en,
+        image_url: images[0] || '',
+        images: images,
+        youtube_url: validVideos[0]?.url || '',
+        video_links: validVideos,
+        user_id: user?.id || null,
+        dietary_tags: selectedTags,
+      };
+
+      if (recipeToEdit?.id && !recipeToEdit.id.startsWith('user_') && !recipeToEdit.id.startsWith('rec_')) {
+        await supabase
+          .from('recipes')
+          .update(supabasePayload)
+          .eq('id', recipeToEdit.id);
+      } else if (user) {
+        const { data: supaRecipe } = await supabase
+          .from('recipes')
+          .insert([supabasePayload])
+          .select()
+          .single();
+
+        if (supaRecipe && validIngredients.length > 0) {
+          const ingPayload = validIngredients.map((ing) => ({
+            recipe_id: supaRecipe.id,
+            name_es: ing.name_es,
+            name_en: ing.name_en,
+            amount: ing.amount,
+            unit: ing.unit,
+          }));
+          await supabase.from('ingredients').insert(ingPayload);
+        }
+      }
+    } catch (supaErr) {
+      console.warn('Supabase sync skipped/offline, saved locally:', supaErr);
     }
 
     setSaving(false);
     setStatusMessage(null);
-
-    if (!error) {
-      onSuccess();
-    } else {
-      alert(isEs ? 'Error guardando la receta: ' + error.message : 'Error saving recipe: ' + error.message);
-    }
+    onSuccess();
   };
 
   return (
@@ -454,7 +547,71 @@ export function RecipeFormModal({
             />
           </div>
 
-          {/* 4. INSTRUCCIONES PASO A PASO UNIFICADAS Y AMPLIAS */}
+          {/* 4. INGREDIENTES */}
+          <div className="bg-[#FAF8F2] p-4 rounded-xl border border-[#E5DFD0] space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#2C3523] flex items-center gap-1.5">
+                <Utensils className="w-4 h-4 text-[#425035]" />
+                <span>{isEs ? 'Ingredientes' : 'Ingredients'}</span>
+                <span className="text-[11px] font-normal text-[#737D67]">
+                  ({ingredients.filter(i => i.name_es?.trim() || i.name_en?.trim()).length})
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={addIngredientField}
+                className="text-[11px] font-semibold text-[#2C3523] flex items-center gap-1 bg-[#EFECE1] px-2.5 py-1 rounded-lg border border-[#D8D3C4] hover:bg-[#E5E0D0] transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                <span>{isEs ? 'Añadir Ingrediente' : 'Add Ingredient'}</span>
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {ingredients.map((ing, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="Cant."
+                    value={ing.amount ?? 1}
+                    onChange={(e) => updateIngredientField(idx, 'amount', Number(e.target.value))}
+                    className="w-16 bg-[#F4F1EA] border border-[#D8D3C4] px-2 py-1.5 rounded-lg text-xs outline-none focus:border-[#2C3523]"
+                  />
+                  <input
+                    type="text"
+                    placeholder={isEs ? 'Unidad (g, ml, cda...)' : 'Unit (g, ml, tbsp...)'}
+                    value={ing.unit || ''}
+                    onChange={(e) => updateIngredientField(idx, 'unit', e.target.value)}
+                    className="w-24 sm:w-28 bg-[#F4F1EA] border border-[#D8D3C4] px-2 py-1.5 rounded-lg text-xs outline-none focus:border-[#2C3523]"
+                  />
+                  <input
+                    type="text"
+                    placeholder={isEs ? 'Nombre del ingrediente (ej. Harina)' : 'Ingredient name (e.g. Flour)'}
+                    value={isEs ? (ing.name_es || '') : (ing.name_en || ing.name_es || '')}
+                    onChange={(e) => {
+                      updateIngredientField(idx, 'name_es', e.target.value);
+                      updateIngredientField(idx, 'name_en', e.target.value);
+                    }}
+                    className="flex-1 bg-[#F4F1EA] border border-[#D8D3C4] px-2.5 py-1.5 rounded-lg text-xs outline-none focus:border-[#2C3523]"
+                  />
+                  {ingredients.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeIngredientField(idx)}
+                      className="p-1.5 text-[#737D67] hover:text-red-700 rounded-lg hover:bg-red-50"
+                      title={isEs ? 'Eliminar' : 'Delete'}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 5. INSTRUCCIONES PASO A PASO UNIFICADAS Y AMPLIAS */}
           <div>
             <label className="block text-xs font-bold text-[#2C3523] mb-1.5 flex items-center justify-between">
               <span>{isEs ? 'Instrucciones paso a paso' : 'Step-by-step Instructions'}</span>

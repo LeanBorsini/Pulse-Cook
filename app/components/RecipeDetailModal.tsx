@@ -45,7 +45,6 @@ interface RecipeDetailModalProps {
   onOpenAuth: () => void;
   isInMenu?: boolean;
   onToggleMenu?: (id: string) => void;
-  onToggleFavorite?: (id: string, isFav: boolean) => void;
 }
 
 export function RecipeDetailModal({
@@ -67,7 +66,6 @@ export function RecipeDetailModal({
   onOpenAuth,
   isInMenu = false,
   onToggleMenu,
-  onToggleFavorite,
 }: RecipeDetailModalProps) {
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
@@ -159,9 +157,9 @@ export function RecipeDetailModal({
 
   const currentImage = recipeImages[activeImageIndex] || recipeImages[0] || null;
 
-  // Author & Owner check
+  // Author & Owner check - permitir gestionar libremente las recetas en el dispositivo
   const authorName = recipe.profiles?.username || 'leanBorsini';
-  const isOwner = user && (recipe.user_id === user.id || recipe.user_id === null || !recipe.user_id);
+  const isOwner = true; // El usuario tiene control total sobre su recetario personal en este dispositivo
 
   const [copiedLink, setCopiedLink] = useState(false);
 
