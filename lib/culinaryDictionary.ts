@@ -133,29 +133,111 @@ export function translateTag(tag: string, targetLang: 'ES' | 'EN'): string {
   return tag;
 }
 
+// Mapa inverso para traducir de Inglés a Español rápidamente
+const EN_TO_ES_MAP: Record<string, string> = {
+  onion: 'Cebolla',
+  onions: 'Cebollas',
+  'red onion': 'Cebolla morada',
+  garlic: 'Ajo',
+  'garlic clove': 'Diente de ajo',
+  'garlic cloves': 'Dientes de ajo',
+  tomato: 'Tomate',
+  tomatoes: 'Tomates',
+  chicken: 'Pollo',
+  'chicken breast': 'Pechuga de pollo',
+  'shredded chicken breast': 'Pechuga de pollo desmenuzada',
+  beef: 'Carne vacuna',
+  'ground beef': 'Carne picada',
+  tuna: 'Atún',
+  salmon: 'Salmón',
+  egg: 'Huevo',
+  eggs: 'Huevos',
+  butter: 'Manteca / Mantequilla',
+  milk: 'Leche',
+  cheese: 'Queso',
+  'mozzarella cheese': 'Queso mozzarella',
+  'parmesan cheese': 'Queso parmesano',
+  flour: 'Harina',
+  'wheat flour': 'Harina de trigo',
+  'oat flour': 'Harina de avena',
+  oats: 'Avena',
+  potato: 'Papa',
+  potatoes: 'Papas',
+  spinach: 'Espinaca',
+  carrot: 'Zanahoria',
+  carrots: 'Zanahorias',
+  lettuce: 'Lechuga',
+  avocado: 'Palta / Aguacate',
+  mushroom: 'Champiñón',
+  mushrooms: 'Champiñones',
+  rice: 'Arroz',
+  pasta: 'Pasta / Fideos',
+  noodles: 'Fideos',
+  lentils: 'Lentejas',
+  chickpeas: 'Garbanzos',
+  salt: 'Sal',
+  pepper: 'Pimienta',
+  'black pepper': 'Pimienta negra',
+  'olive oil': 'Aceite de oliva',
+  oil: 'Aceite',
+  oregano: 'Orégano',
+  paprika: 'Pimentón / Paprika',
+  parsley: 'Perejil',
+  basil: 'Albahaca',
+  cumin: 'Comino',
+  cinnamon: 'Canela',
+  sugar: 'Azúcar',
+  honey: 'Miel',
+  'baking powder': 'Polvo de hornear',
+  'heavy cream': 'Crema de leche',
+};
+
 export function translateIngredientName(
   nameEs: string,
   nameEn: string | undefined,
   targetLang: 'ES' | 'EN'
 ): string {
+  const es = (nameEs || '').trim();
+  const en = (nameEn || '').trim();
+
+  // 1. Si el objetivo es ESPAÑOL
   if (targetLang === 'ES') {
-    return nameEs || nameEn || '';
+    // Si ya tiene un nombre en español que no sea un término inglés huérfano
+    if (es && !EN_TO_ES_MAP[es.toLowerCase()]) {
+      return es;
+    }
+
+    // Si nameEs o nameEn coincide con nuestro mapa de inglés a español
+    const lookupCandidate = (es || en).toLowerCase();
+    if (EN_TO_ES_MAP[lookupCandidate]) {
+      return EN_TO_ES_MAP[lookupCandidate];
+    }
+
+    // Buscar si contiene alguna palabra clave en inglés
+    for (const [engKey, esVal] of Object.entries(EN_TO_ES_MAP)) {
+      if (lookupCandidate.includes(engKey)) {
+        return esVal;
+      }
+    }
+
+    return es || en || '';
   }
 
-  if (nameEn && nameEn.trim().length > 0 && nameEn !== nameEs) {
-    return nameEn;
+  // 2. Si el objetivo es INGLÉS
+  if (en && en.length > 0 && en.toLowerCase() !== es.toLowerCase()) {
+    return en;
   }
 
-  const normalized = (nameEs || '').toLowerCase().trim();
-  if (INGREDIENT_DICTIONARY[normalized]) {
-    return INGREDIENT_DICTIONARY[normalized].en;
+  const normalizedEs = es.toLowerCase();
+  if (INGREDIENT_DICTIONARY[normalizedEs]) {
+    return INGREDIENT_DICTIONARY[normalizedEs].en;
   }
 
   for (const [key, value] of Object.entries(INGREDIENT_DICTIONARY)) {
-    if (normalized.includes(key)) {
+    if (normalizedEs.includes(key)) {
       return value.en;
     }
   }
 
-  return nameEs || '';
+  return en || es || '';
 }

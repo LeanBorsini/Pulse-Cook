@@ -63,23 +63,6 @@ export function translateTextSmart(
     translated = translated.replace(regex, replacement);
   }
 
-  // Traducción de palabras individuales de ingredientes dentro de las instrucciones
-  if (toLang === 'EN') {
-    translated = translated
-      .replace(/\bpechuga\b/gi, 'chicken breast')
-      .replace(/\bzapallo\b/gi, 'butternut squash')
-      .replace(/\bharina de avena\b/gi, 'oat flour')
-      .replace(/\bcebolla\b/gi, 'onion')
-      .replace(/\bpaprika\b/gi, 'paprika')
-      .replace(/\borégano\b/gi, 'oregano')
-      .replace(/\bpimienta\b/gi, 'pepper')
-      .replace(/\bsal\b/gi, 'salt')
-      .replace(/\baceite de oliva\b/gi, 'olive oil')
-      .replace(/\bnuggets\b/gi, 'nuggets')
-      .replace(/\bhorno\b/gi, 'oven')
-      .replace(/\bminutos\b/gi, 'minutes');
-  }
-
   return translated;
 }
 

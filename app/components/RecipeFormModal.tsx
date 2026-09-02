@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { Recipe, VideoLink, Ingredient } from '../types';
@@ -17,6 +17,7 @@ import {
   Check,
   Globe,
   Utensils,
+  ChefHat,
 } from 'lucide-react';
 import { uploadRecipeImage } from '@/lib/storage';
 import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
@@ -124,6 +125,17 @@ export function RecipeFormModal({
   // Estados de guardado y auto-traducción en segundo plano
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // Cerrar con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, saving]);
 
   // Ingredients Management
   const addIngredientField = () => {
@@ -423,52 +435,61 @@ export function RecipeFormModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn overflow-y-auto">
-      <div className="bg-[#FDFBF7] border border-[#D8D3C4] rounded-2xl max-w-2xl w-full p-6 sm:p-7 shadow-2xl relative max-h-[92vh] overflow-y-auto text-[#2C3523] my-6">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !saving) onClose();
+      }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 animate-fadeIn"
+    >
+      <div className="bg-[#FDFBF7] border border-[#D8D3C4] rounded-2xl max-w-2xl w-full shadow-2xl relative max-h-[92vh] flex flex-col text-[#2C3523] overflow-hidden">
         
-        {/* Botón Cerrar */}
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={saving}
-          className="absolute top-4 right-4 p-1.5 rounded-full text-[#737D67] hover:bg-[#EFECE1] hover:text-[#2C3523] transition-colors"
-          title={isEs ? 'Cerrar' : 'Close'}
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Encabezado del Formulario */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5 border-b border-[#EFECE1] pb-3.5">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-serif font-bold text-[#2C3523]">
+        {/* Barra Superior Fija (Sticky Header): Botón Cerrar SIEMPRE VISIBLE */}
+        <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-3 bg-[#FDFBF7]/95 backdrop-blur-md border-b border-[#D8D3C4] shrink-0">
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <div className="p-1.5 bg-[#2C3523] text-white rounded-lg shrink-0">
+              <ChefHat className="w-4 h-4 text-amber-300" />
+            </div>
+            <h2 className="text-sm sm:text-base font-serif font-bold text-[#2C3523] truncate">
               {recipeToEdit
                 ? isEs ? 'Editar Receta' : 'Edit Recipe'
                 : isEs ? 'Añadir Nueva Receta' : 'Add New Recipe'}
             </h2>
-            <p className="text-xs text-[#737D67] mt-0.5">
-              {isEs
-                ? 'Escribe tu receta cómodamente. Se auto-traducirá en segundo plano al guardar.'
-                : 'Write your recipe easily. It will automatically translate in the background when saved.'}
-            </p>
           </div>
 
-          {/* Selector de idioma de redacción */}
-          <div className="flex items-center gap-1.5 bg-[#EFECE1] px-2.5 py-1 rounded-xl border border-[#D8D3C4]">
-            <Globe className="w-3.5 h-3.5 text-[#5C6650]" />
-            <span className="text-[11px] font-bold text-[#5C6650]">
-              {isEs ? 'Redactando en:' : 'Writing in:'}
-            </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Selector de idioma de redacción */}
             <button
               type="button"
               onClick={() => setFormInputLang(formInputLang === 'ES' ? 'EN' : 'ES')}
-              className="text-[11px] font-bold text-[#2C3523] bg-white px-2 py-0.5 rounded-md shadow-2xs hover:bg-[#FAF8F5]"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2C3523] bg-[#EFECE1] hover:bg-[#E2DEC2] px-2.5 py-1.5 rounded-xl border border-[#D8D3C4] shadow-2xs transition-colors cursor-pointer"
+              title={isEs ? 'Cambiar idioma de redacción' : 'Change writing language'}
             >
-              {formInputLang === 'ES' ? 'Español (ES)' : 'English (EN)'}
+              <Globe className="w-3 h-3 text-[#5C6650]" />
+              <span className="hidden xs:inline">{formInputLang === 'ES' ? 'Redactar en ES' : 'Writing in EN'}</span>
+              <span className="xs:hidden">{formInputLang}</span>
+            </button>
+
+            {/* Botón Cerrar (X) - SIEMPRE VISIBLE */}
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="w-8 h-8 rounded-full bg-[#EAE5D6] hover:bg-[#DED8C6] active:scale-90 text-[#2C3523] flex items-center justify-center border border-[#D8D3C4] transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              title={isEs ? 'Cerrar' : 'Close'}
+              aria-label={isEs ? 'Cerrar' : 'Close'}
+            >
+              <X className="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Formulario Scrolleable */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          <p className="text-xs text-[#737D67]">
+            {isEs
+              ? 'Escribe tu receta cómodamente. Se auto-traducirá en segundo plano al guardar.'
+              : 'Write your recipe easily. It will automatically translate in the background when saved.'}
+          </p>
           
           {/* 1. TÍTULO UNIFICADO Y ESPACIOSO */}
           <div>

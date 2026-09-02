@@ -240,33 +240,41 @@ export default function ChefAssistantModal({
     : ['Onion', 'Garlic', 'Potatoes', 'Chicken', 'Pasta', 'Carrot', 'Spinach', 'Tuna'];
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn">
-      <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto text-[#2C3523] flex flex-col">
-        {/* Encabezado */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#D8D3C4]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-[#2C3523] to-[#455337] text-amber-300 flex items-center justify-center shadow-md text-2xl">
-              <RemyIcon className="w-7 h-7" />
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 animate-fadeIn"
+    >
+      <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl relative max-h-[92vh] overflow-y-auto text-[#2C3523] flex flex-col">
+        {/* Encabezado Fijo */}
+        <div className="sticky -top-4 sm:-top-6 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3.5 bg-[#F7F5EC]/95 backdrop-blur-md border-b border-[#D8D3C4] flex items-center justify-between z-20 mb-3">
+          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#2C3523] to-[#455337] text-amber-300 flex items-center justify-center shadow-md text-2xl shrink-0">
+              <RemyIcon className="w-6 h-6" />
             </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[#2C3523] flex items-center gap-2">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-[#2C3523] flex items-center gap-2 truncate">
                 {isEs ? 'Chef Remy' : 'Chef Remy'}
                 <span className="text-[10px] font-bold bg-amber-200/80 text-amber-950 px-2 py-0.5 rounded-full uppercase tracking-wider">
                   AI • Ratatouille
                 </span>
               </h2>
-              <p className="text-xs text-[#5C6650]">
+              <p className="text-xs text-[#5C6650] truncate">
                 {isEs
-                  ? '«Cualquiera puede cocinar»: inspírate con lo que tienes en tu heladera'
-                  : '«Anyone can cook»: get inspired with whatever you have in your fridge'}
+                  ? '«Cualquiera puede cocinar»: inspírate con lo que tienes'
+                  : '«Anyone can cook»: get inspired with whatever you have'}
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-black/5 text-[#5C6650] hover:text-[#2C3523] transition-colors"
+            className="w-8 h-8 rounded-full bg-[#EAE5D6] hover:bg-[#DED8C6] active:scale-90 text-[#2C3523] flex items-center justify-center border border-[#D8D3C4] transition-all cursor-pointer shadow-xs shrink-0"
+            title={isEs ? 'Cerrar' : 'Close'}
+            aria-label={isEs ? 'Cerrar' : 'Close'}
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
 

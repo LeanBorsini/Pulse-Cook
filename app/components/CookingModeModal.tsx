@@ -6,6 +6,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ArrowLeft,
   Volume2,
   VolumeX,
   Users,
@@ -95,6 +96,7 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
   
   // Control por Voz Manos Libres
   const [isListening, setIsListening] = useState<boolean>(false);
+  const isListeningRef = useRef<boolean>(false);
   const [lastVoiceCommand, setLastVoiceCommand] = useState<string | null>(null);
   const recognitionRef = useRef<{ stop: () => void; start: () => void } | null>(null);
 
@@ -109,12 +111,22 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
     isSpeakingRef.current = isSpeaking;
   }, [currentStepIndex, steps.length, isSpeaking]);
 
+  // Tecla Escape para salir y limpieza al desmontar
   useEffect(() => {
-    // Cancel any ongoing speech and recognition on unmount or close
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
+      isListeningRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -123,13 +135,35 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
         }
       }
     };
-  }, []);
+  }, [isOpen, onClose]);
 
   // Manejo de Comandos de Voz
   const handleVoiceCommand = (rawTranscript: string) => {
     const text = rawTranscript.toLowerCase().trim();
     setLastVoiceCommand(text);
     setTimeout(() => setLastVoiceCommand(null), 3000);
+
+    // Salir / Cerrar por comando de voz (Manos libres completo)
+    if (
+      text.includes('salir') ||
+      text.includes('cerrar') ||
+      text.includes('terminar') ||
+      text.includes('cancelar') ||
+      text.includes('exit') ||
+      text.includes('close') ||
+      text.includes('abandonar')
+    ) {
+      if (isSpeakingRef.current && typeof window !== 'undefined') window.speechSynthesis.cancel();
+      isListeningRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      onClose();
+      return;
+    }
 
     // Siguiente paso
     if (
@@ -203,7 +237,7 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
     }
   };
 
-  // Alternar Reconocimiento de Voz
+  // Alternar Reconocimiento de Voz Continuo
   const toggleVoiceRecognition = () => {
     if (typeof window === 'undefined') return;
 
@@ -218,13 +252,14 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
       return;
     }
 
-    if (isListening) {
+    if (isListeningRef.current) {
+      isListeningRef.current = false;
+      setIsListening(false);
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch {}
       }
-      setIsListening(false);
       return;
     }
 
@@ -235,6 +270,7 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
       recognition.interimResults = false;
 
       recognition.onstart = () => {
+        isListeningRef.current = true;
         setIsListening(true);
       };
 
@@ -254,27 +290,50 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
               ? 'Por favor permite el acceso al micrófono en tu navegador para activar los comandos por voz.'
               : 'Please allow microphone access to use voice commands.'
           );
+          isListeningRef.current = false;
           setIsListening(false);
         }
       };
 
       recognition.onend = () => {
-        // Auto-reconnect if still intended to listen and modal is open
-        if (recognitionRef.current && isListening) {
-          try {
-            recognition.start();
-          } catch {
-            setIsListening(false);
-          }
+        // Reconexión automática CONTINUA si el usuario no lo apagó explícitamente
+        if (isListeningRef.current && isOpen) {
+          setTimeout(() => {
+            if (isListeningRef.current) {
+              try {
+                recognition.start();
+              } catch {
+                // En caso de que el motor necesite reiniciar instancia
+                try {
+                  const newRec = new SpeechRec();
+                  newRec.lang = isEs ? 'es-ES' : 'en-US';
+                  newRec.continuous = true;
+                  newRec.interimResults = false;
+                  newRec.onstart = recognition.onstart;
+                  newRec.onresult = recognition.onresult;
+                  newRec.onerror = recognition.onerror;
+                  newRec.onend = recognition.onend;
+                  recognitionRef.current = newRec;
+                  newRec.start();
+                } catch {
+                  isListeningRef.current = false;
+                  setIsListening(false);
+                }
+              }
+            }
+          }, 250);
         } else {
+          isListeningRef.current = false;
           setIsListening(false);
         }
       };
 
       recognitionRef.current = recognition;
+      isListeningRef.current = true;
       recognition.start();
     } catch (e) {
       console.error('Error starting recognition:', e);
+      isListeningRef.current = false;
       setIsListening(false);
     }
   };
@@ -331,57 +390,72 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
     <div className="fixed inset-0 z-50 flex flex-col bg-[#FAF8F2] text-[#2C3523] select-none animate-fadeIn">
       
       {/* Barra Superior */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#D8D3C4] bg-[#F4F1EA]/80 backdrop-blur-xs">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="font-handwritten text-xl font-bold text-[#2C3523]">Pulse&Cook</span>
-            <span className="text-[#8C987E]">•</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#5C6650]">
+      <div className="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-[#D8D3C4] bg-[#F4F1EA]/95 backdrop-blur-md shrink-0">
+        {/* Izquierda: Botón Salir súper visible + Título */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EAE5D6] hover:bg-[#DED8C6] active:scale-95 text-[#2C3523] font-bold text-xs border border-[#D8D3C4] cursor-pointer shadow-xs transition-all shrink-0"
+            title={isEs ? 'Salir del Modo Cocina' : 'Exit Cooking Mode'}
+            aria-label={isEs ? 'Salir del Modo Cocina' : 'Exit Cooking Mode'}
+          >
+            <ArrowLeft className="w-4 h-4 text-[#2C3523]" />
+            <span className="font-sans">{isEs ? 'Salir' : 'Exit'}</span>
+          </button>
+
+          <div className="flex items-center gap-1.5 min-w-0 truncate">
+            <span className="hidden md:inline font-handwritten text-lg font-bold text-[#2C3523]">Pulse&Cook</span>
+            <span className="hidden md:inline text-[#8C987E]">•</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-[#5C6650] shrink-0">
               {isEs ? 'Modo Cocina' : 'Cooking Mode'}
             </span>
+            <span className="text-xs font-serif font-bold text-[#2C3523] truncate max-w-[140px] sm:max-w-xs ml-1">
+              ({displayedTitle})
+            </span>
           </div>
-          <span className="hidden sm:inline-block text-xs font-serif font-bold text-[#2C3523] truncate max-w-xs">
-            ({displayedTitle})
-          </span>
         </div>
 
-        {/* Controles de Porciones, Micrófono e Ingredientes */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Botón Control por Voz */}
+        {/* Derecha: Micrófono Manos Libres, Porciones, Ingredientes */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* Botón Control por Voz Continuo */}
           <button
+            type="button"
             onClick={toggleVoiceRecognition}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
               isListening
-                ? 'bg-red-700 text-white border-red-800 animate-pulse shadow-xs'
+                ? 'bg-emerald-700 text-white border-emerald-800 animate-pulse shadow-xs'
                 : 'bg-[#EAE5D6] hover:bg-[#DED8C6] text-[#2C3523] border-[#D8D3C4]'
             }`}
             title={
               isListening
-                ? isEs ? 'Control por voz ACTIVO (Clic para pausar)' : 'Voice control ACTIVE (Click to pause)'
-                : isEs ? 'Activar comandos por voz (Manos libres)' : 'Enable voice commands (Hands-free)'
+                ? isEs ? 'Micrófono continuo ACTIVO (Clic para pausar)' : 'Continuous mic ACTIVE (Click to pause)'
+                : isEs ? 'Activar micrófono continuo (Manos libres)' : 'Enable continuous mic (Hands-free)'
             }
           >
             {isListening ? <Mic className="w-3.5 h-3.5 text-white animate-bounce" /> : <MicOff className="w-3.5 h-3.5 text-[#737D67]" />}
             <span className="hidden sm:inline">
-              {isListening ? (isEs ? 'Escuchando...' : 'Listening...') : (isEs ? 'Control Voz' : 'Voice Control')}
+              {isListening ? (isEs ? 'Escuchando continuo...' : 'Continuous listening...') : (isEs ? 'Manos Libres' : 'Hands-Free')}
             </span>
           </button>
 
           {/* Ajuste de Porciones */}
-          <div className="flex items-center gap-1.5 bg-[#EAE5D6] px-2.5 py-1 rounded-xl border border-[#D8D3C4] text-xs font-semibold">
-            <Users className="w-3.5 h-3.5 text-[#5C6650]" />
+          <div className="flex items-center gap-1 bg-[#EAE5D6] px-2 sm:px-2.5 py-1 rounded-xl border border-[#D8D3C4] text-xs font-semibold">
+            <Users className="w-3 h-3 text-[#5C6650]" />
             <button
+              type="button"
               onClick={handleDecreaseServings}
-              className="w-5 h-5 flex items-center justify-center bg-white rounded-md text-[#2C3523] hover:bg-[#FAF8F5] cursor-pointer"
+              className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center bg-white rounded text-[#2C3523] hover:bg-[#FAF8F5] cursor-pointer text-xs"
             >
               -
             </button>
-            <span className="px-1 text-[#2C3523] min-w-[20px] text-center font-bold">
+            <span className="px-0.5 sm:px-1 text-[#2C3523] min-w-[16px] text-center font-bold text-xs">
               {currentServings}
             </span>
             <button
+              type="button"
               onClick={handleIncreaseServings}
-              className="w-5 h-5 flex items-center justify-center bg-white rounded-md text-[#2C3523] hover:bg-[#FAF8F5] cursor-pointer"
+              className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center bg-white rounded text-[#2C3523] hover:bg-[#FAF8F5] cursor-pointer text-xs"
             >
               +
             </button>
@@ -389,20 +463,13 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
 
           {/* Ver lista de ingredientes */}
           <button
+            type="button"
             onClick={() => setShowIngredientsList(!showIngredientsList)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#EAE5D6] hover:bg-[#DED8C6] rounded-xl text-xs font-bold text-[#2C3523] border border-[#D8D3C4] transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 sm:px-3 py-1.5 bg-[#EAE5D6] hover:bg-[#DED8C6] rounded-xl text-xs font-bold text-[#2C3523] border border-[#D8D3C4] transition-colors cursor-pointer"
+            title={isEs ? 'Ver Ingredientes' : 'View Ingredients'}
           >
             <List className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{isEs ? 'Ingredientes' : 'Ingredients'}</span>
-          </button>
-
-          {/* Botón Salir */}
-          <button
-            onClick={onClose}
-            className="p-2 text-[#5C6650] hover:text-[#2C3523] rounded-xl hover:bg-[#EAE5D6] transition-colors cursor-pointer"
-            title={isEs ? 'Salir del Modo Cocina' : 'Exit Cooking Mode'}
-          >
-            <X className="w-5 h-5" />
+            <span className="hidden md:inline">{isEs ? 'Ingredientes' : 'Ingredients'}</span>
           </button>
         </div>
       </div>
@@ -520,6 +587,7 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
           {/* Barra de Navegación Inferior */}
           <div className="flex items-center justify-between pt-6 border-t border-[#D8D3C4] gap-4 mt-6">
             <button
+              type="button"
               onClick={() => {
                 if (currentStepIndex > 0) {
                   if (isSpeaking) window.speechSynthesis.cancel();
@@ -527,30 +595,43 @@ export const CookingModeModal: React.FC<CookingModeModalProps> = ({
                 }
               }}
               disabled={currentStepIndex === 0}
-              className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-[#EAE5D6] text-[#2C3523] font-bold text-sm hover:bg-[#DED8C6] transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+              className="flex items-center gap-2 px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl bg-[#EAE5D6] text-[#2C3523] font-bold text-xs sm:text-sm hover:bg-[#DED8C6] transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
             >
-              <ChevronLeft className="w-5 h-5" />
-              <span>{isEs ? 'Paso Anterior' : 'Previous Step'}</span>
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden xs:inline">{isEs ? 'Paso Anterior' : 'Previous Step'}</span>
+              <span className="xs:hidden">{isEs ? 'Anterior' : 'Prev'}</span>
+            </button>
+
+            {/* Salida rápida alternativa */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs text-[#737D67] hover:text-[#2C3523] underline underline-offset-4 cursor-pointer px-2 py-1 transition-colors text-center"
+            >
+              {isEs ? 'Salir' : 'Exit'}
             </button>
 
             {currentStepIndex < totalSteps - 1 ? (
               <button
+                type="button"
                 onClick={() => {
                   if (isSpeaking) window.speechSynthesis.cancel();
                   setCompletedSteps((prev) => ({ ...prev, [currentStepIndex]: true }));
                   setCurrentStepIndex(currentStepIndex + 1);
                 }}
-                className="flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-[#2C3523] text-white font-bold text-sm hover:bg-[#3D4932] shadow-md hover:shadow-lg transition-all cursor-pointer"
+                className="flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 rounded-2xl bg-[#2C3523] text-white font-bold text-xs sm:text-sm hover:bg-[#3D4932] shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
-                <span>{isEs ? 'Siguiente Paso' : 'Next Step'}</span>
-                <ChevronRight className="w-5 h-5" />
+                <span className="hidden xs:inline">{isEs ? 'Siguiente Paso' : 'Next Step'}</span>
+                <span className="xs:hidden">{isEs ? 'Siguiente' : 'Next'}</span>
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             ) : (
               <button
+                type="button"
                 onClick={onClose}
-                className="flex items-center gap-2 px-7 py-3.5 rounded-2xl bg-emerald-800 text-white font-bold text-sm hover:bg-emerald-900 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                className="flex items-center gap-2 px-5 sm:px-7 py-3 sm:py-3.5 rounded-2xl bg-emerald-800 text-white font-bold text-xs sm:text-sm hover:bg-emerald-900 shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
-                <CheckCircle2 className="w-5 h-5" />
+                <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>{isEs ? '¡Plato Terminado!' : 'Dish Completed!'}</span>
               </button>
             )}

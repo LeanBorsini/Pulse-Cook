@@ -52,14 +52,16 @@ export async function POST(req: NextRequest) {
     const targetLanguageName = targetLang === 'EN' ? 'English' : 'Spanish';
     const sourceLanguageName = sourceLang === 'EN' ? 'English' : 'Spanish';
 
-    const prompt = `You are a culinary translator and chef. Translate the following recipe text fields from ${sourceLanguageName} to natural, appetizing ${targetLanguageName}.
-Keep culinary terms accurate and measurements clear.
-Title to translate: "${title || ''}"
-Description to translate: "${description || ''}"
-Instructions to translate: "${instructions || ''}"`;
+    const prompt = `You are an expert culinary translator and professional chef.
+Translate the following recipe text fields from ${sourceLanguageName} to natural, appetizing, grammatically perfect ${targetLanguageName}.
+Keep culinary terms accurate, measurements clear, and instruction steps properly formatted.
+Title: "${title || ''}"
+Description: "${description || ''}"
+Instructions:
+${instructions || ''}`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',

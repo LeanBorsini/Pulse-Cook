@@ -144,7 +144,12 @@ export function ShoppingListModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 print:block print:static print:bg-transparent print:p-0">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 print:block print:static print:bg-transparent print:p-0"
+    >
       {/* Vista Exclusiva de Impresión */}
       <ShoppingListPrintView
         selectedRecipes={selectedRecipes}
@@ -152,28 +157,33 @@ export function ShoppingListModal({
         lang={lang}
       />
 
-      <div className="bg-[#F7F5EC] border border-[#D8D3C4]/80 rounded-2xl max-w-lg w-full p-6 shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative max-h-[90vh] overflow-y-auto print:hidden">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 p-1 rounded-full text-[#2C3523] hover:bg-[#EFECE1] transition-colors"
-          title={lang === 'ES' ? 'Cerrar' : 'Close'}
-        >
-          <X className="w-6 h-6" />
-        </button>
-
-        <div className="flex items-center justify-between mb-1 pr-8">
+      <div className="bg-[#F7F5EC] border border-[#D8D3C4]/80 rounded-2xl max-w-lg w-full shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative max-h-[92vh] flex flex-col text-[#2C3523] overflow-hidden print:hidden">
+        {/* Barra Superior Fija (Sticky Header): Botón Cerrar SIEMPRE VISIBLE */}
+        <div className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-6 py-3 bg-[#F7F5EC]/95 backdrop-blur-md border-b border-[#D8D3C4] shrink-0">
           <div className="flex items-center gap-2">
-            <ShoppingCart className="w-6 h-6 text-[#2C3523]" />
-            <h2 className="text-2xl font-serif font-bold text-[#2C3523]">
+            <ShoppingCart className="w-5 h-5 text-[#2C3523]" />
+            <h2 className="text-lg font-serif font-bold text-[#2C3523]">
               {lang === 'ES' ? 'Lista de Compras' : 'Shopping List'}
             </h2>
           </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-[#EAE5D6] hover:bg-[#DED8C6] active:scale-90 text-[#2C3523] flex items-center justify-center border border-[#D8D3C4] transition-all cursor-pointer shadow-xs"
+            title={lang === 'ES' ? 'Cerrar' : 'Close'}
+            aria-label={lang === 'ES' ? 'Cerrar' : 'Close'}
+          >
+            <X className="w-4 h-4 stroke-[2.5]" />
+          </button>
         </div>
-        <p className="text-xs text-[#5C6650] mb-4">
-          {lang === 'ES'
-            ? 'Ingredientes consolidados para tus recetas seleccionadas'
-            : 'Consolidated ingredients for your selected recipes'}
-        </p>
+
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+          <p className="text-xs text-[#5C6650] mb-4">
+            {lang === 'ES'
+              ? 'Ingredientes consolidados para tus recetas seleccionadas'
+              : 'Consolidated ingredients for your selected recipes'}
+          </p>
 
         {/* Botones de acción rápida: WhatsApp y PDF */}
         {items.length > 0 && (
@@ -276,6 +286,7 @@ export function ShoppingListModal({
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

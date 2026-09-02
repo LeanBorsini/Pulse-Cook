@@ -113,14 +113,21 @@ export function AuthModal({ isOpen, lang = 'ES', onClose, onAuthenticated }: Aut
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-      <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-md w-full p-6 shadow-2xl relative text-[#2C3523]">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) resetModal();
+      }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn"
+    >
+      <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative text-[#2C3523]">
         <button
+          type="button"
           onClick={resetModal}
-          className="absolute top-4 right-4 p-1 rounded-full text-[#5C6650] hover:bg-[#EFECE1] hover:text-[#2C3523] transition-colors"
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-[#EAE5D6] hover:bg-[#DED8C6] active:scale-90 text-[#2C3523] flex items-center justify-center border border-[#D8D3C4] transition-all cursor-pointer shadow-xs"
           title={lang === 'ES' ? 'Cerrar' : 'Close'}
+          aria-label={lang === 'ES' ? 'Cerrar' : 'Close'}
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4 stroke-[2.5]" />
         </button>
 
         <div className="flex items-center gap-2 mb-2">
