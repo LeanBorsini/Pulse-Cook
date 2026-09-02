@@ -1,10 +1,38 @@
 # HANDOVER - Pulse&Cook
 
 ## 📌 Visión General del Proyecto
-**Pulse&Cook** es un recetario personal, familiar y colaborativo con soporte bilingüe (Español / Inglés), auto-traducción inteligente asistida por Gemini, soporte multienlace de videos/tutoriales, sistema comunitario de valoraciones por estrellas (1 a 5), comentarios persistentes y un planificador inteligente de compras para supermercados.
+**Pulse&Cook** es un recetario personal, familiar y colaborativo de alta fidelidad con soporte bilingüe (Español / Inglés), auto-traducción inteligente asistida por Gemini (`@google/genai`), control de voz manos libres para cocinar, soporte multienlace de videos/tutoriales, sistema comunitario de valoraciones por estrellas (1 a 5), comentarios persistentes, asistente culinario Chef Remy con fallbacks offline y un planificador inteligente de compras para supermercados.
 
 - **Stack**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Lucide React, Google GenAI SDK (`@google/genai`).
 - **Base de Datos & Auth**: Supabase (PostgreSQL + Supabase Auth OTP / Magic Links).
+- **IA Generativa**: Google Gemini (`gemini-3.7-flash` / `@google/genai` v0.1.2) con arquitectura de API server-side y respaldo offline.
+
+---
+
+## ⚡ Estado de Estabilidad & Diagnóstico Reciente
+
+### ✅ Corrección del Bloqueo / Congelamiento (Infinite Loop Fix)
+- **Problema Detectado**: La aplicación se congelaba en el navegador arrojando *"La página no responde"* o error `SIGILL` y log de Vercel con códigos `304 Not Modified`.
+- **Causa Raíz**: Bucle reactivo infinito en `app/page.tsx`. El `useEffect` de autenticación de Supabase (`onAuthStateChange`) ejecutaba `fetchRecipes`, el cual tenía como dependencia el objeto `user`. Al cambiar el estado de sesión, la referencia de la función mutaba en cada render, disparando peticiones y re-renders continuos que saturaban el hilo principal de JavaScript.
+- **Solución Implementada**: 
+  1. Desacoplamiento de `fetchRecipes` de las dependencias reactivas mediante paso explícito de usuario (`userOverride`) y uso de `userRef` estabilizado.
+  2. Suscripción a eventos específicos de Supabase (`SIGNED_IN`, `SIGNED_OUT`, `USER_UPDATED`).
+  3. Recreación del archivo `.env.example` con la documentación de variables de entorno.
+- **Verificación**: `npm run lint` y `npm run build` ejecutados exitosamente sin advertencias de bloqueo ni errores.
+
+---
+
+## 🔑 Variables de Entorno Requeridas
+
+Para el correcto funcionamiento local y en producción (Vercel / Cloud Run):
+
+| Variable | Tipo | Descripción | Dónde se obtiene |
+| :--- | :--- | :--- | :--- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Cliente | URL del proyecto Supabase | Supabase > Project Settings > API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Cliente | Clave anónima pública de Supabase | Supabase > Project Settings > API |
+| `GEMINI_API_KEY` | Servidor | Clave de Google AI Studio para Chef Remy y Traductor | [Google AI Studio](https://aistudio.google.com/app/apikey) |
+
+> ⚠️ **Nota de Seguridad**: `GEMINI_API_KEY` es de uso exclusivo en servidor (`app/api/*`) y nunca debe llevar el prefijo `NEXT_PUBLIC_`.
 
 ---
 
@@ -98,7 +126,7 @@ create policy "Users can delete their own comments." on public.comments for dele
 ---
 
 ### 5. Supabase Storage: Bucket `recipe-images`
-Para permitir la subida directa de fotos (máximo 3 imágenes por receta) desde dispositivos móviles y navegadores:
+Para permitir la subida directa de fotos (máximo 3 imágenes por receta con compresión automática en cliente):
 
 1. Ve a **Storage** en tu panel de Supabase.
 2. Crea un nuevo bucket llamado `recipe-images` y márcalo como **Public bucket**.
@@ -170,15 +198,15 @@ create policy "Users can update or delete their own recipe images."
 
 ### ✅ Fase 5: Asistente Chef Gemini IA: ¿Qué cocino hoy? & Sustitutos (COMPLETADA)
 - [x] **Endpoint Servidor Seguro `/api/chef-ai` (`gemini-3.7-flash`)**:
-  - Implementación con SDK `@google/genai` con `User-Agent: 'aistudio-build'` y schema JSON estricto.
+  - Implementación con SDK `@google/genai` con schema JSON estricto.
   - Rate limiting en memoria por IP/Usuario (máx 12 peticiones / 5 minutos) para proteger cuotas de API.
 - [x] **Modo "De la Heladera al Plato" (`ChefAssistantModal.tsx`)**:
   - Creación interactiva de recetas personalizadas basadas en ingredientes disponibles en la heladera/despensa.
   - Ajustes de comensales (1, 2, 4, 6+ porciones), tiempo límite (15m express, 30m, 45m, 60m) y metas dietarias (Vegetariano, Vegano, Celíaco/Sin Gluten, Alto en Proteína, Bajo en Calorías).
   - Botón directo **"Guardar en mi Recetario"** que persiste la receta y sus ingredientes en Supabase.
 - [x] **Modo "Reemplazo Inteligente de Ingredientes"**:
-  - Búsqueda culinaria de sustitutos ante ingredientes faltantes (ej. qué usar si no tengo huevos, polvo de hornear o crema) con ratios de conversión exactos y consejos del chef.
-- [x] **Acceso Directo**: Botón destacado **Chef IA** integrado en la cabecera principal (`Header.tsx`).
+  - Búsqueda culinaria de sustitutos ante ingredientes faltantes con ratios de conversión exactos y consejos del chef.
+- [x] **Acceso Directo**: Botón destacado **Chef Remy** integrado en la cabecera principal (`Header.tsx`).
 
 ---
 
@@ -194,13 +222,13 @@ create policy "Users can update or delete their own recipe images."
 
 ### ✅ Fase 7: Estabilidad, Offline Fallbacks y Consolidación (COMPLETADA)
 - [x] **Manejo de Errores y Fallbacks (`chefRemyOffline.ts`, `recipeTranslator.ts`)**:
-  - Sistema de respaldo local inteligente en caso de que falte la API Key de Gemini, se alcance el límite de cuotas, o **existan picos de demanda (Error 503)**.
-  - El motor captura los fallos de la API silenciosamente y el Chef Remy devuelve recetas de contingencia pre-calculadas o sustitutos para evitar que la UI se rompa mostrando un JSON de error crudo.
+  - Sistema de respaldo local inteligente en caso de que falte la API Key de Gemini, se alcance el límite de cuotas, o existan interrupciones en la API.
+  - El motor captura los fallos de la API silenciosamente y el Chef Remy devuelve recetas de contingencia pre-calculadas o sustitutos para evitar que la UI se rompa.
   - Traducción por diccionario Regex offline como respaldo al traductor IA.
 - [x] **Lista de Compras Robusta (`groceryConsolidator.ts`)**:
-  - Corrección de tipado (`Ingredient`) y lógica para extraer y consolidar correctamente los ingredientes de las recetas pasadas al modal.
+  - Tipado (`Ingredient`) y lógica para extraer y consolidar correctamente los ingredientes de las recetas pasadas al modal.
 - [x] **Corrección de Build y Tipado**:
-  - Solución de errores en `route.ts` de `chef-ai` (redeclaraciones) y `translate` (scope del bloque `try/catch`).
+  - Solución de errores en `route.ts` de `chef-ai` y `translate`.
 
 ---
 
@@ -219,33 +247,27 @@ create policy "Users can update or delete their own recipe images."
   - Presentación editorial bilingüe (ES / EN) que explica el propósito de Pulse & Cook, los 4 pilares clave (IA, Chef Remy, Modo Cocina Guiado, Lista de Compras Inteligente) y botón directo para continuar a las recetas.
   - Persistencia de primer acceso en `localStorage` (`pulse_cook_welcome_seen`) y botón de acceso rápido `"Guía"` en el encabezado (`Header.tsx`).
 - [x] **Formulario Unificado de Recetas (`RecipeFormModal.tsx`)**:
-  - Eliminación de la duplicidad de cajas de texto divididas en pantalla pequeña.
   - El usuario redacta cómodamente en un solo Título espacioso, una sola Descripción y una sola área de Instrucciones numeradas en su idioma preferido.
-  - Al hacer clic en Guardar, el motor invoca transparentemente a Gemini para traducir al segundo idioma en segundo plano y enriquecer con tags antes de almacenar en Supabase.
+  - Al guardar, el motor traduce al segundo idioma en segundo plano y enriquece con tags antes de almacenar en Supabase.
 - [x] **Estabilidad y Resiliencia del Chef Remy IA (`ChefAssistantModal.tsx` & `/api/chef-ai`)**:
-  - Garantizada la comunicación con el modelo `gemini-3.7-flash` con fallback culinario inmediato ante interrupciones o cuotas.
+  - Comunicación con `gemini-3.7-flash` con fallback culinario inmediato ante interrupciones o cuotas.
 - [x] **Corrección de Impresión PDF Limpia (`RecipePrintView.tsx` & `globals.css`)**:
   - Aislamiento estricto del selector `@media print` para eliminar duplicados del DOM y renderizar la ficha culinaria en el idioma activo.
 
 ---
 
-### ✅ Fase 10: Modo Cocina con Comandos por Voz, Menú Directo, Importador & Footer Lean Borsini
+### ✅ Fase 10: Modo Cocina con Comandos por Voz & Experiencia Manos Libres (COMPLETADA)
 - [x] **Modo Cocina con Comandos de Voz Manos Libres (`CookingModeModal.tsx`)**:
-  - Interfaz de lectura a pantalla completa, limpia y libre de distracciones (sin temporizadores invasivos).
+  - Interfaz de lectura a pantalla completa, limpia y libre de distracciones.
   - **Control por Voz Nativo (Web Speech Recognition)**: Activa el botón de micrófono y controla la receta diciendo:
     - 🗣️ *"Siguiente"* / *"Next"* -> Avanza de paso automáticamente.
     - 🗣️ *"Anterior"* / *"Atrás"* / *"Back"* -> Vuelve al paso previo.
-    - 🗣️ *"Leer"* / *"Repetir"* / *"Read"* -> Lee el paso en voz alta.
+    - 🗣️ *"Leer"* / *"Repetir"* / *"Read"* -> Lee el paso en voz alta (Text-To-Speech).
     - 🗣️ *"Ingredientes"* -> Despliega la lista de ingredientes y porciones.
   - Escalado dinámico de porciones (`+` / `-`) que recalcula los ingredientes en vivo.
-- [x] **Botón "Añadir al Menú" directo desde la Receta Abierta (`RecipeDetailModal.tsx`)**:
+- [x] **Botón "Menú" directo desde la Receta Abierta (`RecipeDetailModal.tsx`)**:
   - Sume o retire la receta de la lista de compras sin cerrar la vista.
-- [x] **Pie de Página Minimalista (`Footer.tsx`)**:
-  - Autoría: *"Pulse & Cook • Diseñado & Creado por Lean Borsini"* con acceso a la guía.
-- [x] **Importador de Recetas por Link / URL (`/api/import-recipe` & `RecipeFormModal.tsx`)**:
-  - Extracción automática con IA segura frente a SSRF.
-- [x] **Planificador Semanal Pragmático (`WeeklyPlannerModal.tsx`)**:
-  - Asignación compacta de almuerzos y cenas sincronizada a la lista de compras.
+
 
 
 

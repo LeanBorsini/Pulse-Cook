@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { Recipe, Ingredient, Comment } from './types';
@@ -68,6 +68,12 @@ export default function Home() {
   });
 
   const [user, setUser] = useState<User | null>(null);
+  const userRef = useRef<User | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>(() => {
     if (typeof window !== 'undefined') {
@@ -140,7 +146,7 @@ export default function Home() {
   }, []);
 
   // Fetch Recipes: Prioriza la base de datos de Supabase y combina con el almacén local
-  const fetchRecipes = useCallback(async () => {
+  const fetchRecipes = useCallback(async (userOverride?: User | null) => {
     setLoadingRecipes(true);
     const localList = getLocalRecipes();
     setRecipes(localList);
@@ -204,6 +210,7 @@ export default function Home() {
         }
 
         // 4. Formatear y normalizar cada receta
+        const currentUser = userOverride !== undefined ? userOverride : userRef.current;
         const formatted: Recipe[] = rawRecipes.map((item) => {
           const allRatings = ratingsMap.get(item.id) || item.ratings || [];
           const count = allRatings.length;
@@ -212,8 +219,8 @@ export default function Home() {
             : (typeof item.avg_rating === 'number' ? item.avg_rating : 0);
           
           let myRating = 0;
-          if (user && allRatings.length > 0) {
-            const userRat = allRatings.find((r: SupabaseRatingRow) => r.user_id === user.id);
+          if (currentUser && allRatings.length > 0) {
+            const userRat = allRatings.find((r: SupabaseRatingRow) => r.user_id === currentUser.id);
             if (userRat) myRating = userRat.stars;
           }
 
@@ -287,9 +294,9 @@ export default function Home() {
     } finally {
       setLoadingRecipes(false);
     }
-  }, [user]);
+  }, []);
 
-  // Check auth session on mount
+  // Check auth session on mount (stabilized without loop dependencies)
   useEffect(() => {
     let isMounted = true;
 
@@ -300,30 +307,41 @@ export default function Home() {
 
         if (session?.user) {
           setUser(session.user);
+          userRef.current = session.user;
           await loadUserProfile(session.user.id);
         } else {
           setUser(null);
+          userRef.current = null;
           setProfileUsername(null);
+        }
+
+        if (isMounted) {
+          await fetchRecipes(session?.user || null);
         }
       } catch (err) {
         console.warn('Supabase auth session check failed:', err);
-      }
-
-      if (isMounted) {
-        await fetchRecipes();
+        if (isMounted) {
+          await fetchRecipes(null);
+        }
       }
     };
 
     initAuthAndRecipes();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
-      if (session?.user) {
-        setUser(session.user);
-        await loadUserProfile(session.user.id);
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+      userRef.current = currentUser;
+
+      if (currentUser) {
+        await loadUserProfile(currentUser.id);
       } else {
-        setUser(null);
         setProfileUsername(null);
+      }
+
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+        fetchRecipes(currentUser);
       }
     });
 
