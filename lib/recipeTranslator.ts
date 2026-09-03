@@ -1,3 +1,15 @@
+/**
+ * @file recipeTranslator.ts
+ * @description Motor de detección lingüística y traducción culinaria heurística offline.
+ *
+ * Propósitos principales:
+ * 1. Detección genuina de idioma: Verifica si un campo de texto realmente corresponde
+ *    al idioma esperado (ej. detectando conjugaciones, caracteres especiales y léxico gastronómico)
+ *    o si contiene una copia idéntica del idioma original.
+ * 2. Fallback offline de alta fidelidad: Traduce instrucciones y términos culinarios
+ *    cuando la API de Gemini no está disponible o se agota la cuota temporal.
+ */
+
 // Diccionario de frases y pasos culinarios frecuentes
 const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
   // Verbos y conjugaciones culinarias comunes (incluyendo imperativo argentino/latino y estándar)
@@ -141,6 +153,14 @@ export function hasGenuineSpanishInstructions(instructionsEs?: string | null, in
   return true;
 }
 
+/**
+ * Traduce un texto entre español e inglés utilizando el diccionario culinario de expresiones regulares.
+ *
+ * @param {string | null | undefined} text - Texto fuente a traducir.
+ * @param {'ES' | 'EN'} fromLang - Idioma origen.
+ * @param {'ES' | 'EN'} toLang - Idioma destino.
+ * @returns {string} Texto traducido o el original si los idiomas coinciden.
+ */
 export function translateTextSmart(
   text: string | null | undefined,
   fromLang: 'ES' | 'EN',
@@ -159,6 +179,15 @@ export function translateTextSmart(
   return translated;
 }
 
+/**
+ * Resuelve el texto correspondiente para un campo bilingüe según el idioma de visualización objetivo.
+ * Si no existe una versión genuina en el idioma solicitado, aplica la traducción inteligente.
+ *
+ * @param {string | null | undefined} fieldEs - Versión en español del campo.
+ * @param {string | null | undefined} fieldEn - Versión en inglés del campo.
+ * @param {'ES' | 'EN'} targetLang - Idioma en el que se desea renderizar.
+ * @returns {string} Texto final listo para mostrar en la interfaz.
+ */
 export function translateRecipeField(
   fieldEs: string | null | undefined,
   fieldEn: string | null | undefined,

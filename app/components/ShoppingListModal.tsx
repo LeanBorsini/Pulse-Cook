@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * @file ShoppingListModal.tsx
+ * @description Modal del Planificador de Menú y Lista de Compras Inteligente.
+ *
+ * Características:
+ * - Recupera los ingredientes de todas las recetas seleccionadas en el menú (local o Supabase).
+ * - Aplica el motor de consolidación (`groceryConsolidator.ts`) para sumar cantidades y agrupar por pasillo.
+ * - Permite marcar artículos comprados con persistencia durante la sesión.
+ * - Compartir la lista vía WhatsApp formateada con viñetas.
+ * - Vista optimizada para impresión física o PDF (`ShoppingListPrintView`).
+ */
+
 import { useState, useEffect } from 'react';
 import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle } from 'lucide-react';
 import { Ingredient, Recipe } from '../types';

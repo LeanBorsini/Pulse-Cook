@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * @file page.tsx
+ * @description Vista y controlador principal de Pulse&Cook.
+ *
+ * Responsabilidades:
+ * 1. Inicialización y persistencia dual de recetas (localStorage + Supabase Cloud).
+ * 2. Gestión del estado global: idioma activo, autenticación del usuario, perfil y menú semanal.
+ * 3. Búsqueda y filtrado interactivo: filtrado por término de búsqueda, etiquetas dietéticas y ordenamiento.
+ * 4. Orquestación de modales: Creación/Edición, Detalle de Receta, Lista de Compras, Chef Remy,
+ *    Autenticación y Bienvenida.
+ */
+
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';

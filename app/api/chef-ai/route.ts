@@ -1,10 +1,33 @@
+/**
+ * @file route.ts
+ * @description Endpoint de servidor para el asistente culinario interactivo "Chef Remy".
+ *
+ * Ruta: POST /api/chef-ai
+ *
+ * Capacidades:
+ * 1. Modo 'fridge': Genera recetas personalizadas aprovechando ingredientes disponibles.
+ * 2. Modo 'substitute': Recomienda alternativas con ratios de sustitución culinaria precisos.
+ *
+ * Características de fiabilidad:
+ * - Rate Limiter en memoria para prevenir abusos (máx. 12 peticiones cada 5 min).
+ * - Esquema estructurado JSON garantizado mediante el SDK `@google/genai`.
+ * - Zero-Failure Fallback: Si no hay API key o hay problemas de cuota/red, responde
+ *   usando el motor heurístico local (`lib/chefRemyOffline.ts`) sin arrojar errores 500.
+ */
+
 import { GoogleGenAI, Type } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateRemyFallbackRecipe, generateRemyFallbackSubstitute } from '@/lib/chefRemyOffline';
 
-// Rate limiting simple en memoria por IP/User (máx 10 peticiones cada 5 minutos)
+// Rate limiting simple en memoria por IP/User (máx 12 peticiones cada 5 minutos)
 const rateLimitMap = new Map<string, { count: number; expiresAt: number }>();
 
+/**
+ * Valida si un identificador (IP o User ID) ha excedido su cuota de peticiones.
+ *
+ * @param {string} identifier - Cadena identificadora del cliente.
+ * @returns {boolean} `true` si la petición está permitida, `false` si excede la tasa.
+ */
 function checkRateLimit(identifier: string): boolean {
   const now = Date.now();
   const userRate = rateLimitMap.get(identifier);

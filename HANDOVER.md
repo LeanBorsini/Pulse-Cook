@@ -20,6 +20,12 @@
   3. Recreación del archivo `.env.example` con la documentación de variables de entorno.
 - **Verificación**: `npm run lint` y `npm run build` ejecutados exitosamente sin advertencias de bloqueo ni errores.
 
+### ✅ Corrección del Motor de Traducción de Instrucciones & Cascada de Modelos
+- **Problema Detectado**: Las recetas guardadas en español no mostraban instrucciones al cambiar al inglés o se duplicaba el texto en español.
+- **Causa Raíz**: Fallo por duplicidad en el campo `instructions_en` y fallos 503 por saturación temporal de un solo modelo en `/api/translate`.
+- **Solución Implementada**: Cascada de modelos (`gemini-3.1-flash-lite`, `gemini-3.6-flash`, `gemini-3.8-flash`), saneamiento de textos clonados, diccionario offline de respaldo y conmutador `[ES | EN]` con botón interactivo de traducción en `RecipeDetailModal.tsx`.
+- **Servidor Dev**: Operando en `http://localhost:3000` con respuesta HTTP 200 OK.
+
 ---
 
 ## 🔑 Variables de Entorno Requeridas
@@ -268,6 +274,37 @@ create policy "Users can update or delete their own recipe images."
 - [x] **Botón "Menú" directo desde la Receta Abierta (`RecipeDetailModal.tsx`)**:
   - Sume o retire la receta de la lista de compras sin cerrar la vista.
 
+---
 
+### ✅ Fase 11: Motor de Traducción Culinaria Robusta & Corrección de Instrucciones Bilingües (COMPLETADA)
+- [x] **Detección Lingüística Culinaria Genuina (`lib/recipeTranslator.ts`)**:
+  - Detección precisa de textos culinarios en español vs. inglés (`isSpanishCulinaryText`, `hasGenuineEnglishInstructions`, `hasGenuineSpanishInstructions`).
+  - Reconocimiento de conjugaciones estándar e imperativas rioplatenses/latinas (*cortá, cociná, agregá, serví, mezclá, dorá*) y vocabulario gastronómico específico.
+  - Corrección del bug donde recetas cargadas solo en español duplicaban su contenido en `instructions_en`, bloqueando falsamente la traducción.
+- [x] **Cascada Resiliente de Modelos de IA en `/api/translate`**:
+  - Implementación de cascada automática entre modelos Gemini (`gemini-3.1-flash-lite` -> `gemini-3.6-flash` -> `gemini-3.8-flash`) para mitigar saturación de cuota o errores 503 temporales.
+  - Fallback offline inmediato con diccionario culinario inteligente expandido, garantizando que el usuario nunca vea un error ni se quede sin instrucciones traducidas.
+- [x] **Selector Directo de Idioma y Traducción Rápida en Detalle (`RecipeDetailModal.tsx`)**:
+  - Conmutador directo `[ES | EN]` en la cabecera de las instrucciones.
+  - Botón interactivo de traducción directa con indicador de carga.
+  - Almacenamiento y persistencia local inmediata de las instrucciones traducidas para que estén listas sin esperas en el Modo Cocina y futuras visitas.
+- [x] **Normalización en Formulario y Listado (`RecipeFormModal.tsx` & `app/page.tsx`)**:
+  - Saneamiento en la ingesta de datos para evitar que `instructions_en` almacene copias en español.
+  - Fallback culinario inteligente integrado directamente en el guardado de nuevas recetas.
 
+---
+
+### ✅ Fase 12: Documentación Integral del Proyecto & Guía de Arquitectura (COMPLETADA)
+- [x] **Manual de Instalación y Referencia (`README.md`)**:
+  - Guía completa de inicio rápido, configuración de variables de entorno (`.env.local`), scripts npm y estructura de carpetas.
+  - Tabla de credenciales de prueba, detalles del stack tecnológico (Next.js 15 App Router, Supabase, Google GenAI SDK, Tailwind CSS) y notas sobre el funcionamiento offline-first.
+- [x] **Documento Técnico de Arquitectura (`docs/ARCHITECTURE.md`)**:
+  - Diagrama de flujo de datos y modelo de persistencia híbrida (`localStorage` v3 + Supabase PostgreSQL).
+  - Especificación técnica del motor de consolidación de compras (`lib/groceryConsolidator.ts`) y normalización de unidades.
+  - Detalle del sistema de fallback en cascada para la IA culinaria (`/api/chef-ai` y `/api/translate` con `lib/chefRemyOffline.ts`).
+  - Guía de onboarding para nuevos desarrolladores y mantenimiento futuro.
+- [x] **Comentarios JSDoc Exhaustivos en el Código**:
+  - Documentación de tipos e interfaces clave (`app/types.ts`).
+  - Comentarios explicativos en módulos de lógica de negocio (`lib/recipeStore.ts`, `lib/supabase.ts`, `lib/storage.ts`, `lib/groceryConsolidator.ts`, `lib/recipeTranslator.ts`, `lib/chefRemyOffline.ts`).
+  - Documentación a nivel de archivo y props en rutas de API (`/api/chef-ai`, `/api/translate`) y componentes principales (`app/page.tsx`, `RecipeDetailModal.tsx`, `CookingModeModal.tsx`, `ShoppingListModal.tsx`, `ChefAssistantModal.tsx`, `RecipeFormModal.tsx`).
 

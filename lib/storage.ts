@@ -1,7 +1,22 @@
+/**
+ * @file storage.ts
+ * @description Manejo de imágenes de recetas: compresión del lado del cliente y almacenamiento.
+ *
+ * Utiliza Canvas HTML5 para comprimir imágenes de alta resolución antes de la transferencia,
+ * reduciendo el consumo de ancho de banda y almacenamiento. Cuenta con fallback automático
+ * a Base64 (Data URL) si el bucket de Supabase no está creado o configurado.
+ */
+
 import { supabase } from './supabase';
 
 /**
- * Comprime una imagen en el cliente usando HTML Canvas para ahorrar ancho de banda y almacenamiento.
+ * Comprime una imagen en el navegador usando un elemento Canvas off-screen.
+ * Redimensiona proporcionalmente si el ancho supera `maxWidth` y comprime a formato JPEG.
+ *
+ * @param {File} file - Archivo de imagen seleccionado por el usuario.
+ * @param {number} [maxWidth=1600] - Ancho máximo permitido en píxeles.
+ * @param {number} [quality=0.85] - Calidad de compresión JPEG (0 a 1).
+ * @returns {Promise<Blob>} Blob de imagen optimizado listo para subir o convertir.
  */
 export async function compressImage(file: File, maxWidth = 1600, quality = 0.85): Promise<Blob> {
   return new Promise((resolve, reject) => {

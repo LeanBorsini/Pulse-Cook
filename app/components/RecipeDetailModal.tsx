@@ -1,5 +1,19 @@
 'use client';
 
+/**
+ * @file RecipeDetailModal.tsx
+ * @description Modal de visualización exhaustiva de una receta.
+ *
+ * Características:
+ * - Selector local de idioma [ES | EN] con botón de traducción automática interactiva.
+ * - Galería de imágenes (hasta 3 fotos) y visor de videos/YouTube embebido.
+ * - Ajuste interactivo de porciones (escalado de ingredientes).
+ * - Calificación comunitaria por estrellas y sección de comentarios con avatares.
+ * - Botón de acceso directo al Modo Cocina interactivo (`CookingModeModal`).
+ * - Impresión física / exportación PDF optimizada (`RecipePrintView`).
+ * - Inclusión/exclusión directa de la receta en el menú semanal para compras.
+ */
+
 import { useState, useEffect } from 'react';
 import {
   X,

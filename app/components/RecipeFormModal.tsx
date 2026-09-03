@@ -1,5 +1,19 @@
 'use client';
 
+/**
+ * @file RecipeFormModal.tsx
+ * @description Modal de creación y edición completa de recetas.
+ *
+ * Características:
+ * - Soporte para carga y edición bilingüe simultánea.
+ * - Auto-traducción asistida por IA (o diccionario offline de respaldo) al guardar o con botón interactivo.
+ * - Subida y compresión de hasta 3 fotos con previsualización inmediata.
+ * - Gestión dinámica de ingredientes con cantidades y unidades normalizadas.
+ * - Enlace a YouTube con reproductor embebido y múltiples enlaces adicionales.
+ * - Selección de etiquetas dietéticas rápidas (chips).
+ * - Guardado híbrido: actualiza `localStorage` de forma inmediata e intenta sincronizar con Supabase si está disponible.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';

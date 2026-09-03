@@ -1,16 +1,41 @@
+/**
+ * @file groceryConsolidator.ts
+ * @description Motor algorítmico de consolidación para la Lista de Compras inteligente.
+ *
+ * Responsabilidades:
+ * 1. Normalizar unidades de medida heterogéneas (ej. "grs", "gramos", "g" -> "g").
+ * 2. Unificar ingredientes duplicados mediante claves canónicas ("pechuga", "pollo", etc.).
+ * 3. Sumar matemáticamente cantidades de recetas distintas asociadas a la misma unidad.
+ * 4. Clasificar automáticamente los ingredientes en pasillos del supermercado:
+ *    (produce, meat, dairy, pantry, other).
+ */
+
 import { Recipe, Ingredient } from '../app/types';
 import { translateIngredientName } from './culinaryDictionary';
 
+/**
+ * Representa un artículo consolidado listo para la lista de compras del usuario.
+ */
 export interface ConsolidatedItem {
+  /** Clave canónica única para deduplicación (ej. 'pollo_pechuga') */
   key: string;
+  /** Nombre en español formateado para compras */
   name_es: string;
+  /** Nombre en inglés formateado para compras */
   name_en: string;
+  /** Cantidad matemática sumada de todas las recetas */
   amount: number;
+  /** Unidad de medida normalizada */
   unit: string;
+  /** Pasillo o categoría del supermercado */
   category: 'produce' | 'meat' | 'dairy' | 'pantry' | 'other';
+  /** Nombres de las recetas de origen que requieren este ingrediente */
   recipes: string[];
 }
 
+/**
+ * Nombres legibles bilingües de las categorías de pasillo del supermercado.
+ */
 export const CATEGORY_NAMES = {
   produce: { es: 'Frutas y Verduras', en: 'Produce & Vegetables' },
   meat: { es: 'Carnes y Proteínas', en: 'Meats & Proteins' },
@@ -19,7 +44,12 @@ export const CATEGORY_NAMES = {
   other: { es: 'Otros Artículos', en: 'Other Items' },
 };
 
-// Normalizar unidades comunes a un formato estándar
+/**
+ * Normaliza cadenas de unidades culinarias a una nomenclatura estándar común.
+ * 
+ * @param {string | undefined} unit - Unidad original (ej. 'cucharadas', 'tbsp', 'gramos').
+ * @returns {string} Unidad normalizada (ej. 'cda', 'g', 'kg', 'ml', 'und').
+ */
 export function normalizeUnit(unit: string | undefined): string {
   if (!unit) return '';
   const u = unit.toLowerCase().trim();
@@ -38,7 +68,13 @@ export function normalizeUnit(unit: string | undefined): string {
   return unit.trim();
 }
 
-// Normalizar nombres para unificar variaciones
+/**
+ * Normaliza nombres de ingredientes para unificar variaciones morfológicas o sinónimos.
+ * Remueve tildes, minúsculas y clasifica en el pasillo correspondiente.
+ *
+ * @param {string} name - Nombre bruto del ingrediente (ej. 'Pechuguitas de pollo').
+ * @returns {{ key: string, canonical_es: string, canonical_en: string, category: 'produce' | 'meat' | 'dairy' | 'pantry' | 'other' }}
+ */
 export function normalizeIngredientKey(name: string): {
   key: string;
   canonical_es: string;
@@ -225,7 +261,16 @@ export function normalizeIngredientKey(name: string): {
   };
 }
 
-// Consolidación y suma matemática de ingredientes
+/**
+ * Realiza la consolidación matemática y semántica de una lista de ingredientes.
+ * Agrupa duplicados sumando sus cantidades cuando coinciden en clave y unidad,
+ * redondea a 2 decimales y organiza el resultado por categorías de pasillo.
+ *
+ * @param {Ingredient[]} items - Lista de ingredientes brutos extraídos de las recetas del menú.
+ * @param {Recipe[]} recipes - Lista de recetas para recuperar sus títulos y asociarlas a los ítems.
+ * @param {'ES' | 'EN'} [lang='ES'] - Idioma para mostrar los títulos de las recetas de origen.
+ * @returns {Record<'produce' | 'meat' | 'dairy' | 'pantry' | 'other', ConsolidatedItem[]>} Mapa agrupado por pasillo.
+ */
 export function consolidateIngredients(
   items: Ingredient[],
   recipes: Recipe[],

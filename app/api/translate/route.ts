@@ -1,7 +1,32 @@
+/**
+ * @file route.ts
+ * @description Endpoint de servidor para la traducción culinaria bilingüe asistida por IA.
+ *
+ * Ruta: POST /api/translate
+ *
+ * Estrategia de Resiliencia:
+ * 1. Validación de entrada (título, descripción, instrucciones, idiomas origen/destino).
+ * 2. Cascada de modelos Gemini ('gemini-3.1-flash-lite' -> 'gemini-3.6-flash' -> 'gemini-3.8-flash').
+ * 3. En caso de ausencia de API key o fallo en todos los modelos, activa automáticamente el
+ *    diccionario culinario inteligente (`lib/recipeTranslator.ts`) para devolver una respuesta 200
+ *    completamente traducida y sin errores de interfaz.
+ */
+
 import { GoogleGenAI, Type } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { translateTextSmart } from '@/lib/recipeTranslator';
 
+/**
+ * Procesa la solicitud de traducción de una receta.
+ *
+ * @param {NextRequest} req - Request que contiene:
+ *   - title: string
+ *   - description?: string
+ *   - instructions: string
+ *   - sourceLang: 'ES' | 'EN'
+ *   - targetLang: 'ES' | 'EN'
+ * @returns {Promise<NextResponse>} JSON con los campos traducidos y etiquetas sugeridas.
+ */
 export async function POST(req: NextRequest) {
   let title = '';
   let description = '';

@@ -1,17 +1,47 @@
-// Motor de contingencia del Chef Remy para cuando no hay API Key de Gemini o falla la conexión
+/**
+ * @file chefRemyOffline.ts
+ * @description Motor heurístico y de reglas offline para el Asistente Culinario "Chef Remy".
+ *
+ * Actúa como mecanismo de contingencia (*zero-failure fallback*) cuando:
+ * 1. No se ha proporcionado la variable de entorno `GEMINI_API_KEY`.
+ * 2. La API de Google Gemini experimenta cortes temporales o límites de cuota (HTTP 429/503).
+ * 3. El usuario se encuentra sin conexión a internet en la cocina.
+ */
 
+/**
+ * Estructura de receta producida por el asistente Chef Remy.
+ */
 export interface RemyRecipeResult {
+  /** Título de la receta sugerida */
   title: string;
+  /** Descripción y justificación culinaria */
   description: string;
+  /** Tiempo de preparación estimado en minutos */
   prepTime: number;
+  /** Número de comensales */
   servings: number;
+  /** Categoría del plato */
   category: string;
+  /** Etiquetas dietéticas sugeridas */
   dietaryTags: string[];
+  /** Ingredientes cuantificados */
   ingredients: { amount: number; unit: string; name_es: string; name_en: string }[];
+  /** Pasos numerados de cocción */
   instructions: string[];
+  /** Consejo o secreto de cocina de Remy */
   chefTip: string;
 }
 
+/**
+ * Genera una receta equilibrada basada en los ingredientes disponibles del usuario sin llamar a IA externa.
+ *
+ * @param {string[]} ingredients - Lista de ingredientes que el usuario tiene a mano.
+ * @param {number} [servings=2] - Cantidad de porciones deseadas.
+ * @param {number} [prepTime=20] - Tiempo límite disponible en minutos.
+ * @param {string} [dietaryGoal='No restrictions'] - Preferencia o restricción alimentaria.
+ * @param {'ES' | 'EN'} [lang='ES'] - Idioma en el cual generar el contenido.
+ * @returns {RemyRecipeResult} Receta completa lista para cocinar o guardar.
+ */
 export function generateRemyFallbackRecipe(
   ingredients: string[],
   servings: number = 2,
@@ -62,6 +92,13 @@ export function generateRemyFallbackRecipe(
   };
 }
 
+/**
+ * Sugiere sustitutos culinarios fiables y sus proporciones cuando falta un ingrediente.
+ *
+ * @param {string} targetIngredient - Nombre del ingrediente que el usuario necesita sustituir.
+ * @param {'ES' | 'EN'} [lang='ES'] - Idioma de la respuesta.
+ * @returns {{ substitute: string, ratio: string, explanation: string }} Sustituto, proporción y justificación técnica.
+ */
 export function generateRemyFallbackSubstitute(
   targetIngredient: string,
   lang: 'ES' | 'EN' = 'ES'

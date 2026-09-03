@@ -1,5 +1,18 @@
 'use client';
 
+/**
+ * @file CookingModeModal.tsx
+ * @description Modal de pantalla completa interactivo para el "Modo Cocina".
+ *
+ * Características:
+ * - Vista enfocada paso a paso con controles táctiles grandes para usar en la cocina.
+ * - Detección automática de temporizadores dentro del texto de las instrucciones
+ *   (ej. "cocinar 10 minutos") con cuenta regresiva en tiempo real y alerta sonora (Web Audio API).
+ * - Lectura en voz alta de los pasos (Text-to-Speech con SpeechSynthesis).
+ * - Control por voz opcional (SpeechRecognition para avanzar o retroceder manos libres).
+ * - Lista de ingredientes con checkboxes interactivos para chequear ingredientes en tiempo real.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Recipe, Ingredient } from '../types';
 import {

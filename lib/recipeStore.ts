@@ -1,14 +1,31 @@
+/**
+ * @file recipeStore.ts
+ * @description Capa de persistencia local (Offline-First) en el navegador usando localStorage.
+ * Permite guardar, recuperar, actualizar y eliminar recetas e ingredientes asociados
+ * sin depender de conexión a internet o de la disponibilidad de Supabase.
+ *
+ * Incluye lógica de migración para esquemas v2 -> v3 y purga estricta de recetas demo.
+ */
+
 import { Recipe, Ingredient } from '../app/types';
 
+/** Clave de localStorage para el arreglo principal de recetas del usuario */
 const RECIPES_STORAGE_KEY = 'pulse_cook_local_recipes_v3';
+
+/** Clave de localStorage para el mapa de ingredientes { [recipeId]: Ingredient[] } */
 const INGREDIENTS_STORAGE_KEY = 'pulse_cook_local_ingredients_v3';
+
+/** Clave heredada de versiones previas para facilitar la migración automática */
 const LEGACY_STORAGE_KEY = 'pulse_cook_local_recipes_v2';
 
+/** Conjunto de identificadores de recetas de prueba que deben ser excluidas permanentemente */
 const DEMO_IDS = new Set(['rec_1', 'rec_2', 'rec_3', 'rec_4', '1', '2', '3', '4']);
 
 /**
- * Obtiene las recetas guardadas localmente creadas por el usuario.
- * Excluye y purga permanentemente cualquier receta de ejemplo o demo.
+ * Obtiene todas las recetas guardadas localmente por el usuario.
+ * Realiza migración transparente desde esquemas anteriores y filtra demos.
+ *
+ * @returns {Recipe[]} Lista de recetas locales válidas del usuario.
  */
 export function getLocalRecipes(): Recipe[] {
   if (typeof window === 'undefined') return [];

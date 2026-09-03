@@ -1,5 +1,16 @@
 'use client';
 
+/**
+ * @file ChefAssistantModal.tsx
+ * @description Interfaz interactiva del Asistente Culinario "Chef Remy".
+ *
+ * Características:
+ * - Pestaña 1: "Nevera Inteligente" (Sugerir recetas según ingredientes disponibles, porciones, tiempo y dieta).
+ * - Pestaña 2: "Sustituciones" (Buscar alternativas gastronómicas con equivalencias técnicas).
+ * - Permite guardar las recetas generadas por Remy directamente en el recetario del usuario
+ *   con un solo clic (vía `onSaveRecipe`).
+ */
+
 import { useState } from 'react';
 import {
   Sparkles,
