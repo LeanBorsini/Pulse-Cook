@@ -263,7 +263,12 @@ export default function Home() {
             description_es: item.description_es || item.description_en || '',
             description_en: item.description_en || item.description_es || '',
             instructions_es: item.instructions_es || item.instructions_en || '',
-            instructions_en: item.instructions_en || item.instructions_es || '',
+            instructions_en:
+              item.instructions_en &&
+              item.instructions_en.trim() !== '' &&
+              item.instructions_en !== item.instructions_es
+                ? item.instructions_en
+                : '',
             youtube_url: item.youtube_url || '',
             video_links: Array.isArray(item.video_links) ? item.video_links : [],
             image_url: item.image_url || (imagesList.length > 0 ? imagesList[0] : ''),

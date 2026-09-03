@@ -25,6 +25,12 @@ import { RecipePrintView } from './RecipePrintView';
 import { CookingModeModal } from './CookingModeModal';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
 import { saveLocalRecipe } from '../../lib/recipeStore';
+import {
+  hasGenuineEnglishInstructions,
+  hasGenuineSpanishInstructions,
+  isSpanishCulinaryText,
+  translateTextSmart,
+} from '../../lib/recipeTranslator';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -69,7 +75,9 @@ export function RecipeDetailModal({
 }: RecipeDetailModalProps) {
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [dynamicLang, setDynamicLang] = useState<'ES' | 'EN'>(lang);
+  const [overrideLang, setOverrideLang] = useState<'ES' | 'EN' | null>(null);
+  const [prevRecipeId, setPrevRecipeId] = useState(recipe.id);
+  const [prevLang, setPrevLang] = useState(lang);
   const [translatingView, setTranslatingView] = useState(false);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
@@ -79,6 +87,17 @@ export function RecipeDetailModal({
     description?: string;
     instructions?: string;
   } | null>(null);
+
+  // Sincronizar estado cuando cambia el idioma base o la receta seleccionada
+  if (recipe.id !== prevRecipeId || lang !== prevLang) {
+    setPrevRecipeId(recipe.id);
+    setPrevLang(lang);
+    setOverrideLang(null);
+    setTranslatedContent(null);
+  }
+
+  const dynamicLang: 'ES' | 'EN' = overrideLang || lang;
+  const setDynamicLang = (newLang: 'ES' | 'EN') => setOverrideLang(newLang);
 
   // Cerrar con tecla Escape
   useEffect(() => {
@@ -109,39 +128,40 @@ export function RecipeDetailModal({
   const currentVideo = videoList[activeVideoIndex] || videoList[0];
   const youtubeEmbed = getEmbedYoutubeUrl(currentVideo?.url);
 
-  // Detección real de disponibilidad lingüística en la receta
-  const hasEsInstructions = Boolean(recipe.instructions_es && recipe.instructions_es.trim().length > 0);
-  const hasEnInstructions = Boolean(recipe.instructions_en && recipe.instructions_en.trim().length > 0);
+  // Detección real y precisa de disponibilidad lingüística genuina en la receta
+  const hasValidEn = hasGenuineEnglishInstructions(recipe.instructions_en, recipe.instructions_es);
+  const hasValidEs = hasGenuineSpanishInstructions(recipe.instructions_es, recipe.instructions_en);
 
   // Textos a mostrar según el idioma dinámico seleccionado
   const displayedTitle =
     translatedContent?.title ||
     (dynamicLang === 'ES' 
       ? (recipe.title_es || recipe.title_en || '') 
-      : (recipe.title_en || recipe.title_es || ''));
+      : (recipe.title_en && recipe.title_en !== recipe.title_es ? recipe.title_en : (recipe.title_en || recipe.title_es || '')));
 
   const displayedDesc =
     translatedContent?.description ||
     (dynamicLang === 'ES' 
       ? (recipe.description_es || recipe.description_en || '') 
-      : (recipe.description_en || recipe.description_es || ''));
+      : (recipe.description_en && recipe.description_en !== recipe.description_es ? recipe.description_en : (recipe.description_en || recipe.description_es || '')));
 
+  // Instrucciones activas para el idioma dinámico seleccionado
   const displayedInstructions =
     translatedContent?.instructions ||
     (dynamicLang === 'ES'
-      ? (recipe.instructions_es || recipe.instructions_en || '')
-      : (recipe.instructions_en || recipe.instructions_es || ''));
+      ? (hasValidEs ? recipe.instructions_es : (recipe.instructions_es || recipe.instructions_en || ''))
+      : (hasValidEn ? recipe.instructions_en : (recipe.instructions_en && !isSpanishCulinaryText(recipe.instructions_en) ? recipe.instructions_en : '')));
 
-  // Indicador claro de si las instrucciones mostradas están en el otro idioma y necesitan traducción
+  // Indicador de si las instrucciones mostradas en el idioma activo no están traducidas
   const needsTranslationToActiveLang =
-    (dynamicLang === 'EN' && !hasEnInstructions && !translatedContent?.instructions && hasEsInstructions) ||
-    (dynamicLang === 'ES' && !hasEsInstructions && !translatedContent?.instructions && hasEnInstructions);
+    (dynamicLang === 'EN' && !hasValidEn && !translatedContent?.instructions && Boolean(recipe.instructions_es || recipe.instructions_en)) ||
+    (dynamicLang === 'ES' && !hasValidEs && !translatedContent?.instructions && Boolean(recipe.instructions_en || recipe.instructions_es));
 
   const handleInstantTranslate = async (forceTargetLang?: 'ES' | 'EN') => {
     const target = forceTargetLang || (dynamicLang === 'ES' ? 'EN' : 'ES');
 
-    // Si ya existe la traducción guardada directamente en el objeto de la receta
-    if (target === 'ES' && recipe.instructions_es && recipe.instructions_es.trim()) {
+    // Si ya existe la traducción guardada directamente en el objeto de la receta y es genuina
+    if (target === 'ES' && hasValidEs && recipe.instructions_es && recipe.instructions_es.trim()) {
       setDynamicLang('ES');
       setTranslatedContent((prev) => ({
         ...prev,
@@ -151,7 +171,7 @@ export function RecipeDetailModal({
       }));
       return;
     }
-    if (target === 'EN' && recipe.instructions_en && recipe.instructions_en.trim()) {
+    if (target === 'EN' && hasValidEn && recipe.instructions_en && recipe.instructions_en.trim()) {
       setDynamicLang('EN');
       setTranslatedContent((prev) => ({
         ...prev,
@@ -165,7 +185,9 @@ export function RecipeDetailModal({
     // Determinar con certeza los textos fuente para traducir
     const sourceTextTitle = target === 'EN' ? (recipe.title_es || displayedTitle) : (recipe.title_en || displayedTitle);
     const sourceTextDesc = target === 'EN' ? (recipe.description_es || displayedDesc) : (recipe.description_en || displayedDesc);
-    const sourceTextInst = target === 'EN' ? (recipe.instructions_es || displayedInstructions) : (recipe.instructions_en || displayedInstructions);
+    const sourceTextInst = target === 'EN'
+      ? (recipe.instructions_es || recipe.instructions_en || '')
+      : (recipe.instructions_en || recipe.instructions_es || '');
     const sourceLang: 'ES' | 'EN' = target === 'EN' ? 'ES' : 'EN';
 
     setTranslatingView(true);
@@ -184,33 +206,53 @@ export function RecipeDetailModal({
       });
 
       const data = await res.json();
-      if (res.ok && data) {
+      if (res.ok && data && data.translatedInstructions) {
+        const translatedInst = data.translatedInstructions;
+        const translatedTitle = data.translatedTitle || sourceTextTitle;
+        const translatedDesc = data.translatedDescription || sourceTextDesc;
+
         setTranslatedContent({
-          title: data.translatedTitle || sourceTextTitle,
-          description: data.translatedDescription || sourceTextDesc,
-          instructions: data.translatedInstructions || sourceTextInst,
+          title: translatedTitle,
+          description: translatedDesc,
+          instructions: translatedInst,
         });
         setDynamicLang(target);
 
-        // Guardar y persistir la traducción para que quede disponible permanentemente sin mutar props
+        // Guardar y persistir la traducción en almacenamiento local
         const updatedRecipe: Recipe = {
           ...recipe,
           ...(target === 'EN'
             ? {
-                title_en: data.translatedTitle || recipe.title_en,
-                description_en: data.translatedDescription || recipe.description_en,
-                instructions_en: data.translatedInstructions || recipe.instructions_en,
+                title_en: translatedTitle,
+                description_en: translatedDesc,
+                instructions_en: translatedInst,
               }
             : {
-                title_es: data.translatedTitle || recipe.title_es,
-                description_es: data.translatedDescription || recipe.description_es,
-                instructions_es: data.translatedInstructions || recipe.instructions_es,
+                title_es: translatedTitle,
+                description_es: translatedDesc,
+                instructions_es: translatedInst,
               }),
         };
         saveLocalRecipe(updatedRecipe, ingredients);
+      } else {
+        // Fallback inmediato con el diccionario culinario inteligente
+        const fallbackInst = translateTextSmart(sourceTextInst, sourceLang, target);
+        setTranslatedContent({
+          title: sourceTextTitle,
+          description: sourceTextDesc,
+          instructions: fallbackInst,
+        });
+        setDynamicLang(target);
       }
     } catch (err) {
-      console.warn('Instant translation error:', err);
+      console.warn('Instant translation error, using smart culinary dictionary:', err);
+      const fallbackInst = translateTextSmart(sourceTextInst, sourceLang, target);
+      setTranslatedContent({
+        title: sourceTextTitle,
+        description: sourceTextDesc,
+        instructions: fallbackInst,
+      });
+      setDynamicLang(target);
     } finally {
       setTranslatingView(false);
     }
@@ -610,18 +652,47 @@ export function RecipeDetailModal({
                 {dynamicLang === 'ES' ? 'Instrucciones' : 'Instructions'}
               </h3>
               
-              {/* Botón contextual de traducción de instrucciones */}
-              {needsTranslationToActiveLang && (
+              <div className="flex items-center gap-1.5">
+                {/* Selector de idioma específico para las instrucciones */}
+                <div className="inline-flex rounded-lg border border-[#D8D3C4] p-0.5 bg-[#EFECE1]">
+                  <button
+                    type="button"
+                    onClick={() => handleInstantTranslate('ES')}
+                    disabled={translatingView}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer ${
+                      dynamicLang === 'ES'
+                        ? 'bg-[#2C3523] text-white shadow-xs'
+                        : 'text-[#5C6650] hover:text-[#2C3523]'
+                    }`}
+                  >
+                    ES
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInstantTranslate('EN')}
+                    disabled={translatingView}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors cursor-pointer ${
+                      dynamicLang === 'EN'
+                        ? 'bg-[#2C3523] text-white shadow-xs'
+                        : 'text-[#5C6650] hover:text-[#2C3523]'
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
+
+                {/* Botón de traducción directa */}
                 <button
                   type="button"
-                  onClick={() => handleInstantTranslate(dynamicLang)}
+                  onClick={() => handleInstantTranslate(dynamicLang === 'ES' ? 'EN' : 'ES')}
                   disabled={translatingView}
-                  className="text-[11px] text-amber-700 hover:text-amber-800 font-semibold flex items-center gap-1 cursor-pointer bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg"
+                  className="text-[11px] text-amber-700 hover:text-amber-800 font-semibold flex items-center gap-1 cursor-pointer bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-lg transition-colors"
+                  title={dynamicLang === 'ES' ? 'Traducir al inglés' : 'Translate to Spanish'}
                 >
                   {translatingView ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-amber-600" />}
-                  <span>{dynamicLang === 'ES' ? 'Traducir al español' : 'Translate to English'}</span>
+                  <span>{dynamicLang === 'ES' ? 'Traducir al Inglés' : 'Traducir al Español'}</span>
                 </button>
-              )}
+              </div>
             </div>
 
             {/* Banner destacado si las instrucciones están en otro idioma */}
@@ -659,9 +730,9 @@ export function RecipeDetailModal({
                 {displayedInstructions}
               </div>
             ) : (
-              <p className="text-xs text-stone-400 italic">
-                {dynamicLang === 'ES' ? 'No hay instrucciones escritas para esta receta.' : 'No instructions provided.'}
-              </p>
+              <div className="text-xs text-[#2C3523] whitespace-pre-line leading-relaxed bg-[#EFECE1] p-3.5 rounded-xl border border-[#D8D3C4]">
+                {recipe.instructions_es || recipe.instructions_en || (dynamicLang === 'ES' ? 'No hay instrucciones escritas.' : 'No instructions provided.')}
+              </div>
             )}
           </div>
 

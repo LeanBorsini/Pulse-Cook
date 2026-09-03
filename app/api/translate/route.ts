@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    title = body.title;
-    description = body.description;
-    instructions = body.instructions;
-    sourceLang = body.sourceLang;
-    targetLang = body.targetLang;
+    title = (body.title || '').trim();
+    description = (body.description || '').trim();
+    instructions = (body.instructions || '').trim();
+    sourceLang = body.sourceLang === 'EN' ? 'EN' : 'ES';
+    targetLang = body.targetLang === 'ES' ? 'ES' : 'EN';
 
     if (!title && !description && !instructions) {
       return NextResponse.json({ error: 'No content provided to translate' }, { status: 400 });
@@ -53,47 +53,83 @@ export async function POST(req: NextRequest) {
     const sourceLanguageName = sourceLang === 'EN' ? 'English' : 'Spanish';
 
     const prompt = `You are an expert culinary translator and professional chef.
-Translate the following recipe text fields from ${sourceLanguageName} to natural, appetizing, grammatically perfect ${targetLanguageName}.
-Keep culinary terms accurate, measurements clear, and instruction steps properly formatted.
-Title: "${title || ''}"
-Description: "${description || ''}"
-Instructions:
-${instructions || ''}`;
+Translate the following recipe content from ${sourceLanguageName} into natural, appetizing, grammatically correct ${targetLanguageName}.
+Keep culinary terms accurate, measurements clear, and instruction steps properly formatted and numbered if numbered in original.
+Do not leave any words in ${sourceLanguageName}.
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            translatedTitle: {
-              type: Type.STRING,
-              description: 'The translated recipe title',
-            },
-            translatedDescription: {
-              type: Type.STRING,
-              description: 'The translated recipe description',
-            },
-            translatedInstructions: {
-              type: Type.STRING,
-              description: 'The translated recipe step-by-step instructions',
-            },
-            suggestedTags: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: 'Dietary or culinary tags such as Sin Gluten, Sin Lácteos, Vegetariano, Vegano, Rápido, Postre, etc.',
+Recipe Title: "${title}"
+Recipe Description: "${description}"
+Recipe Instructions:
+${instructions}`;
+
+    let responseText = '';
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'];
+
+    for (const modelName of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                translatedTitle: {
+                  type: Type.STRING,
+                  description: 'The translated recipe title',
+                },
+                translatedDescription: {
+                  type: Type.STRING,
+                  description: 'The translated recipe description',
+                },
+                translatedInstructions: {
+                  type: Type.STRING,
+                  description: 'The translated recipe step-by-step instructions',
+                },
+                suggestedTags: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: 'Dietary or culinary tags such as Gluten-Free, Dairy-Free, Vegetarian, Vegan, Quick, Healthy, etc.',
+                },
+              },
+              required: ['translatedInstructions'],
             },
           },
-          required: ['translatedTitle', 'translatedDescription', 'translatedInstructions'],
-        },
-      },
+        });
+
+        if (response.text && response.text.trim()) {
+          responseText = response.text;
+          break;
+        }
+      } catch (err) {
+        console.warn(`Translation attempt with model ${modelName} failed, trying next candidate:`, err);
+      }
+    }
+
+    if (!responseText) {
+      throw new Error('All candidate translation models failed or were unavailable');
+    }
+
+    let rawText = responseText.trim();
+    if (rawText.startsWith('```json')) {
+      rawText = rawText.slice(7);
+    } else if (rawText.startsWith('```')) {
+      rawText = rawText.slice(3);
+    }
+    if (rawText.endsWith('```')) {
+      rawText = rawText.slice(0, -3);
+    }
+    rawText = rawText.trim();
+
+    const result = JSON.parse(rawText || '{}');
+
+    return NextResponse.json({
+      translatedTitle: result.translatedTitle || fallbackTitle || title,
+      translatedDescription: result.translatedDescription || fallbackDesc || description,
+      translatedInstructions: result.translatedInstructions || fallbackInst || instructions,
+      suggestedTags: result.suggestedTags || ['Saludable'],
     });
-
-    const result = JSON.parse(response.text || '{}');
-
-    return NextResponse.json(result);
   } catch (error: unknown) {
     console.error('Translation API error, utilizing culinary engine fallback:', error);
     return NextResponse.json({

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { uploadRecipeImage } from '@/lib/storage';
 import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
+import { translateTextSmart } from '@/lib/recipeTranslator';
 
 interface RecipeFormModalProps {
   recipeToEdit?: Recipe | null;
@@ -313,27 +314,27 @@ export function RecipeFormModal({
           });
         }
       } else {
-        // Fallback: usar el mismo texto si la API de traducción no responde
+        // Fallback: usar el diccionario inteligente culinario si la API de traducción no responde
         if (sourceLang === 'ES') {
           title_en = title;
           desc_en = description;
-          inst_en = instructions;
+          inst_en = translateTextSmart(instructions, 'ES', 'EN');
         } else {
           title_es = title;
           desc_es = description;
-          inst_es = instructions;
+          inst_es = translateTextSmart(instructions, 'EN', 'ES');
         }
       }
     } catch (err) {
-      console.warn('Auto-translation failed during save, falling back to original text:', err);
+      console.warn('Auto-translation failed during save, falling back to smart culinary dictionary:', err);
       if (formInputLang === 'ES') {
         title_en = title;
         desc_en = description;
-        inst_en = instructions;
+        inst_en = translateTextSmart(instructions, 'ES', 'EN');
       } else {
         title_es = title;
         desc_es = description;
-        inst_es = instructions;
+        inst_es = translateTextSmart(instructions, 'EN', 'ES');
       }
     }
 
