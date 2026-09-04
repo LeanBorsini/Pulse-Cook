@@ -159,25 +159,33 @@ export function RecipeDetailModal({
     translatedContent?.title ||
     (dynamicLang === 'ES' 
       ? (recipe.title_es || recipe.title_en || '') 
-      : (recipe.title_en && recipe.title_en !== recipe.title_es ? recipe.title_en : (recipe.title_en || recipe.title_es || '')));
+      : (hasValidEn && recipe.title_en && recipe.title_en !== recipe.title_es
+          ? recipe.title_en
+          : translateTextSmart(recipe.title_en || recipe.title_es, 'ES', 'EN')));
 
   const displayedDesc =
     translatedContent?.description ||
     (dynamicLang === 'ES' 
       ? (recipe.description_es || recipe.description_en || '') 
-      : (recipe.description_en && recipe.description_en !== recipe.description_es ? recipe.description_en : (recipe.description_en || recipe.description_es || '')));
+      : (hasValidEn && recipe.description_en && recipe.description_en !== recipe.description_es
+          ? recipe.description_en
+          : translateTextSmart(recipe.description_en || recipe.description_es, 'ES', 'EN')));
 
   // Instrucciones activas para el idioma dinámico seleccionado
   const displayedInstructions =
     translatedContent?.instructions ||
     (dynamicLang === 'ES'
       ? (hasValidEs ? recipe.instructions_es : (recipe.instructions_es || recipe.instructions_en || ''))
-      : (hasValidEn ? recipe.instructions_en : (translatedContent?.instructions || (translatingView ? '' : (recipe.instructions_en && !isSpanishCulinaryText(recipe.instructions_en) ? recipe.instructions_en : '')))));
+      : (hasValidEn
+          ? recipe.instructions_en
+          : (translatingView
+              ? ''
+              : translateTextSmart(recipe.instructions_en || recipe.instructions_es, 'ES', 'EN'))));
 
   // Indicador de si las instrucciones mostradas en el idioma activo no están traducidas
   const needsTranslationToActiveLang =
-    (dynamicLang === 'EN' && !hasValidEn && !translatedContent?.instructions && Boolean(recipe.instructions_es || recipe.instructions_en)) ||
-    (dynamicLang === 'ES' && !hasValidEs && !translatedContent?.instructions && Boolean(recipe.instructions_en || recipe.instructions_es));
+    (dynamicLang === 'EN' && (!hasValidEn || !hasGenuineEnglishInstructions(translatedContent?.instructions, recipe.instructions_es)) && Boolean(recipe.instructions_es || recipe.instructions_en)) ||
+    (dynamicLang === 'ES' && (!hasValidEs || !hasGenuineSpanishInstructions(translatedContent?.instructions, recipe.instructions_en)) && Boolean(recipe.instructions_en || recipe.instructions_es));
 
   // Determinar la acción exacta para el botón de traducción
   const targetForTranslateAction: 'ES' | 'EN' = (() => {
@@ -211,10 +219,10 @@ export function RecipeDetailModal({
     // Determinar con certeza los textos fuente para traducir
     const sourceTextTitle = target === 'EN' ? (recipe.title_es || displayedTitle) : (recipe.title_en || displayedTitle);
     const sourceTextDesc = target === 'EN' ? (recipe.description_es || displayedDesc) : (recipe.description_en || displayedDesc);
-    // Para instrucciones: si vamos a EN, preferir siempre las instrucciones en español originales para evitar traducir textos corruptos en Spanglish
+    // Para instrucciones: si vamos a EN, preferir siempre las instrucciones originales para evitar traducir textos corruptos en Spanglish
     const sourceTextInst = target === 'EN'
-      ? (recipe.instructions_es || (hasValidEn ? recipe.instructions_en : '') || recipe.instructions_en || '')
-      : (recipe.instructions_en || (hasValidEs ? recipe.instructions_es : '') || recipe.instructions_es || '');
+      ? (recipe.instructions_es || recipe.instructions_en || '')
+      : (recipe.instructions_en || recipe.instructions_es || '');
     const sourceLang: 'ES' | 'EN' = target === 'EN' ? 'ES' : 'EN';
 
     const commentsPayload = comments.map((c) => ({
@@ -240,9 +248,16 @@ export function RecipeDetailModal({
 
       const data = await res.json();
       if (res.ok && data && (data.translatedInstructions || data.translatedTitle)) {
-        const translatedInst = data.translatedInstructions || sourceTextInst;
-        const translatedTitle = data.translatedTitle || sourceTextTitle;
-        const translatedDesc = data.translatedDescription || sourceTextDesc;
+        let translatedInst = (data.translatedInstructions || sourceTextInst).trim();
+        const translatedTitle = (data.translatedTitle || sourceTextTitle).trim();
+        const translatedDesc = (data.translatedDescription || sourceTextDesc).trim();
+
+        // Limpieza profunda si el objetivo es EN y aún quedan residuos de Spanglish
+        if (target === 'EN' && !hasGenuineEnglishInstructions(translatedInst, sourceTextInst)) {
+          translatedInst = translateTextSmart(translatedInst, 'ES', 'EN');
+        } else if (target === 'ES' && !hasGenuineSpanishInstructions(translatedInst, sourceTextInst)) {
+          translatedInst = translateTextSmart(translatedInst, 'EN', 'ES');
+        }
 
         setTranslatedContent({
           title: translatedTitle,
@@ -281,9 +296,10 @@ export function RecipeDetailModal({
           onRecipeUpdated(updatedRecipe);
         }
       } else {
-        // En caso de fallo o modo sin conexión, mantener el texto limpio sin corromperlo con Spanglish
+        // En caso de fallo de red o modo sin conexión, aplicar motor culinario limpio sin Spanglish
         const fallbackTitle = translateTextSmart(sourceTextTitle, sourceLang, target);
         const fallbackDesc = translateTextSmart(sourceTextDesc, sourceLang, target);
+        const fallbackInst = translateTextSmart(sourceTextInst, sourceLang, target);
         const fallbackCommMap: Record<string, string> = {};
         comments.forEach((c) => {
           fallbackCommMap[c.id] = translateTextSmart(c.message, sourceLang, target) || c.message;
@@ -292,7 +308,7 @@ export function RecipeDetailModal({
         setTranslatedContent({
           title: fallbackTitle || sourceTextTitle,
           description: fallbackDesc || sourceTextDesc,
-          instructions: sourceTextInst,
+          instructions: fallbackInst || sourceTextInst,
         });
         setTranslatedComments(fallbackCommMap);
         setDynamicLang(target);
@@ -301,6 +317,7 @@ export function RecipeDetailModal({
       console.warn('Instant translation error:', err);
       const fallbackTitle = translateTextSmart(sourceTextTitle, sourceLang, target);
       const fallbackDesc = translateTextSmart(sourceTextDesc, sourceLang, target);
+      const fallbackInst = translateTextSmart(sourceTextInst, sourceLang, target);
       const fallbackCommMap: Record<string, string> = {};
       comments.forEach((c) => {
         fallbackCommMap[c.id] = translateTextSmart(c.message, sourceLang, target) || c.message;
@@ -309,7 +326,7 @@ export function RecipeDetailModal({
       setTranslatedContent({
         title: fallbackTitle || sourceTextTitle,
         description: fallbackDesc || sourceTextDesc,
-        instructions: sourceTextInst,
+        instructions: fallbackInst || sourceTextInst,
       });
       setTranslatedComments(fallbackCommMap);
       setDynamicLang(target);

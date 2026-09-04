@@ -13,6 +13,43 @@
 // Diccionario de frases y pasos culinarios frecuentes
 // Diccionario de frases y pasos culinarios frecuentes con límites de palabra (\b)
 const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
+  // Reparaciones de Spanglish frecuente y frases compuestas
+  [/\ben\s+una\s+baking\s+dish\b/gi, 'in a baking dish'],
+  [/\b(lo\s+)?llevamos\s+a\s+cook\s+por\s+unos\s+minutos\b/gi, 'bake for a few minutes'],
+  [/\b(lo\s+)?llevamos\s+a\s+cocinar\s+por\s+unos\s+minutos\b/gi, 'bake for a few minutes'],
+  [/\b(lo\s+)?llevamos\s+a\s+cook\b/gi, 'bake it'],
+  [/\b(lo\s+)?llevamos\s+a\s+cocinar\b/gi, 'bake it'],
+  [/\bhasta\s+que\s+est[eé]n\s+golden\s+brown\b/gi, 'until golden brown'],
+  [/\bhasta\s+que\s+est[eé]n\s+(doradas|dorados)\b/gi, 'until golden brown'],
+  [/\bcolocar\s+en\s+un\s+procesador\s+de\s+alimentos\b/gi, 'place in a food processor'],
+  [/\bcolocamos\s+en\s+un\s+procesador\s+de\s+alimentos\b/gi, 'place in a food processor'],
+  [/\b(lo\s+)?trituramos\s+hasta\s+conseguir\s+una\s+masa\s+homog[eé]nea\b/gi, 'blend until a smooth, uniform dough is formed'],
+  [/\bhasta\s+conseguir\s+una\s+masa\s+homog[eé]nea\b/gi, 'until a smooth dough is formed'],
+  [/\bluego\s+vamos\s+a\s+colocar\b/gi, 'next, apply'],
+  [/\bvamos\s+a\s+colocar\b/gi, 'apply'],
+  [/\bpor\s+nuestras\s+manos\b/gi, 'to your hands'],
+  [/\ben\s+las\s+manos\b/gi, 'on your hands'],
+  [/\bpara\s+poder\s+dar\s+forma\s+de\s+nuggets\b/gi, 'to shape the mixture into nuggets'],
+  [/\bdar\s+forma\s+de\s+nuggets\b/gi, 'shape into nuggets'],
+  [/\bdar\s+forma\s+de\b/gi, 'shape into'],
+  [/\bmientras\s+vamos\s+poni[eé]ndolas\s+en\b/gi, 'placing them onto'],
+  [/\bpor\s+unos\s+minutos\b/gi, 'for a few minutes'],
+  [/\bun\s+poco\s+de\b/gi, 'a little'],
+
+  // Ingredientes culinarios específicos (evita Spanglish en pechuga, zapallo, etc.)
+  [/\bpechuga\s+de\s+pollo\b/gi, 'chicken breast'],
+  [/\bpechugas?\b/gi, 'chicken breast'],
+  [/\b(zapallo|calabaza)\s+(anam[aá]|anco|butternut)\b/gi, 'butternut squash'],
+  [/\b(zapallo|calabaza)\b/gi, 'butternut squash'],
+  [/\bharina\s+de\s+avena\b/gi, 'oat flour'],
+  [/\baceite\s+de\s+oliva\b/gi, 'olive oil'],
+  [/\bcebolla\s+(blanca|morada|picada)?\b/gi, 'onion'],
+  [/\bpimienta\s+negra\b/gi, 'black pepper'],
+  [/\bpimienta\b/gi, 'pepper'],
+  [/\bor[eé]gano\b/gi, 'oregano'],
+  [/\bpaprika\b/gi, 'paprika'],
+  [/\bfuente\s+(para\s+horno|apta\s+para\s+horno)\b/gi, 'baking dish'],
+
   // Pasos e imperativos completos
   [/\b(cort[aá]|cortar)\s+los\s+pimientos\b/gi, 'dice the bell peppers'],
   [/\b(cort[aá]|cortar)\s+la\s+cebolla\b/gi, 'chop the onion'],
@@ -35,7 +72,6 @@ const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
   [/\bprocesar\s+hasta\b/gi, 'process until'],
   [/\btriturar\s+hasta\b/gi, 'blend until'],
   [/\bmezclar\s+en\s+un\s+bol\b/gi, 'mix in a bowl'],
-  [/\bfuente\s+apta\s+para\s+horno\b/gi, 'baking dish'],
   [/\ben\s+cubitos|\ben\s+cubos\b/gi, 'into cubes'],
   [/\ben\s+una\s+sartén\b/gi, 'in a skillet'],
   [/\ba\s+fuego\s+medio\b/gi, 'over medium heat'],

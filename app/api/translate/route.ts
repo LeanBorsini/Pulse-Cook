@@ -98,7 +98,22 @@ Translate the following recipe content from ${sourceLanguageName} into natural, 
 CRITICAL REQUIREMENTS:
 1. Complete translation: Translate the Title, Description, and Instructions 100% into ${targetLanguageName}.
 2. NO MIXED LANGUAGES OR SPANGLISH: Absolutely ZERO words, phrases, or ingredients may remain in ${sourceLanguageName}.
-   - When translating to English: Never leave Spanish words or fragments (e.g. "la cebolla y el tomate pelado", "con sal", "cociná", "mezclá", "fideos", "pollo desmenuzado", "yema", "formitas"). Translate them cleanly into natural English (e.g. "the onion and peeled tomato", "with salt", "cook", "mix", "noodles/pasta", "shredded chicken", "egg yolk", "patties/croquettes").
+   - When translating to English: The input might be in Spanish OR may contain an existing corrupted mixture of Spanish and English (Spanglish). You must translate the ENTIRE text so that 100% of it is in natural, fluent English.
+   - Specific terms that MUST be translated cleanly:
+     * "pechuga" / "pechuga de pollo" -> "chicken breast"
+     * "zapallo" / "calabaza" -> "butternut squash" (or "squash" / "pumpkin")
+     * "harina de avena" -> "oat flour"
+     * "cebolla" -> "onion"
+     * "paprika" -> "paprika"
+     * "orégano" -> "oregano"
+     * "pimienta" -> "black pepper" (or "pepper")
+     * "sal" -> "salt"
+     * "procesador de alimentos" -> "food processor"
+     * "trituramos hasta conseguir una masa homogénea" -> "blend until a smooth dough is formed"
+     * "dar forma de nuggets" -> "shape into nuggets"
+     * "fuente para horno" / "baking dish" -> "baking dish"
+     * "cook por unos minutos" / "cocinar por unos minutos" -> "bake/cook for a few minutes"
+     * "golden brown" / "dorados" -> "golden brown"
 3. Culinary accuracy: Ensure cooking techniques, measurements, temperatures, and ingredients are natural in ${targetLanguageName}.
 4. Keep numbered step formats (1., 2., 3.) intact.
 5. Translate each community comment accurately preserving the user's tone in 100% ${targetLanguageName}.
@@ -109,8 +124,8 @@ Recipe Instructions:
 ${instructions}${commentsSection}`;
 
     let responseText = '';
-    // Prioritize gemini-3.1-flash-lite as it provides fast, reliable bilingual responses without 503 capacity spikes
-    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+    // gemini-3.1-flash-lite and gemini-3.8-flash provide fast, high-quality bilingual culinary translation
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
 
     for (const modelName of candidateModels) {
       try {

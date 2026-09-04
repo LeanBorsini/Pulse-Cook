@@ -38,7 +38,11 @@ import {
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
 import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
-import { translateTextSmart } from '@/lib/recipeTranslator';
+import {
+  translateTextSmart,
+  hasGenuineEnglishInstructions,
+  hasGenuineSpanishInstructions,
+} from '@/lib/recipeTranslator';
 import { RECIPE_CATEGORIES, getCategoryKey, getCategoryLabel } from '@/lib/categories';
 
 interface RecipeFormModalProps {
@@ -349,13 +353,19 @@ export function RecipeFormModal({
       if (res.ok) {
         const translated = await res.json();
         if (sourceLang === 'ES') {
-          title_en = translated.translatedTitle || title;
-          desc_en = translated.translatedDescription || description;
-          inst_en = translated.translatedInstructions || instructions;
+          title_en = translated.translatedTitle || translateTextSmart(title, 'ES', 'EN');
+          desc_en = translated.translatedDescription || translateTextSmart(description, 'ES', 'EN');
+          inst_en = (translated.translatedInstructions || translateTextSmart(instructions, 'ES', 'EN')).trim();
+          if (inst_en && !hasGenuineEnglishInstructions(inst_en, instructions)) {
+            inst_en = translateTextSmart(inst_en, 'ES', 'EN');
+          }
         } else {
-          title_es = translated.translatedTitle || title;
-          desc_es = translated.translatedDescription || description;
-          inst_es = translated.translatedInstructions || instructions;
+          title_es = translated.translatedTitle || translateTextSmart(title, 'EN', 'ES');
+          desc_es = translated.translatedDescription || translateTextSmart(description, 'EN', 'ES');
+          inst_es = (translated.translatedInstructions || translateTextSmart(instructions, 'EN', 'ES')).trim();
+          if (inst_es && !hasGenuineSpanishInstructions(inst_es, instructions)) {
+            inst_es = translateTextSmart(inst_es, 'EN', 'ES');
+          }
         }
 
         // Si la IA sugiere nuevas etiquetas que enriquezcan la receta
@@ -369,24 +379,24 @@ export function RecipeFormModal({
       } else {
         // Fallback: usar el diccionario inteligente culinario si la API de traducción no responde
         if (sourceLang === 'ES') {
-          title_en = title;
-          desc_en = description;
+          title_en = translateTextSmart(title, 'ES', 'EN');
+          desc_en = translateTextSmart(description, 'ES', 'EN');
           inst_en = translateTextSmart(instructions, 'ES', 'EN');
         } else {
-          title_es = title;
-          desc_es = description;
+          title_es = translateTextSmart(title, 'EN', 'ES');
+          desc_es = translateTextSmart(description, 'EN', 'ES');
           inst_es = translateTextSmart(instructions, 'EN', 'ES');
         }
       }
     } catch (err) {
       console.warn('Auto-translation failed during save, falling back to smart culinary dictionary:', err);
       if (formInputLang === 'ES') {
-        title_en = title;
-        desc_en = description;
+        title_en = translateTextSmart(title, 'ES', 'EN');
+        desc_en = translateTextSmart(description, 'ES', 'EN');
         inst_en = translateTextSmart(instructions, 'ES', 'EN');
       } else {
-        title_es = title;
-        desc_es = description;
+        title_es = translateTextSmart(title, 'EN', 'ES');
+        desc_es = translateTextSmart(description, 'EN', 'ES');
         inst_es = translateTextSmart(instructions, 'EN', 'ES');
       }
     }
