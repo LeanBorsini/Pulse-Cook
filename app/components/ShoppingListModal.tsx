@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle } from 'lucide-react';
+import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle, Trash2 } from 'lucide-react';
 import { Ingredient, Recipe } from '../types';
 import { supabase } from '../../lib/supabase';
 import { getLocalIngredients } from '../../lib/recipeStore';
@@ -28,6 +28,7 @@ interface ShoppingListModalProps {
   recipes?: Recipe[];
   onClose: () => void;
   onClearMenu?: () => void;
+  onRemoveRecipe?: (recipeId: string) => void;
 }
 
 export function ShoppingListModal({
@@ -37,12 +38,45 @@ export function ShoppingListModal({
   recipes = [],
   onClose,
   onClearMenu,
+  onRemoveRecipe,
 }: ShoppingListModalProps) {
   const [fetchedItems, setFetchedItems] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>({});
+  const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('pulse_shopping_list_checks');
+        if (saved) return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    return {};
+  });
 
   const items = initialShoppingList || (selectedRecipeIds.length > 0 ? fetchedItems : []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('pulse_shopping_list_checks', JSON.stringify(checkedMap));
+      } catch {
+        // ignore
+      }
+    }
+  }, [checkedMap]);
+
+  const handleClear = () => {
+    setCheckedMap({});
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('pulse_shopping_list_checks');
+      } catch {
+        // ignore
+      }
+    }
+    onClearMenu?.();
+  };
 
   useEffect(() => {
     if (initialShoppingList || selectedRecipeIds.length === 0) {
@@ -219,12 +253,42 @@ export function ShoppingListModal({
           </div>
         )}
 
-        {selectedRecipesNames.length > 0 && (
-          <div className="mb-4 p-2.5 bg-[#EFECE1] rounded-xl border border-[#D8D3C4] text-xs text-[#5C6650]">
-            <span className="font-semibold text-[#2C3523]">
-              {lang === 'ES' ? 'Recetas en el menú: ' : 'Menu recipes: '}
-            </span>
-            {selectedRecipesNames.join(', ')}
+        {selectedRecipes.length > 0 && (
+          <div className="mb-4 p-3 bg-[#EFECE1] rounded-xl border border-[#D8D3C4] text-xs text-[#5C6650]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-[#2C3523]">
+                {lang === 'ES' ? 'Recetas en el menú semanal:' : 'Recipes in weekly menu:'}
+              </span>
+              <span className="text-[11px] text-[#5C6650] font-medium bg-[#E2DEC2] px-2 py-0.5 rounded-full">
+                {selectedRecipes.length} {lang === 'ES' ? (selectedRecipes.length === 1 ? 'receta' : 'recetas') : (selectedRecipes.length === 1 ? 'recipe' : 'recipes')}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {selectedRecipes.map((r) => {
+                const title = lang === 'ES' ? r.title_es : r.title_en || r.title_es;
+                return (
+                  <span
+                    key={r.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#FDFBF7] text-[#2C3523] rounded-lg border border-[#D8D3C4] font-medium text-xs shadow-2xs"
+                  >
+                    <span>{title}</span>
+                    {onRemoveRecipe && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveRecipe(r.id);
+                        }}
+                        className="text-[#5C6650] hover:text-rose-600 transition-colors p-0.5 rounded cursor-pointer"
+                        title={lang === 'ES' ? `Quitar "${title}" del menú` : `Remove "${title}" from menu`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -289,10 +353,12 @@ export function ShoppingListModal({
             {onClearMenu && (
               <div className="pt-2">
                 <button
-                  onClick={onClearMenu}
-                  className="w-full bg-red-100 text-red-700 hover:bg-red-200 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  type="button"
+                  onClick={handleClear}
+                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.99]"
                 >
-                  {lang === 'ES' ? 'Vaciar Menú' : 'Clear Menu'}
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>{lang === 'ES' ? 'Vaciar / Limpiar Menú' : 'Clear Weekly Menu'}</span>
                 </button>
               </div>
             )}

@@ -14,7 +14,7 @@
  * - Inclusión/exclusión directa de la receta en el menú semanal para compras.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Clock,
@@ -67,6 +67,7 @@ interface RecipeDetailModalProps {
   onOpenAuth: () => void;
   isInMenu?: boolean;
   onToggleMenu?: (id: string) => void;
+  onRecipeUpdated?: (updated: Recipe) => void;
 }
 
 export function RecipeDetailModal({
@@ -88,6 +89,7 @@ export function RecipeDetailModal({
   onOpenAuth,
   isInMenu = false,
   onToggleMenu,
+  onRecipeUpdated,
 }: RecipeDetailModalProps) {
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
@@ -170,7 +172,7 @@ export function RecipeDetailModal({
     translatedContent?.instructions ||
     (dynamicLang === 'ES'
       ? (hasValidEs ? recipe.instructions_es : (recipe.instructions_es || recipe.instructions_en || ''))
-      : (hasValidEn ? recipe.instructions_en : (recipe.instructions_en && !isSpanishCulinaryText(recipe.instructions_en) ? recipe.instructions_en : (recipe.instructions_en || recipe.instructions_es || ''))));
+      : (hasValidEn ? recipe.instructions_en : (translatedContent?.instructions || (translatingView ? '' : (recipe.instructions_en && !isSpanishCulinaryText(recipe.instructions_en) ? recipe.instructions_en : '')))));
 
   // Indicador de si las instrucciones mostradas en el idioma activo no están traducidas
   const needsTranslationToActiveLang =
@@ -186,7 +188,7 @@ export function RecipeDetailModal({
     }
   })();
 
-  const handleInstantTranslate = async (forceTargetLang?: 'ES' | 'EN') => {
+  const handleInstantTranslate = useCallback(async (forceTargetLang?: 'ES' | 'EN') => {
     const target = forceTargetLang || (dynamicLang === 'ES' ? 'EN' : 'ES');
 
     // Si ya existe la traducción guardada directamente en el objeto de la receta y es genuina
@@ -209,9 +211,10 @@ export function RecipeDetailModal({
     // Determinar con certeza los textos fuente para traducir
     const sourceTextTitle = target === 'EN' ? (recipe.title_es || displayedTitle) : (recipe.title_en || displayedTitle);
     const sourceTextDesc = target === 'EN' ? (recipe.description_es || displayedDesc) : (recipe.description_en || displayedDesc);
+    // Para instrucciones: si vamos a EN, preferir siempre las instrucciones en español originales para evitar traducir textos corruptos en Spanglish
     const sourceTextInst = target === 'EN'
-      ? (recipe.instructions_es || recipe.instructions_en || displayedInstructions || '')
-      : (recipe.instructions_en || recipe.instructions_es || displayedInstructions || '');
+      ? (recipe.instructions_es || (hasValidEn ? recipe.instructions_en : '') || recipe.instructions_en || '')
+      : (recipe.instructions_en || (hasValidEs ? recipe.instructions_es : '') || recipe.instructions_es || '');
     const sourceLang: 'ES' | 'EN' = target === 'EN' ? 'ES' : 'EN';
 
     const commentsPayload = comments.map((c) => ({
@@ -258,7 +261,7 @@ export function RecipeDetailModal({
           setTranslatedComments(commMap);
         }
 
-        // Guardar y persistir la traducción en almacenamiento local
+        // Guardar y persistir la traducción en almacenamiento local y notificar al componente padre
         const updatedRecipe: Recipe = {
           ...recipe,
           ...(target === 'EN'
@@ -274,11 +277,13 @@ export function RecipeDetailModal({
               }),
         };
         saveLocalRecipe(updatedRecipe, ingredients);
+        if (onRecipeUpdated) {
+          onRecipeUpdated(updatedRecipe);
+        }
       } else {
-        // Fallback heurístico con el diccionario culinario limpio
+        // En caso de fallo o modo sin conexión, mantener el texto limpio sin corromperlo con Spanglish
         const fallbackTitle = translateTextSmart(sourceTextTitle, sourceLang, target);
         const fallbackDesc = translateTextSmart(sourceTextDesc, sourceLang, target);
-        const fallbackInst = translateTextSmart(sourceTextInst, sourceLang, target);
         const fallbackCommMap: Record<string, string> = {};
         comments.forEach((c) => {
           fallbackCommMap[c.id] = translateTextSmart(c.message, sourceLang, target) || c.message;
@@ -287,16 +292,15 @@ export function RecipeDetailModal({
         setTranslatedContent({
           title: fallbackTitle || sourceTextTitle,
           description: fallbackDesc || sourceTextDesc,
-          instructions: fallbackInst || sourceTextInst,
+          instructions: sourceTextInst,
         });
         setTranslatedComments(fallbackCommMap);
         setDynamicLang(target);
       }
     } catch (err) {
-      console.warn('Instant translation error, using smart culinary dictionary:', err);
+      console.warn('Instant translation error:', err);
       const fallbackTitle = translateTextSmart(sourceTextTitle, sourceLang, target);
       const fallbackDesc = translateTextSmart(sourceTextDesc, sourceLang, target);
-      const fallbackInst = translateTextSmart(sourceTextInst, sourceLang, target);
       const fallbackCommMap: Record<string, string> = {};
       comments.forEach((c) => {
         fallbackCommMap[c.id] = translateTextSmart(c.message, sourceLang, target) || c.message;
@@ -305,14 +309,41 @@ export function RecipeDetailModal({
       setTranslatedContent({
         title: fallbackTitle || sourceTextTitle,
         description: fallbackDesc || sourceTextDesc,
-        instructions: fallbackInst || sourceTextInst,
+        instructions: sourceTextInst,
       });
       setTranslatedComments(fallbackCommMap);
       setDynamicLang(target);
     } finally {
       setTranslatingView(false);
     }
-  };
+  }, [
+    comments,
+    displayedDesc,
+    displayedTitle,
+    dynamicLang,
+    hasValidEn,
+    hasValidEs,
+    ingredients,
+    onRecipeUpdated,
+    recipe,
+  ]);
+
+  // Auto-traducción fluida: Si la app está en inglés y las instrucciones están en español (o viceversa),
+  // se traducen automáticamente con Chef IA para que el usuario las lea en su idioma sin tener que apretar el botón
+  useEffect(() => {
+    let isMounted = true;
+    if (needsTranslationToActiveLang && !translatingView) {
+      const timer = setTimeout(() => {
+        if (isMounted) {
+          handleInstantTranslate(dynamicLang);
+        }
+      }, 50);
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
+    }
+  }, [recipe.id, dynamicLang, needsTranslationToActiveLang, translatingView, handleInstantTranslate]);
 
   const handleShareWhatsApp = () => {
     const currentUrl = typeof window !== 'undefined' ? window.location.href : '';

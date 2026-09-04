@@ -92,14 +92,16 @@ export async function POST(req: NextRequest) {
       ? `\n\nCommunity Comments to translate:\n${JSON.stringify(comments.map((c) => ({ id: c.id, text: c.message })))}`
       : '';
 
-    const prompt = `You are a world-class professional culinary translator and bilingual chef.
-Translate the following recipe content from ${sourceLanguageName} into natural, appetizing, fluent ${targetLanguageName}.
-Requirements:
-1. Translate the Title, Description, and Instructions completely into ${targetLanguageName}.
-2. Ensure culinary terms, cooking techniques (e.g. sauté, simmer, boil, roast, brown, fold), and ingredients are natural.
-3. Keep numbered step formats (1., 2., 3.) intact.
-4. Translate each community comment accurately preserving the user's tone and culinary feedback.
-5. NEVER leave sentences or words in the original language (${sourceLanguageName}) or mixed Spanglish.
+    const prompt = `You are a world-class professional culinary translator and bilingual executive chef.
+Translate the following recipe content from ${sourceLanguageName} into natural, appetizing, 100% fluent ${targetLanguageName}.
+
+CRITICAL REQUIREMENTS:
+1. Complete translation: Translate the Title, Description, and Instructions 100% into ${targetLanguageName}.
+2. NO MIXED LANGUAGES OR SPANGLISH: Absolutely ZERO words, phrases, or ingredients may remain in ${sourceLanguageName}.
+   - When translating to English: Never leave Spanish words or fragments (e.g. "la cebolla y el tomate pelado", "con sal", "cociná", "mezclá", "fideos", "pollo desmenuzado", "yema", "formitas"). Translate them cleanly into natural English (e.g. "the onion and peeled tomato", "with salt", "cook", "mix", "noodles/pasta", "shredded chicken", "egg yolk", "patties/croquettes").
+3. Culinary accuracy: Ensure cooking techniques, measurements, temperatures, and ingredients are natural in ${targetLanguageName}.
+4. Keep numbered step formats (1., 2., 3.) intact.
+5. Translate each community comment accurately preserving the user's tone in 100% ${targetLanguageName}.
 
 Recipe Title: "${title}"
 Recipe Description: "${description}"
@@ -107,7 +109,8 @@ Recipe Instructions:
 ${instructions}${commentsSection}`;
 
     let responseText = '';
-    const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    // Prioritize gemini-3.1-flash-lite as it provides fast, reliable bilingual responses without 503 capacity spikes
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
 
     for (const modelName of candidateModels) {
       try {

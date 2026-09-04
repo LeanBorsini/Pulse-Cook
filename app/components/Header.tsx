@@ -38,15 +38,19 @@ export function Header({
 
   return (
     <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 pb-6 border-b border-[#D8D3C4]/60">
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-4xl sm:text-5xl font-handwritten font-bold text-[#2C3523] tracking-tight">
-            Pulse&Cook
-          </h1>
-        </div>
-        <p className="text-[#5C6650] text-xs sm:text-sm italic mt-0.5">
+      <div className="w-full md:w-auto flex flex-col items-center justify-center text-center">
+        <h1
+          id="brand-heading"
+          className="text-4xl sm:text-5xl font-handwritten font-bold text-[#2C3523] tracking-tight text-center"
+        >
+          Pulse&Cook
+        </h1>
+        <h2
+          id="brand-subheading"
+          className="text-[#5C6650] text-xs sm:text-sm italic mt-0.5 text-center font-normal"
+        >
           {lang === 'ES' ? 'Recetario familiar & Planificador inteligente' : 'Family Recipe Book & Smart Meal Planner'}
-        </p>
+        </h2>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">

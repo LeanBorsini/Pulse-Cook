@@ -104,8 +104,45 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'recent' | 'rating' | 'prepTime'>('recent');
 
-  // Menu Selection for Shopping List
-  const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>([]);
+  // Menu Selection for Shopping List (Persists across reloads & sessions)
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('pulse_menu_recipe_ids');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (err) {
+        console.warn('Error loading saved menu recipe ids:', err);
+      }
+    }
+    return [];
+  });
+
+  // Persist selected menu recipe IDs whenever changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('pulse_menu_recipe_ids', JSON.stringify(selectedRecipeIds));
+      } catch (err) {
+        console.warn('Error saving menu recipe ids:', err);
+      }
+    }
+  }, [selectedRecipeIds]);
+
+  // Clear entire menu and stored checks
+  const handleClearMenu = () => {
+    setSelectedRecipeIds([]);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('pulse_menu_recipe_ids');
+        localStorage.removeItem('pulse_shopping_list_checks');
+      } catch (err) {
+        console.warn('Error clearing menu storage:', err);
+      }
+    }
+  };
 
   // Modals
   const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
@@ -843,6 +880,8 @@ export default function Home() {
           lang={lang}
           user={user}
           userRating={currentUserRating}
+          isInMenu={activeRecipe ? selectedRecipeIds.includes(activeRecipe.id) : false}
+          onToggleMenu={handleToggleMenu}
           onRate={handleRateRecipe}
           onClose={() => {
             setActiveRecipe(null);
@@ -860,6 +899,10 @@ export default function Home() {
           onDelete={handleDeleteRecipe}
           onAddComment={handleAddComment}
           onOpenAuth={() => setShowAuthModal(true)}
+          onRecipeUpdated={(updated) => {
+            setRecipes((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+            setActiveRecipe(updated);
+          }}
         />
       )}
 
@@ -888,7 +931,8 @@ export default function Home() {
           selectedRecipeIds={selectedRecipeIds}
           recipes={recipes}
           onClose={() => setShowShoppingList(false)}
-          onClearMenu={() => setSelectedRecipeIds([])}
+          onClearMenu={handleClearMenu}
+          onRemoveRecipe={handleToggleMenu}
         />
       )}
 

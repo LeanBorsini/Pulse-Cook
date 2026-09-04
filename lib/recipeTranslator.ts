@@ -149,17 +149,26 @@ export function isEnglishCulinaryText(text?: string | null): boolean {
  */
 export function hasGenuineEnglishInstructions(instructionsEn?: string | null, instructionsEs?: string | null): boolean {
   if (!instructionsEn || !instructionsEn.trim()) return false;
-  if (instructionsEs && instructionsEn.trim().toLowerCase() === instructionsEs.trim().toLowerCase()) {
+  const trimmed = instructionsEn.trim();
+  if (instructionsEs && trimmed.toLowerCase() === instructionsEs.trim().toLowerCase()) {
     return false;
   }
-  // Detecta palabras o construcciones corruptas de spanglish
-  if (/brownda|mix sobre|add los|chop en|chop la|chop los|bake a \d+/i.test(instructionsEn)) {
+  // Si contiene acentos o signos españoles, no es inglés genuino
+  if (/[áéíóúñ¿¡]/.test(trimmed)) {
     return false;
   }
-  if (isSpanishCulinaryText(instructionsEn)) {
+  // Detecta palabras o construcciones corruptas de spanglish o fragmentos en español no traducidos
+  if (/brownda|mix sobre|add los|chop en|chop la|chop los|bake a \d+/i.test(trimmed)) {
     return false;
   }
-  return isEnglishCulinaryText(instructionsEn);
+  const spanishMarkers = /\b(la|el|los|las|una|uno|unos|unas|con|del|y|en|por|para|cocin[aá]|mezcl[aá]|incorpor[aá]|serv[íi]|agreg[aá]|cubr[íi]|acompañ[aá]|cebolla|tomate|pimientos?|fideos|pollo|queso|sal|harina|huevo|yema|clara|avena|rebozador|formitas|demás|sartén)\b/i;
+  if (spanishMarkers.test(trimmed)) {
+    return false;
+  }
+  if (isSpanishCulinaryText(trimmed)) {
+    return false;
+  }
+  return isEnglishCulinaryText(trimmed);
 }
 
 /**
@@ -167,13 +176,14 @@ export function hasGenuineEnglishInstructions(instructionsEn?: string | null, in
  */
 export function hasGenuineSpanishInstructions(instructionsEs?: string | null, instructionsEn?: string | null): boolean {
   if (!instructionsEs || !instructionsEs.trim()) return false;
-  if (instructionsEn && instructionsEs.trim().toLowerCase() === instructionsEn.trim().toLowerCase()) {
+  const trimmed = instructionsEs.trim();
+  if (instructionsEn && trimmed.toLowerCase() === instructionsEn.trim().toLowerCase()) {
     return false;
   }
-  if (isEnglishCulinaryText(instructionsEs)) {
+  if (isEnglishCulinaryText(trimmed)) {
     return false;
   }
-  return isSpanishCulinaryText(instructionsEs);
+  return isSpanishCulinaryText(trimmed);
 }
 
 /**
