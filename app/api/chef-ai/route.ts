@@ -97,6 +97,7 @@ function getFallbackResponse(
           steps: fallbackRecipe.instructions,
           dietaryTags: fallbackRecipe.dietaryTags,
           chefAdvice: fallbackRecipe.chefTip,
+          safetyTip: fallbackRecipe.safetyTip,
         },
       ],
     },
@@ -213,8 +214,11 @@ Dietary Restrictions: "${dietaryPreference || 'Ninguna'}"
 Max Preparation Time: "${timeLimit ? timeLimit + ' minutos' : 'Rápido y práctico'}"
 Language: Respond strictly in ${outputLanguage}.
 
-Create 2 distinct, highly creative, flavorful recipes that maximize the user's available ingredients while requiring minimal or standard pantry staples (salt, oil, pepper, water). Make the chefAdvice full of passionate French/culinary wisdom inspired by Remy's philosophy.
-For each recipe, provide full details so the user could directly save it or cook it immediately.`;
+CRITICAL INSTRUCTIONS FOR BEGINNER-FRIENDLY PRECISION & FOOD SAFETY:
+1. PRECISION & SENSORY CUES: Avoid vague instructions like "cook 6 minutes on medium". Novices need clarity: in every cooking step, specify BOTH the estimated time range (e.g. 5-7 min) AND unmistakable sensory indicators (e.g., "until the onions turn translucent and release a sweet aroma without browning at the edges", "until bubbles become slow and thick", "until the oil glistens without smoking").
+2. HIGH-RISK FOOD SAFETY: If the recipe includes poultry (chicken/turkey), pork, ground meats, seafood/fish, or eggs, you MUST provide an explicit doneness test (e.g. for poultry: "pierce the thickest part—juices must run completely clear with no pink meat, or 74°C/165°F on a meat thermometer"; for fish: "flakes cleanly with gentle fork pressure and turns opaque white"; for ground meat: "no pink remains inside").
+3. NOVICE SAFETY TIP: Provide a clear "safetyTip" covering cross-contamination rules, knife handling, hand washing, or resting time for this specific dish.
+4. Remy's Philosophy: Infuse the chefAdvice with warmth, inspiration, and secret culinary wisdom. Create 2 distinct, flavorful recipes that make optimal use of the user's available ingredients.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.7-flash',
@@ -258,7 +262,7 @@ For each recipe, provide full details so the user could directly save it or cook
                   steps: {
                     type: Type.ARRAY,
                     items: { type: Type.STRING },
-                    description: 'Clear, concise step-by-step cooking instructions',
+                    description: 'Step-by-step instructions with exact time ranges and sensory cues (visual, aroma, texture)',
                   },
                   dietaryTags: {
                     type: Type.ARRAY,
@@ -268,6 +272,10 @@ For each recipe, provide full details so the user could directly save it or cook
                   chefAdvice: {
                     type: Type.STRING,
                     description: 'A brief secret chef advice to make it delicious',
+                  },
+                  safetyTip: {
+                    type: Type.STRING,
+                    description: 'Crucial beginner food safety and safe cooking doneness guidance for this specific dish',
                   },
                 },
                 required: [
@@ -279,6 +287,8 @@ For each recipe, provide full details so the user could directly save it or cook
                   'ingredientsList',
                   'steps',
                   'dietaryTags',
+                  'chefAdvice',
+                  'safetyTip',
                 ],
               },
             },

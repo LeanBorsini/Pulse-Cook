@@ -3,6 +3,7 @@
 import { User } from '@supabase/supabase-js';
 import { LogOut, Plus, ShoppingCart, Globe, UserCheck, HelpCircle } from 'lucide-react';
 import { RemyIcon } from './RemyIcon';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   lang: 'ES' | 'EN';
@@ -47,6 +48,9 @@ export function Header({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        {/* Botón Instalar PWA */}
+        <PWAInstallButton lang={lang} />
+
         {/* Botón de Ayuda / Info de la App */}
         {onOpenWelcome && (
           <button

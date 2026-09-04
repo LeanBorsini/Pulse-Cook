@@ -25,6 +25,9 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Recipe, Ingredient } from '../types';
 import { User } from '@supabase/supabase-js';
@@ -41,6 +44,7 @@ interface ChefGeneratedRecipe {
   steps: string[];
   dietaryTags: string[];
   chefAdvice?: string;
+  safetyTip?: string;
 }
 
 interface SubstituteResult {
@@ -95,6 +99,7 @@ export default function ChefAssistantModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [suggestedRecipes, setSuggestedRecipes] = useState<ChefGeneratedRecipe[]>([]);
   const [savedRecipeIndex, setSavedRecipeIndex] = useState<number | null>(null);
+  const [expandedRecipeIndex, setExpandedRecipeIndex] = useState<number | null>(null);
 
   if (!isOpen) return null;
 
@@ -227,13 +232,18 @@ export default function ChefAssistantModal({
       unit: ing.unit || (isEs ? 'unidad' : 'unit'),
     }));
 
+    const safetyNote = recipeItem.safetyTip
+      ? `\n\n🛡️ ${isEs ? 'Punto de Cocción y Seguridad para Principiantes' : 'Beginner Cooking Doneness & Safety'}:\n${recipeItem.safetyTip}`
+      : '';
+    const fullInstructions = recipeItem.steps.join('\n\n') + safetyNote;
+
     const newRecipeData: Partial<Recipe> & { generatedIngredients?: Ingredient[] } = {
       title_es: isEs ? recipeItem.title : '',
       title_en: !isEs ? recipeItem.title : '',
       description_es: isEs ? recipeItem.description : '',
       description_en: !isEs ? recipeItem.description : '',
-      instructions_es: isEs ? recipeItem.steps.join('\n\n') : '',
-      instructions_en: !isEs ? recipeItem.steps.join('\n\n') : '',
+      instructions_es: isEs ? fullInstructions : '',
+      instructions_en: !isEs ? fullInstructions : '',
       category: isEs ? 'Almuerzo / Cena' : 'Lunch / Dinner',
       prep_time: recipeItem.prepTime || 30,
       servings: servings || 2,
@@ -541,6 +551,48 @@ export default function ChefAssistantModal({
                               <strong>{isEs ? 'Tip del Chef: ' : "Chef's tip: "}</strong>
                               {rec.chefAdvice}
                             </span>
+                          </div>
+                        )}
+
+                        {/* Guía de Seguridad Alimentaria y Punto de Cocción para Novatos */}
+                        {rec.safetyTip && (
+                          <div className="mt-2 p-2 bg-emerald-50 rounded-lg border border-emerald-200/80 text-[11px] text-emerald-950 flex items-start gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" />
+                            <span>
+                              <strong>{isEs ? '🛡️ Seguridad y Cocción: ' : '🛡️ Safety & Doneness: '}</strong>
+                              {rec.safetyTip}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Acordeón de Pasos e Indicadores Sensoriales */}
+                        {rec.steps && rec.steps.length > 0 && (
+                          <div className="mt-2.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedRecipeIndex(expandedRecipeIndex === idx ? null : idx)
+                              }
+                              className="w-full flex items-center justify-between text-[11px] font-bold text-[#5C6650] hover:text-[#2C3523] py-1 border-t border-[#D8D3C4]/60 transition-colors"
+                            >
+                              <span>
+                                {isEs ? 'Ver pasos e indicadores de cocción' : 'View cooking steps & sensory cues'} ({rec.steps.length})
+                              </span>
+                              {expandedRecipeIndex === idx ? (
+                                <ChevronUp className="w-3.5 h-3.5 text-[#5C6650]" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5 text-[#5C6650]" />
+                              )}
+                            </button>
+                            {expandedRecipeIndex === idx && (
+                              <ol className="mt-1.5 space-y-1.5 pl-4 list-decimal text-[11px] text-[#2C3523] bg-[#F7F5EC] p-2.5 rounded-lg border border-[#D8D3C4] max-h-48 overflow-y-auto">
+                                {rec.steps.map((step, sIdx) => (
+                                  <li key={sIdx} className="leading-relaxed">
+                                    {step.replace(/^\d+\.\s*/, '')}
+                                  </li>
+                                ))}
+                              </ol>
+                            )}
                           </div>
                         )}
                       </div>

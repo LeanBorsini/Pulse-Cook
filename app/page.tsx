@@ -32,6 +32,7 @@ import { AuthModal } from './components/AuthModal';
 import { UsernameSetupModal } from './components/UsernameSetupModal';
 import ChefAssistantModal from './components/ChefAssistantModal';
 import { WelcomeLandingModal } from './components/WelcomeLandingModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 
 interface SupabaseRatingRow {
@@ -914,6 +915,9 @@ export default function Home() {
         lang={lang === 'ES' ? 'es' : 'en'}
         onLanguageChange={(newLang) => handleSetLang(newLang === 'es' ? 'ES' : 'EN')}
       />
+
+      {/* Indicador sutil de conectividad offline para PWA */}
+      <OfflineIndicator lang={lang} />
     </main>
   );
 }

@@ -32,7 +32,9 @@ import {
   Globe,
   Utensils,
   ChefHat,
+  Camera,
 } from 'lucide-react';
+import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
 import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
 import { translateTextSmart } from '@/lib/recipeTranslator';
@@ -122,7 +124,9 @@ export function RecipeFormModal({
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Videos
   const [videos, setVideos] = useState<VideoLink[]>(
@@ -244,6 +248,34 @@ export function RecipeFormModal({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleCameraCapture = async (file: File) => {
+    const availableSlots = 3 - images.length;
+    if (availableSlots <= 0) {
+      alert(
+        isEs
+          ? 'Límite alcanzado: Máximo 3 imágenes por receta.'
+          : 'Limit reached: Maximum 3 images per recipe.'
+      );
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const uploadedUrl = await uploadRecipeImage(file, user?.id || 'guest');
+      if (uploadedUrl) {
+        setImages((prev) => [...prev, uploadedUrl].slice(0, 3));
+      }
+    } catch (err) {
+      console.warn('Error uploading captured photo:', err);
+      alert(isEs ? 'Error al procesar la foto tomada.' : 'Error processing captured photo.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -680,33 +712,55 @@ export function RecipeFormModal({
               </label>
 
               {images.length < 3 && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => setShowUrlInput(!showUrlInput)}
                     className="text-[11px] font-semibold text-[#5C6650] hover:text-[#2C3523] flex items-center gap-1"
                   >
                     <Link className="w-3 h-3" />
-                    {isEs ? 'Por URL' : 'By URL'}
+                    <span className="hidden sm:inline">{isEs ? 'Por URL' : 'By URL'}</span>
                   </button>
+
+                  {/* Botón Cámara en vivo */}
+                  <button
+                    type="button"
+                    disabled={uploadingImage}
+                    onClick={() => setShowCameraModal(true)}
+                    className="text-[11px] font-semibold text-amber-950 flex items-center gap-1 bg-amber-200/80 hover:bg-amber-300/80 px-2.5 py-1 rounded-lg border border-amber-400/70 transition-colors shadow-2xs cursor-pointer"
+                    title={isEs ? 'Abrir cámara para tomar foto' : 'Open camera to take photo'}
+                  >
+                    <Camera className="w-3.5 h-3.5 text-amber-800" />
+                    <span>{isEs ? 'Cámara' : 'Camera'}</span>
+                  </button>
+
+                  {/* Botón Subir Archivo */}
                   <button
                     type="button"
                     disabled={uploadingImage}
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-[11px] font-semibold text-[#2C3523] flex items-center gap-1 bg-[#EFECE1] px-2.5 py-1 rounded-lg border border-[#D8D3C4] hover:bg-[#E5E0D0] transition-colors"
+                    className="text-[11px] font-semibold text-[#2C3523] flex items-center gap-1 bg-[#EFECE1] px-2.5 py-1 rounded-lg border border-[#D8D3C4] hover:bg-[#E5E0D0] transition-colors cursor-pointer"
                   >
                     {uploadingImage ? (
                       <Loader2 className="w-3 h-3 animate-spin text-emerald-700" />
                     ) : (
                       <UploadCloud className="w-3 h-3 text-emerald-700" />
                     )}
-                    <span>{isEs ? 'Subir Foto' : 'Upload Photo'}</span>
+                    <span>{isEs ? 'Subir' : 'Upload'}</span>
                   </button>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
                     multiple
+                    className="hidden"
+                    onChange={(e) => handleFilesSelected(e.target.files)}
+                  />
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
                     className="hidden"
                     onChange={(e) => handleFilesSelected(e.target.files)}
                   />
@@ -895,6 +949,14 @@ export function RecipeFormModal({
           </div>
         </form>
       </div>
+
+      {/* Modal de Captura con Cámara en Vivo */}
+      <CameraCaptureModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onCapture={handleCameraCapture}
+        lang={lang}
+      />
     </div>
   );
 }

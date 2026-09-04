@@ -30,6 +30,8 @@ export interface RemyRecipeResult {
   instructions: string[];
   /** Consejo o secreto de cocina de Remy */
   chefTip: string;
+  /** Regla de seguridad alimentaria y punto de cocción para principiantes */
+  safetyTip: string;
 }
 
 /**
@@ -75,20 +77,23 @@ export function generateRemyFallbackRecipe(
     })),
     instructions: isEs
       ? [
-          `1. Lavar, cortar y preparar ${ingredients.join(', ')} en porciones uniformes.`,
-          `2. Calentar una sartén a fuego medio con un hilo de aceite de oliva y saltear los ingredientes principales durante 6-8 minutos.`,
-          `3. Añadir las hierbas y especias al gusto, rectificar sal y pimienta.`,
-          `4. Servir inmediatamente bien caliente y disfrutar de este plato rápido.`,
+          `1. Lavar, secar y cortar ${ingredients.join(', ')} en bocados de tamaño parejo (unos 2 cm) para que se cocinen al mismo tiempo.`,
+          `2. Calentar la sartén a fuego medio con un hilo de aceite hasta que empiece a brillar pero sin humear.`,
+          `3. Añadir los ingredientes principales: saltear por 6-8 minutos moviendo de vez en cuando, hasta que los bordes adquieran un tono dorado apetitoso y al pincharlos con un tenedor ofrezcan tierna resistencia.`,
+          `4. Bajar a fuego suave, sazonar con hierbas, sal y pimienta. Dejar asentar 1 minuto para concentrar jugos y aromas antes de servir.`,
         ]
       : [
-          `1. Wash, chop, and prepare ${ingredients.join(', ')} into uniform bite-sized pieces.`,
-          `2. Heat a skillet over medium heat with a drizzle of olive oil and sauté the main ingredients for 6-8 minutes.`,
-          `3. Add seasonings and herbs to taste, adjusting salt and black pepper.`,
-          `4. Serve immediately warm and enjoy this quick gourmet dish.`,
+          `1. Wash, dry, and chop ${ingredients.join(', ')} into uniform 1-inch bite pieces so they cook evenly together.`,
+          `2. Heat a skillet over medium heat with a light drizzle of oil until the oil has a glossy shimmer without smoking.`,
+          `3. Add the main ingredients: sauté for 6-8 minutes, stirring occasionally, until edges take on a golden-brown sear and a fork pierces them with tender give.`,
+          `4. Lower heat to gentle, season with herbs, salt, and pepper. Let rest 1 minute in the pan so juices settle before serving warm.`,
         ],
     chefTip: isEs
-      ? `«Cualquiera puede cocinar»: no sobrecargues la sartén para lograr un dorado dorado y crocante.`
-      : `«Anyone can cook»: do not overcrowd the pan so your ingredients get a nice crispy sear.`,
+      ? `«Cualquiera puede cocinar»: no sobrecargues la sartén para lograr un dorado crocante en lugar de hervir los ingredientes.`
+      : `«Anyone can cook»: do not overcrowd the pan so your ingredients get a nice crispy sear rather than steaming.`,
+    safetyTip: isEs
+      ? `Seguridad para principiantes: Si utilizas pollo o carnes, asegúrate de que el centro alcance 74°C (o al pincharlo los jugos broten 100% transparentes sin tonos rosados). Lava siempre la tabla y cuchillo con agua caliente y jabón tras cortar carnes crudas.`
+      : `Beginner Safety Guide: If incorporating poultry or meats, ensure internal temperature reaches 165°F/74°C (juices must run clear with zero pink meat). Always wash cutting boards and knives with hot soapy water after raw prep.`,
   };
 }
 
