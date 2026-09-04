@@ -98,10 +98,10 @@ export default function Home() {
   });
   const [loadingRecipes, setLoadingRecipes] = useState<boolean>(true);
 
-  // Search, Filters & Sorting
+  // Search, Filters & Sorting (Soporte de selección múltiple)
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'recent' | 'rating' | 'prepTime'>('recent');
 
   // Menu Selection for Shopping List (Persists across reloads & sessions)
@@ -643,10 +643,10 @@ export default function Home() {
   const filteredRecipes = useMemo(() => {
     return recipes
       .filter((r) => {
-        // Filtro estricto por categoría seleccionada
-        if (selectedCategory) {
+        // Filtro por categorías seleccionadas (OR: coincide con cualquiera de las seleccionadas)
+        if (selectedCategories.length > 0) {
           const recCatKey = getCategoryKey(r.category);
-          if (recCatKey !== selectedCategory) {
+          if (!selectedCategories.includes(recCatKey)) {
             return false;
           }
         }
@@ -670,20 +670,23 @@ export default function Home() {
           }
         }
 
-        if (selectedTag) {
-          const normTag = selectedTag.toLowerCase();
-          const matches = r.dietary_tags?.some((t) => {
-            const nt = t.toLowerCase();
-            if (normTag === 'glutenfree') return nt.includes('gluten') || nt.includes('celiac');
-            if (normTag === 'dairyfree') return nt.includes('lacteo') || nt.includes('dairy');
-            if (normTag === 'vegetarian') return nt.includes('vege');
-            if (normTag === 'vegan') return nt.includes('vega');
-            if (normTag === 'nutfree') return nt.includes('frutos') || nt.includes('nut');
-            if (normTag === 'lowcarb') return nt.includes('carb') || nt.includes('keto');
-            if (normTag === 'quick') return r.prep_time <= 20;
-            return nt.includes(normTag);
+        // Filtro por dietas seleccionadas (AND: cumple cada una de las restricciones de dieta seleccionadas)
+        if (selectedTags.length > 0) {
+          const satisfiesAllTags = selectedTags.every((tag) => {
+            const normTag = tag.toLowerCase();
+            return r.dietary_tags?.some((t) => {
+              const nt = t.toLowerCase();
+              if (normTag === 'glutenfree') return nt.includes('gluten') || nt.includes('celiac') || nt.includes('sin gluten');
+              if (normTag === 'dairyfree') return nt.includes('lacteo') || nt.includes('dairy') || nt.includes('sin lacteos');
+              if (normTag === 'vegetarian') return nt.includes('vege');
+              if (normTag === 'vegan') return nt.includes('vega');
+              if (normTag === 'nutfree') return nt.includes('frutos') || nt.includes('nut') || nt.includes('sin nueces');
+              if (normTag === 'lowcarb') return nt.includes('carb') || nt.includes('keto') || nt.includes('bajo en carb');
+              if (normTag === 'quick') return r.prep_time <= 20;
+              return nt.includes(normTag);
+            });
           });
-          if (!matches) return false;
+          if (!satisfiesAllTags) return false;
         }
 
         return true;
@@ -701,7 +704,7 @@ export default function Home() {
         const dateB = new Date(b.created_at || 0).getTime();
         return dateB - dateA;
       });
-  }, [recipes, searchTerm, selectedTag, selectedCategory, sortBy]);
+  }, [recipes, searchTerm, selectedCategories, selectedTags, sortBy]);
 
   const isEs = lang === 'ES';
 
@@ -727,15 +730,15 @@ export default function Home() {
         onOpenShareApp={() => setShowShareApp(true)}
       />
 
-      {/* Buscador & Etiquetas Gastronómicas */}
+      {/* Buscador & Combobox de Filtros Inteligente */}
       <SearchBar
         lang={lang}
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
-        selectedTag={selectedTag}
-        setSelectedTag={setSelectedTag}
-        selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
+        selectedCategories={selectedCategories}
+        setSelectedCategories={setSelectedCategories}
+        selectedTags={selectedTags}
+        setSelectedTags={setSelectedTags}
       />
 
       {/* Controles de Ordenamiento & Total de Recetas */}
@@ -805,28 +808,28 @@ export default function Home() {
         <div className="text-center py-16 bg-[#EFECE1]/50 border border-dashed border-[#D8D3C4] rounded-2xl p-8 max-w-xl mx-auto">
           <UtensilsCrossed className="w-12 h-12 text-[#5C6650] mx-auto mb-3 opacity-60" />
           <h3 className="text-base font-bold text-[#2C3523] mb-1.5">
-            {searchTerm || selectedTag || selectedCategory
+            {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0
               ? (isEs ? 'No se encontraron recetas con estos filtros' : 'No recipes found with these filters')
               : (isEs ? 'Aún no hay recetas publicadas' : 'No recipes published yet')}
           </h3>
           <p className="text-xs text-[#5C6650] max-w-md mx-auto mb-6 leading-relaxed">
-            {searchTerm || selectedTag || selectedCategory
+            {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0
               ? (isEs
-                  ? 'Prueba a cambiar el término de búsqueda o seleccionar otra categoría.'
-                  : 'Try changing your search keywords or selecting another category.')
+                  ? 'Prueba a cambiar el término de búsqueda o seleccionar otra categoría en el menú de filtros.'
+                  : 'Try changing your search keywords or selecting another category from the filters menu.')
               : (isEs
                   ? '¡Sé el primero en compartir una receta con la comunidad o crea una con la ayuda del Chef IA!'
                   : 'Be the first to share a recipe with the community or generate one with the AI Chef!')}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {searchTerm || selectedTag || selectedCategory ? (
+            {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0 ? (
               <button
                 onClick={() => {
                   setSearchTerm('');
-                  setSelectedTag(null);
-                  setSelectedCategory(null);
+                  setSelectedCategories([]);
+                  setSelectedTags([]);
                 }}
-                className="px-4 py-2 bg-[#2C3523] text-white rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-colors"
+                className="px-4 py-2 bg-[#2C3523] text-white rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-colors cursor-pointer"
               >
                 {isEs ? 'Restablecer filtros' : 'Reset filters'}
               </button>
