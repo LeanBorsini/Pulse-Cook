@@ -1,8 +1,15 @@
 /**
  * @file categories.ts
- * @description Catálogo estandarizado de categorías gastronómicas bilingüe (ES/EN).
- * Proporciona claves fijas, etiquetas uniformes y un normalizador inteligente
- * para corregir errores tipográficos comunes o variantes históricas (e.g. "plato fuerte", "Prinles", "almuerzo").
+ * @description Catálogo simplificado y natural de categorías gastronómicas bilingüe (ES/EN).
+ * Opciones claras y no redundantes:
+ * - Desayuno
+ * - Plato Principal
+ * - Acompañamiento
+ * - Ensalada
+ * - Sopa
+ * - Entrada o Snack
+ * - Postre
+ * - Otro
  */
 
 export interface RecipeCategory {
@@ -13,6 +20,26 @@ export interface RecipeCategory {
 }
 
 export const RECIPE_CATEGORIES: RecipeCategory[] = [
+  {
+    id: 'breakfast',
+    label_es: 'Desayuno',
+    label_en: 'Breakfast',
+    aliases: [
+      'desayuno',
+      'desayunos',
+      'brunch',
+      'breakfast',
+      'merienda',
+      'tostada',
+      'tostadas',
+      'pancakes',
+      'panaderia',
+      'panadería',
+      'pan',
+      'bakery',
+      'waffles',
+    ],
+  },
   {
     id: 'main_dish',
     label_es: 'Plato Principal',
@@ -38,24 +65,44 @@ export const RECIPE_CATEGORIES: RecipeCategory[] = [
       'prinles',
       'segundo plato',
       'segundo',
+      'pasta',
+      'pastas',
+      'arroz',
+      'arroces',
+      'fideo',
+      'fideos',
+      'rice',
+      'noodles',
+      'spaghetti',
+      'pasta & rice',
+      'risotto',
     ],
   },
   {
-    id: 'appetizer',
-    label_es: 'Entrada / Aperitivo',
-    label_en: 'Appetizer & Starter',
+    id: 'side_dish',
+    label_es: 'Acompañamiento',
+    label_en: 'Side Dish',
     aliases: [
-      'entrada',
-      'entradas',
-      'aperitivo',
-      'aperitivos',
-      'appetizer',
-      'appetizers',
-      'starter',
-      'starters',
-      'primer plato',
-      'entremes',
-      'entremeses',
+      'acompañamiento',
+      'acompañamientos',
+      'acompanamiento',
+      'guarnicion',
+      'guarnición',
+      'guarniciones',
+      'side',
+      'sides',
+      'side dish',
+      'aderezo',
+      'aderezos',
+      'salsa',
+      'salsas',
+      'sauce',
+      'dip',
+      'dips',
+      'dressing',
+      'pure',
+      'puré',
+      'papas',
     ],
   },
   {
@@ -71,27 +118,9 @@ export const RECIPE_CATEGORIES: RecipeCategory[] = [
     ],
   },
   {
-    id: 'pasta_rice',
-    label_es: 'Pasta / Arroz',
-    label_en: 'Pasta & Rice',
-    aliases: [
-      'pasta',
-      'pastas',
-      'arroz',
-      'arroces',
-      'fideo',
-      'fideos',
-      'rice',
-      'noodles',
-      'spaghetti',
-      'pasta & rice',
-      'risotto',
-    ],
-  },
-  {
     id: 'soup',
-    label_es: 'Sopa / Crema',
-    label_en: 'Soup & Stew',
+    label_es: 'Sopa',
+    label_en: 'Soup',
     aliases: [
       'sopa',
       'sopas',
@@ -109,40 +138,35 @@ export const RECIPE_CATEGORIES: RecipeCategory[] = [
     ],
   },
   {
-    id: 'breakfast',
-    label_es: 'Desayuno / Brunch',
-    label_en: 'Breakfast & Brunch',
+    id: 'appetizer_snack',
+    label_es: 'Entrada o Snack',
+    label_en: 'Appetizer or Snack',
     aliases: [
-      'desayuno',
-      'desayunos',
-      'brunch',
-      'breakfast',
-      'merienda',
-      'tostada',
-      'tostadas',
-      'hotcakes',
-      'pancakes',
-    ],
-  },
-  {
-    id: 'side_dish',
-    label_es: 'Guarnición',
-    label_en: 'Side Dish',
-    aliases: [
-      'guarnicion',
-      'guarnición',
-      'guarniciones',
-      'acompañamiento',
-      'acompanamiento',
-      'side',
-      'sides',
-      'side dish',
+      'entrada',
+      'entradas',
+      'aperitivo',
+      'aperitivos',
+      'appetizer',
+      'appetizers',
+      'starter',
+      'starters',
+      'snack',
+      'snacks',
+      'picoteo',
+      'tapa',
+      'tapas',
+      'bocadillo',
+      'bocado',
+      'primer plato',
+      'entremes',
+      'entremeses',
+      'bites',
     ],
   },
   {
     id: 'dessert',
-    label_es: 'Postre / Dulce',
-    label_en: 'Dessert & Baking',
+    label_es: 'Postre',
+    label_en: 'Dessert',
     aliases: [
       'postre',
       'postres',
@@ -156,95 +180,35 @@ export const RECIPE_CATEGORIES: RecipeCategory[] = [
       'reposteria',
       'repostería',
       'sweet',
-    ],
-  },
-  {
-    id: 'snack',
-    label_es: 'Snack / Picoteo',
-    label_en: 'Snack & Bite',
-    aliases: [
-      'snack',
-      'snacks',
-      'picoteo',
-      'tapa',
-      'tapas',
-      'bocadillo',
-      'bocado',
-      'bites',
-    ],
-  },
-  {
-    id: 'beverage',
-    label_es: 'Bebida / Trago',
-    label_en: 'Beverage & Drink',
-    aliases: [
-      'bebida',
-      'bebidas',
-      'trago',
-      'tragos',
-      'coctel',
-      'cocktail',
-      'smoothie',
-      'jugo',
-      'drink',
-      'beverage',
-      'infusion',
-      'café',
-      'tea',
-    ],
-  },
-  {
-    id: 'sauce',
-    label_es: 'Salsa / Aderezo',
-    label_en: 'Sauce & Dip',
-    aliases: [
-      'salsa',
-      'salsas',
-      'aderezo',
-      'aderezos',
-      'dip',
-      'dips',
-      'sauce',
-      'sauces',
-      'dressing',
-    ],
-  },
-  {
-    id: 'bread_bakery',
-    label_es: 'Pan / Panadería',
-    label_en: 'Bread & Bakery',
-    aliases: [
-      'pan',
-      'panes',
-      'panaderia',
-      'panadería',
-      'masa',
-      'masas',
-      'bread',
-      'bakery',
-      'dough',
+      'helado',
     ],
   },
   {
     id: 'other',
-    label_es: 'Otro / General',
-    label_en: 'Other / General',
+    label_es: 'Otro',
+    label_en: 'Other',
     aliases: [
       'general',
       'otro',
       'otros',
       'other',
       'varios',
+      'bebida',
+      'bebidas',
+      'trago',
+      'tragos',
+      'drink',
+      'beverage',
     ],
   },
 ];
 
 /**
- * Normaliza cualquier texto libre o categoría previa a una categoría canónica.
+ * Normaliza cualquier texto libre o categoría previa a una categoría canónica del catálogo simplificado.
  */
 export function normalizeCategory(rawCategory: string | undefined | null): RecipeCategory {
   if (!rawCategory || !rawCategory.trim()) {
-    return RECIPE_CATEGORIES[0]; // Por defecto 'main_dish'
+    return RECIPE_CATEGORIES[1]; // 'main_dish' ('Plato Principal') por defecto
   }
 
   const clean = rawCategory.toLowerCase().trim();
@@ -252,6 +216,20 @@ export function normalizeCategory(rawCategory: string | undefined | null): Recip
   // 1. Coincidencia exacta por ID
   const directMatch = RECIPE_CATEGORIES.find((c) => c.id === clean);
   if (directMatch) return directMatch;
+
+  // Compatibilidad con IDs previos consolidados
+  if (clean === 'appetizer' || clean === 'snack') {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'appetizer_snack')!;
+  }
+  if (clean === 'pasta_rice') {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'main_dish')!;
+  }
+  if (clean === 'sauce') {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'side_dish')!;
+  }
+  if (clean === 'bread_bakery') {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'breakfast')!;
+  }
 
   // 2. Coincidencia exacta por etiquetas ES o EN
   const labelMatch = RECIPE_CATEGORIES.find(
@@ -267,6 +245,21 @@ export function normalizeCategory(rawCategory: string | undefined | null): Recip
 
   // 4. Búsqueda por sub-cadena inteligente
   if (
+    clean.includes('desayun') ||
+    clean.includes('breakfast') ||
+    clean.includes('brunch')
+  ) {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'breakfast')!;
+  }
+  if (
+    clean.includes('acompañ') ||
+    clean.includes('acompan') ||
+    clean.includes('guarnic') ||
+    clean.includes('side')
+  ) {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'side_dish')!;
+  }
+  if (
     clean.includes('prin') ||
     clean.includes('fuerte') ||
     clean.includes('main') ||
@@ -279,6 +272,25 @@ export function normalizeCategory(rawCategory: string | undefined | null): Recip
     return RECIPE_CATEGORIES.find((c) => c.id === 'salad')!;
   }
   if (
+    clean.includes('sopa') ||
+    clean.includes('crema') ||
+    clean.includes('caldo') ||
+    clean.includes('soup') ||
+    clean.includes('guiso')
+  ) {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'soup')!;
+  }
+  if (
+    clean.includes('entrad') ||
+    clean.includes('snack') ||
+    clean.includes('aperitiv') ||
+    clean.includes('tapa') ||
+    clean.includes('picote') ||
+    clean.includes('appetiz')
+  ) {
+    return RECIPE_CATEGORIES.find((c) => c.id === 'appetizer_snack')!;
+  }
+  if (
     clean.includes('postre') ||
     clean.includes('dulce') ||
     clean.includes('dessert') ||
@@ -287,36 +299,12 @@ export function normalizeCategory(rawCategory: string | undefined | null): Recip
   ) {
     return RECIPE_CATEGORIES.find((c) => c.id === 'dessert')!;
   }
-  if (
-    clean.includes('pasta') ||
-    clean.includes('arroz') ||
-    clean.includes('fideo') ||
-    clean.includes('rice')
-  ) {
-    return RECIPE_CATEGORIES.find((c) => c.id === 'pasta_rice')!;
-  }
-  if (
-    clean.includes('sopa') ||
-    clean.includes('crema') ||
-    clean.includes('caldo') ||
-    clean.includes('soup')
-  ) {
-    return RECIPE_CATEGORIES.find((c) => c.id === 'soup')!;
-  }
-  if (
-    clean.includes('desayuno') ||
-    clean.includes('breakfast') ||
-    clean.includes('brunch')
-  ) {
-    return RECIPE_CATEGORIES.find((c) => c.id === 'breakfast')!;
-  }
 
-  // Si no coincide con ninguna, devolver 'other'
-  return RECIPE_CATEGORIES.find((c) => c.id === 'other') || RECIPE_CATEGORIES[0];
+  return RECIPE_CATEGORIES.find((c) => c.id === 'other') || RECIPE_CATEGORIES[1];
 }
 
 /**
- * Obtiene el ID canónico de una categoría (e.g. 'main_dish')
+ * Obtiene el ID canónico de una categoría (e.g. 'main_dish', 'breakfast', 'side_dish')
  */
 export function getCategoryKey(rawCategory: string | undefined | null): string {
   return normalizeCategory(rawCategory).id;

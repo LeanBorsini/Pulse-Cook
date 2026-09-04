@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { RECIPE_CATEGORIES } from '@/lib/categories';
 
 const TAG_TRANSLATIONS: Record<string, { ES: string; EN: string }> = {
@@ -36,9 +36,6 @@ export function SearchBar({
 }: SearchBarProps) {
   const isEs = lang === 'ES';
 
-  // Acceso directo a las categorías más frecuentes
-  const quickCategories = ['main_dish', 'salad', 'pasta_rice', 'dessert', 'appetizer'];
-
   return (
     <section className="mb-8 space-y-3">
       {/* Campo de búsqueda principal */}
@@ -53,8 +50,8 @@ export function SearchBar({
         />
       </div>
 
-      {/* Filtro por Categorías Estandarizadas */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Filtro por Categorías Simplificadas */}
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <span className="text-[11px] font-bold text-[#5C6650] uppercase tracking-wider mr-1">
           {isEs ? 'Categoría:' : 'Category:'}
         </span>
@@ -69,14 +66,12 @@ export function SearchBar({
           {isEs ? 'Todas' : 'All'}
         </button>
 
-        {quickCategories.map((catId) => {
-          const cat = RECIPE_CATEGORIES.find((c) => c.id === catId);
-          if (!cat) return null;
-          const isSelected = selectedCategory === catId;
+        {RECIPE_CATEGORIES.map((cat) => {
+          const isSelected = selectedCategory === cat.id;
           return (
             <button
-              key={catId}
-              onClick={() => setSelectedCategory?.(isSelected ? null : catId)}
+              key={cat.id}
+              onClick={() => setSelectedCategory?.(isSelected ? null : cat.id)}
               className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${
                 isSelected
                   ? 'bg-[#2C3523] text-[#F7F5EC] shadow-xs'
@@ -87,30 +82,6 @@ export function SearchBar({
             </button>
           );
         })}
-
-        {/* Combobox desplegable para acceder a cualquiera de las 13 categorías */}
-        <div className="relative inline-flex items-center">
-          <select
-            value={selectedCategory || ''}
-            onChange={(e) => setSelectedCategory?.(e.target.value ? e.target.value : null)}
-            aria-label={isEs ? 'Más categorías gastronómicas' : 'More recipe categories'}
-            className={`text-xs pl-2.5 pr-6 py-1 rounded-full font-semibold border transition-all appearance-none cursor-pointer outline-none ${
-              selectedCategory && !quickCategories.includes(selectedCategory)
-                ? 'bg-[#2C3523] text-[#F7F5EC] border-[#2C3523]'
-                : 'bg-[#EFECE1] text-[#5C6650] border-[#D8D3C4] hover:text-[#2C3523]'
-            }`}
-          >
-            <option value="" className="bg-[#FAF8F2] text-[#2C3523]">
-              {isEs ? 'Más categorías...' : 'More categories...'}
-            </option>
-            {RECIPE_CATEGORIES.map((cat) => (
-              <option key={cat.id} value={cat.id} className="bg-[#FAF8F2] text-[#2C3523]">
-                {isEs ? cat.label_es : cat.label_en}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-3 h-3 pointer-events-none absolute right-1.5 text-current opacity-70" />
-        </div>
       </div>
 
       {/* Filtro por Dietas / Preferencias */}
