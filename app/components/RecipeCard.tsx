@@ -4,6 +4,7 @@ import { Clock, Users, BookmarkCheck, Plus, Star, Images } from 'lucide-react';
 import { Recipe } from '../types';
 import { User } from '@supabase/supabase-js';
 import { translateTextSmart } from '../../lib/recipeTranslator';
+import { getCategoryLabel } from '@/lib/categories';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -74,6 +75,10 @@ export function RecipeCard({
         </div>
 
         <div className="flex items-center gap-2 text-xs text-[#5C6650] mb-2.5 font-medium flex-wrap">
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-[#EAE5D6] text-[#2C3523] border border-[#D8D3C4]/80">
+            {getCategoryLabel(recipe.category, lang)}
+          </span>
+          <span>•</span>
           <span>by @{authorName}</span>
           <span>•</span>
           <span className="flex items-center gap-1">

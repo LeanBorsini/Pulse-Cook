@@ -39,6 +39,7 @@ import { RecipePrintView } from './RecipePrintView';
 import { CookingModeModal } from './CookingModeModal';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
 import { saveLocalRecipe } from '../../lib/recipeStore';
+import { getCategoryLabel } from '@/lib/categories';
 import {
   hasGenuineEnglishInstructions,
   hasGenuineSpanishInstructions,
@@ -531,7 +532,7 @@ export function RecipeDetailModal({
                 {recipe.servings || 1} {dynamicLang === 'ES' ? 'Porciones' : 'Servings'}
               </span>
               <span className="bg-[#2C3523] text-[#F7F5EC] px-2.5 py-1 rounded-lg font-semibold">
-                {recipe.category || 'General'}
+                {getCategoryLabel(recipe.category, dynamicLang)}
               </span>
             </div>
 

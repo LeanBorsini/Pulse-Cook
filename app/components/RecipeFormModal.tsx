@@ -33,11 +33,13 @@ import {
   Utensils,
   ChefHat,
   Camera,
+  ChevronDown,
 } from 'lucide-react';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
 import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
 import { translateTextSmart } from '@/lib/recipeTranslator';
+import { RECIPE_CATEGORIES, getCategoryKey, getCategoryLabel } from '@/lib/categories';
 
 interface RecipeFormModalProps {
   recipeToEdit?: Recipe | null;
@@ -106,8 +108,13 @@ export function RecipeFormModal({
     ];
   });
 
-  // Campos complementarios
-  const [category, setCategory] = useState(recipeToEdit?.category || 'General');
+  // Campos complementarios (Categoría normalizada mediante catálogo fijo)
+  const [category, setCategory] = useState(() => {
+    if (recipeToEdit?.category) {
+      return getCategoryKey(recipeToEdit.category);
+    }
+    return 'main_dish';
+  });
   const [prepTime, setPrepTime] = useState<number>(recipeToEdit?.prep_time || 25);
   const [servings, setServings] = useState<number>(recipeToEdit?.servings || 4);
 
@@ -397,12 +404,13 @@ export function RecipeFormModal({
       }));
 
     const recipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const standardizedCategory = getCategoryLabel(category, 'ES');
 
     const recipeData: Recipe = {
       id: recipeId,
       title_es,
       title_en,
-      category: category || 'General',
+      category: standardizedCategory,
       prep_time: Number(prepTime) || 20,
       servings: Number(servings) || 4,
       description_es: desc_es,
@@ -434,7 +442,7 @@ export function RecipeFormModal({
       const supabasePayload = {
         title_es,
         title_en,
-        category: category || 'General',
+        category: standardizedCategory,
         prep_time: Number(prepTime) || 20,
         servings: Number(servings) || 4,
         description_es: desc_es,
@@ -561,15 +569,24 @@ export function RecipeFormModal({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-[#2C3523] mb-1">
-                {isEs ? 'Categoría' : 'Category'}
+                {isEs ? 'Tipo de Plato / Categoría' : 'Dish Type / Category'}
               </label>
-              <input
-                type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder={isEs ? 'Ej. Pastas, Postres' : 'e.g. Pasta, Desserts'}
-                className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-2 rounded-xl text-xs font-medium outline-none focus:border-[#2C3523] transition-all"
-              />
+              <div className="relative">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-2 rounded-xl text-xs font-semibold text-[#2C3523] outline-none focus:border-[#2C3523] focus:ring-1 focus:ring-[#2C3523] cursor-pointer appearance-none pr-8 transition-all"
+                >
+                  {RECIPE_CATEGORIES.map((cat) => (
+                    <option key={cat.id} value={cat.id} className="bg-[#FAF8F2] text-[#2C3523]">
+                      {formInputLang === 'ES' ? cat.label_es : cat.label_en}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-[#5C6650]">
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </div>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-[#2C3523] mb-1">

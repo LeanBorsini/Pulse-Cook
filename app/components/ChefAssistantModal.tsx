@@ -32,6 +32,7 @@ import {
 import { Recipe, Ingredient } from '../types';
 import { User } from '@supabase/supabase-js';
 import { RemyIcon } from './RemyIcon';
+import { getCategoryLabel } from '@/lib/categories';
 
 interface ChefGeneratedRecipe {
   title: string;
@@ -244,7 +245,7 @@ export default function ChefAssistantModal({
       description_en: !isEs ? recipeItem.description : '',
       instructions_es: isEs ? fullInstructions : '',
       instructions_en: !isEs ? fullInstructions : '',
-      category: isEs ? 'Almuerzo / Cena' : 'Lunch / Dinner',
+      category: getCategoryLabel('main_dish', 'ES'),
       prep_time: recipeItem.prepTime || 30,
       servings: servings || 2,
       dietary_tags: recipeItem.dietaryTags || [],
