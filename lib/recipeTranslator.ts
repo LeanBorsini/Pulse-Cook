@@ -21,10 +21,15 @@ const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
   [/\b(lo\s+)?llevamos\s+a\s+cocinar\b/gi, 'bake it'],
   [/\bhasta\s+que\s+est[eé]n\s+golden\s+brown\b/gi, 'until golden brown'],
   [/\bhasta\s+que\s+est[eé]n\s+(doradas|dorados)\b/gi, 'until golden brown'],
+  [/\bhasta\s+que\s+est[eé]\s+(dorada|dorado)\b/gi, 'until golden brown'],
+  [/\bcolocar\s+en\s+un\s+procesador\s+de\s+alimentos\s+(la|el|los|las)?\b/gi, 'place in a food processor the'],
   [/\bcolocar\s+en\s+un\s+procesador\s+de\s+alimentos\b/gi, 'place in a food processor'],
   [/\bcolocamos\s+en\s+un\s+procesador\s+de\s+alimentos\b/gi, 'place in a food processor'],
   [/\b(lo\s+)?trituramos\s+hasta\s+conseguir\s+una\s+masa\s+homog[eé]nea\b/gi, 'blend until a smooth, uniform dough is formed'],
+  [/\btriturar\s+hasta\s+conseguir\s+una\s+masa\s+homog[eé]nea\b/gi, 'blend until a smooth, uniform dough is formed'],
   [/\bhasta\s+conseguir\s+una\s+masa\s+homog[eé]nea\b/gi, 'until a smooth dough is formed'],
+  [/\b(y\s+)?triturar\s+hasta\b/gi, 'and blend until'],
+  [/\btriturar\s+hasta\b/gi, 'blend until'],
   [/\bluego\s+vamos\s+a\s+colocar\b/gi, 'next, apply'],
   [/\bvamos\s+a\s+colocar\b/gi, 'apply'],
   [/\bpor\s+nuestras\s+manos\b/gi, 'to your hands'],
@@ -34,20 +39,26 @@ const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
   [/\bdar\s+forma\s+de\b/gi, 'shape into'],
   [/\bmientras\s+vamos\s+poni[eé]ndolas\s+en\b/gi, 'placing them onto'],
   [/\bpor\s+unos\s+minutos\b/gi, 'for a few minutes'],
+  [/\bdurante\s+unos\s+minutos\b/gi, 'for a few minutes'],
+  [/\bdurante\s+a\s+few\s+minutes\b/gi, 'for a few minutes'],
+  [/\bdurante\b/gi, 'for'],
   [/\bun\s+poco\s+de\b/gi, 'a little'],
 
-  // Ingredientes culinarios específicos (evita Spanglish en pechuga, zapallo, etc.)
+  // Ingredientes culinarios específicos (evita Spanglish en pechuga, zapallo, cebolla, etc.)
   [/\bpechuga\s+de\s+pollo\b/gi, 'chicken breast'],
   [/\bpechugas?\b/gi, 'chicken breast'],
   [/\b(zapallo|calabaza)\s+(anam[aá]|anco|butternut)\b/gi, 'butternut squash'],
   [/\b(zapallo|calabaza)\b/gi, 'butternut squash'],
   [/\bharina\s+de\s+avena\b/gi, 'oat flour'],
   [/\baceite\s+de\s+oliva\b/gi, 'olive oil'],
-  [/\bcebolla\s+(blanca|morada|picada)?\b/gi, 'onion'],
+  // Corrección crítica: cebolla con o sin espacio, coma o adjetivo
+  [/\bcebollas?\s*(moradas?|blancas?|picadas?)?\b/gi, 'onion'],
   [/\bpimienta\s+negra\b/gi, 'black pepper'],
   [/\bpimienta\b/gi, 'pepper'],
   [/\bor[eé]gano\b/gi, 'oregano'],
   [/\bpaprika\b/gi, 'paprika'],
+  [/\bpiment[oó]n\b/gi, 'paprika'],
+  [/\bsal\b/gi, 'salt'],
   [/\bfuente\s+(para\s+horno|apta\s+para\s+horno)\b/gi, 'baking dish'],
 
   // Pasos e imperativos completos
@@ -100,13 +111,51 @@ const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
 ];
 
 const PHRASE_DICTIONARY_EN_TO_ES: [RegExp, string][] = [
-  [/\bplace in a food processor\b/gi, 'colocar en un procesador de alimentos'],
+  // Frases compuestas y Spanglish de preparación
+  [/\bplace into a food processor the\b/gi, 'colocar en un procesador de alimentos la'],
+  [/\bplace in a food processor the\b/gi, 'colocar en un procesador de alimentos la'],
+  [/\bplace (into|in) a food processor\b/gi, 'colocar en un procesador de alimentos'],
+  [/\binto a food processor\b/gi, 'en un procesador de alimentos'],
+  [/\bfood processor\b/gi, 'procesador de alimentos'],
+  [/\ba smooth,?\s+uniform\s+dough\s+is\s+formed\b/gi, 'conseguir una masa homogénea'],
+  [/\ba smooth dough is formed\b/gi, 'conseguir una masa homogénea'],
+  [/\bnext,\s*apply\s+a\s+little\s+olive\s+oil\s+to\s+your\s+hands\s+to\s+shape\s+the\s+mixture\s+into\s+nuggets,\s*placing\s+them\s+onto\b/gi, 'luego colocar un poco de aceite de oliva en las manos para dar forma de nuggets, colocándolos en'],
+  [/\bnext,\s*apply\s+a\s+little\s+olive\s+oil\s+to\s+your\s+hands\b/gi, 'luego colocar un poco de aceite de oliva en las manos'],
+  [/\bshape the mixture into nuggets\b/gi, 'dar forma de nuggets a la masa'],
+  [/\bshape into nuggets\b/gi, 'dar forma de nuggets'],
+  [/\bto shape the mixture\b/gi, 'para dar forma a la mezcla'],
+  [/\bplacing them onto\b/gi, 'colocándolos en'],
+  [/\bonto a baking dish\b/gi, 'en una fuente para horno'],
+  [/\bin a baking dish\b/gi, 'en una fuente para horno'],
+  [/\buna baking dish\b/gi, 'una fuente para horno'],
+  [/\bbaking dish\b/gi, 'fuente para horno'],
+  [/\ba few minutes\b/gi, 'unos minutos'],
+  [/\buntil golden brown\b/gi, 'hasta que esté dorado'],
+  [/\bgolden brown\b/gi, 'dorado'],
+  [/\bfor a few minutes\b/gi, 'durante unos minutos'],
+  [/\bbake for a few minutes\b/gi, 'hornear durante unos minutos'],
+  [/\bbake for\b/gi, 'hornear durante'],
+  [/\bbake it\b/gi, 'hornearlo'],
+
+  // Ingredientes culinarios en inglés traducidos al español
+  [/\bchicken\s+breast\b/gi, 'pechuga de pollo'],
+  [/\bbutternut\s+squash\b/gi, 'zapallo'],
+  [/\bsquash\b/gi, 'zapallo'],
+  [/\boat\s+flour\b/gi, 'harina de avena'],
+  [/\bolive\s+oil\b/gi, 'aceite de oliva'],
+  [/\bblack\s+pepper\b/gi, 'pimienta negra'],
+  [/\bpepper\b/gi, 'pimienta'],
+  [/\boregano\b/gi, 'orégano'],
+  [/\bpaprika\b/gi, 'paprika'],
+  [/\bonion\b/gi, 'cebolla'],
+  [/\bsalt\b/gi, 'sal'],
+  [/\bchicken\b/gi, 'pollo'],
+
+  // Pasos y verbos
   [/\bmix in a bowl\b/gi, 'mezclar en un tazón'],
   [/\bblend until\b/gi, 'triturar hasta'],
-  [/\bbake for\b/gi, 'hornear durante'],
   [/\bpreheat (the )?oven to\b/gi, 'precalentar el horno a'],
   [/\bseason with salt and pepper\b/gi, 'sazonar con sal y pimienta'],
-  [/\buntil golden brown\b/gi, 'hasta que esté dorado'],
   [/\bserve warm\b/gi, 'servir tibio'],
   [/\bserve hot\b/gi, 'servir caliente'],
   [/\bto taste\b/gi, 'al gusto'],
@@ -136,6 +185,42 @@ const PHRASE_DICTIONARY_EN_TO_ES: [RegExp, string][] = [
   [/\bsprinkle\b/gi, 'espolvorear'],
   [/\bboil\b/gi, 'hervir'],
 ];
+
+/**
+ * Convierte cualquier texto culinario mezclado o en Spanglish en español 100% puro.
+ */
+export function cleanToPureSpanish(text: string | null | undefined): string {
+  if (!text || !text.trim()) return '';
+  let cleaned = text;
+  for (const [regex, replacement] of PHRASE_DICTIONARY_EN_TO_ES) {
+    cleaned = cleaned.replace(regex, replacement);
+  }
+  return cleaned;
+}
+
+/**
+ * Convierte cualquier texto culinario mezclado o en Spanglish en inglés 100% puro.
+ */
+export function cleanToPureEnglish(text: string | null | undefined): string {
+  if (!text || !text.trim()) return '';
+  let cleaned = text;
+  for (const [regex, replacement] of PHRASE_DICTIONARY_ES_TO_EN) {
+    cleaned = cleaned.replace(regex, replacement);
+  }
+  // Limpieza final de conectores o artículos españoles residuales
+  cleaned = cleaned
+    .replace(/\b(en\s+un\s+procesador\s+de\s+alimentos)\b/gi, 'in a food processor')
+    .replace(/\b(la|el|los|las)\s+(chicken breast|butternut squash|oat flour|onion|olive oil)/gi, 'the $2')
+    .replace(/\buna\s+(baking dish)/gi, 'a $1')
+    .replace(/\by\s+(blend|mix|bake|stir|add)/gi, 'and $1')
+    .replace(/\b(hornear\s+durante)\b/gi, 'bake for')
+    .replace(/\b(hasta\s+que\s+est[eé]\s+dorado)\b/gi, 'until golden brown')
+    .replace(/\b(cebollas?)\b/gi, 'onion')
+    .replace(/\b(sal)\b/gi, 'salt')
+    .replace(/\b(pimienta)\b/gi, 'pepper');
+
+  return cleaned;
+}
 
 /**
  * Detecta si un texto culinario está en español
@@ -216,10 +301,26 @@ export function hasGenuineSpanishInstructions(instructionsEs?: string | null, in
   if (instructionsEn && trimmed.toLowerCase() === instructionsEn.trim().toLowerCase()) {
     return false;
   }
+  // Si contiene residuos o frases obvias en inglés o Spanglish, NO es español genuino
+  const englishResidueMarkers = /\b(chicken breast|butternut squash|oat flour|olive oil|food processor|baking dish|smooth dough|uniform dough|golden brown|few minutes|shape into|to shape|next, apply|apply a little|placing them|black pepper|bell pepper|green onion)\b/i;
+  if (englishResidueMarkers.test(trimmed)) {
+    return false;
+  }
   if (isEnglishCulinaryText(trimmed)) {
     return false;
   }
   return isSpanishCulinaryText(trimmed);
+}
+
+/**
+ * Detecta si un texto culinario contiene residuos o mezcla de Spanglish
+ */
+export function hasSpanglishResidue(text?: string | null): boolean {
+  if (!text || !text.trim()) return false;
+  const t = text.trim();
+  const englishInSpanish = /\b(chicken breast|butternut squash|oat flour|olive oil|food processor|baking dish|smooth dough|uniform dough|golden brown|few minutes|shape into|to shape|next, apply|apply a little|placing them)\b/i;
+  const spanishInEnglish = /\b(cebolla|pechuga|zapallo|calabaza|colocar|procesador de alimentos|triturar|harina de avena|aceite de oliva|una baking dish|hornear durante|hasta que est[eé]|dorado)\b/i;
+  return englishInSpanish.test(t) || spanishInEnglish.test(t);
 }
 
 /**
@@ -236,7 +337,9 @@ export function translateTextSmart(
   toLang: 'ES' | 'EN'
 ): string {
   if (!text || !text.trim()) return '';
-  if (fromLang === toLang) return text;
+  if (fromLang === toLang) {
+    return toLang === 'EN' ? cleanToPureEnglish(text) : cleanToPureSpanish(text);
+  }
 
   let translated = text;
   const dictionary = toLang === 'EN' ? PHRASE_DICTIONARY_ES_TO_EN : PHRASE_DICTIONARY_EN_TO_ES;
@@ -245,7 +348,7 @@ export function translateTextSmart(
     translated = translated.replace(regex, replacement);
   }
 
-  return translated;
+  return toLang === 'EN' ? cleanToPureEnglish(translated) : cleanToPureSpanish(translated);
 }
 
 /**

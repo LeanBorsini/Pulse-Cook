@@ -46,6 +46,9 @@ import {
   isSpanishCulinaryText,
   isEnglishCulinaryText,
   translateTextSmart,
+  cleanToPureSpanish,
+  cleanToPureEnglish,
+  hasSpanglishResidue,
 } from '../../lib/recipeTranslator';
 
 interface RecipeDetailModalProps {
@@ -154,33 +157,122 @@ export function RecipeDetailModal({
   const hasValidEn = hasGenuineEnglishInstructions(recipe.instructions_en, recipe.instructions_es);
   const hasValidEs = hasGenuineSpanishInstructions(recipe.instructions_es, recipe.instructions_en);
 
-  // Textos a mostrar según el idioma dinámico seleccionado
-  const displayedTitle =
-    translatedContent?.title ||
-    (dynamicLang === 'ES' 
-      ? (recipe.title_es || recipe.title_en || '') 
-      : (hasValidEn && recipe.title_en && recipe.title_en !== recipe.title_es
-          ? recipe.title_en
-          : translateTextSmart(recipe.title_en || recipe.title_es, 'ES', 'EN')));
+  // Estados de edición manual directa de instrucciones y saneamiento
+  const [isEditingInstructions, setIsEditingInstructions] = useState(false);
+  const [instructionEditText, setInstructionEditText] = useState('');
+  const [isAutoSanitizing, setIsAutoSanitizing] = useState(false);
 
-  const displayedDesc =
-    translatedContent?.description ||
-    (dynamicLang === 'ES' 
-      ? (recipe.description_es || recipe.description_en || '') 
-      : (hasValidEn && recipe.description_en && recipe.description_en !== recipe.description_es
-          ? recipe.description_en
-          : translateTextSmart(recipe.description_en || recipe.description_es, 'ES', 'EN')));
+  // Textos a mostrar según el idioma dinámico seleccionado garantizando 100% pureza léxica
+  const rawTitle = translatedContent?.title || (dynamicLang === 'ES' ? (recipe.title_es || recipe.title_en || '') : (recipe.title_en || recipe.title_es || ''));
+  const displayedTitle = dynamicLang === 'ES' ? cleanToPureSpanish(rawTitle) : cleanToPureEnglish(rawTitle);
 
-  // Instrucciones activas para el idioma dinámico seleccionado
-  const displayedInstructions =
+  const rawDesc = translatedContent?.description || (dynamicLang === 'ES' ? (recipe.description_es || recipe.description_en || '') : (recipe.description_en || recipe.description_es || ''));
+  const displayedDesc = dynamicLang === 'ES' ? cleanToPureSpanish(rawDesc) : cleanToPureEnglish(rawDesc);
+
+  // Instrucciones activas para el idioma dinámico seleccionado: SIEMPRE limpiadas de Spanglish
+  const rawInstructions =
     translatedContent?.instructions ||
     (dynamicLang === 'ES'
-      ? (hasValidEs ? recipe.instructions_es : (recipe.instructions_es || recipe.instructions_en || ''))
-      : (hasValidEn
-          ? recipe.instructions_en
-          : (translatingView
-              ? ''
-              : translateTextSmart(recipe.instructions_en || recipe.instructions_es, 'ES', 'EN'))));
+      ? (recipe.instructions_es || recipe.instructions_en || '')
+      : (recipe.instructions_en || recipe.instructions_es || ''));
+
+  const displayedInstructions =
+    dynamicLang === 'ES'
+      ? cleanToPureSpanish(rawInstructions)
+      : cleanToPureEnglish(rawInstructions);
+
+  const hasSpanglishInActive = hasSpanglishResidue(rawInstructions);
+
+  // Auto-reparación en segundo plano al montar o cambiar de receta si contiene Spanglish
+  useEffect(() => {
+    let changed = false;
+    let newEs = recipe.instructions_es || '';
+    let newEn = recipe.instructions_en || '';
+
+    if (hasSpanglishResidue(newEs) || (newEs && !hasGenuineSpanishInstructions(newEs, newEn))) {
+      newEs = cleanToPureSpanish(newEs);
+      changed = true;
+    }
+    if (hasSpanglishResidue(newEn) || (newEn && !hasGenuineEnglishInstructions(newEn, newEs))) {
+      newEn = cleanToPureEnglish(newEn);
+      changed = true;
+    }
+    if (!newEn && newEs) {
+      newEn = cleanToPureEnglish(newEs);
+      changed = true;
+    }
+
+    if (changed) {
+      const updated: Recipe = {
+        ...recipe,
+        title_es: cleanToPureSpanish(recipe.title_es),
+        title_en: cleanToPureEnglish(recipe.title_en || recipe.title_es),
+        instructions_es: newEs,
+        instructions_en: newEn,
+      };
+      saveLocalRecipe(updated, ingredients);
+      if (onRecipeUpdated) {
+        onRecipeUpdated(updated);
+      }
+    }
+  }, [recipe.id]);
+
+  const handleSanitizeRecipe = () => {
+    setIsAutoSanitizing(true);
+    const sourceEs = recipe.instructions_es || recipe.instructions_en || '';
+    const sourceEn = recipe.instructions_en || recipe.instructions_es || '';
+
+    const cleanEs = cleanToPureSpanish(sourceEs);
+    const cleanEn = cleanToPureEnglish(sourceEn || cleanEs);
+    const cleanTitleEs = cleanToPureSpanish(recipe.title_es || recipe.title_en);
+    const cleanTitleEn = cleanToPureEnglish(recipe.title_en || recipe.title_es);
+
+    const updatedRecipe: Recipe = {
+      ...recipe,
+      title_es: cleanTitleEs,
+      title_en: cleanTitleEn,
+      instructions_es: cleanEs,
+      instructions_en: cleanEn,
+    };
+    saveLocalRecipe(updatedRecipe, ingredients);
+    if (onRecipeUpdated) {
+      onRecipeUpdated(updatedRecipe);
+    }
+    setTranslatedContent({
+      title: dynamicLang === 'ES' ? cleanTitleEs : cleanTitleEn,
+      description: dynamicLang === 'ES' ? cleanToPureSpanish(recipe.description_es) : cleanToPureEnglish(recipe.description_en),
+      instructions: dynamicLang === 'ES' ? cleanEs : cleanEn,
+    });
+    setTimeout(() => setIsAutoSanitizing(false), 400);
+  };
+
+  const handleSaveEditedInstructions = () => {
+    const sanitized = dynamicLang === 'ES' 
+      ? cleanToPureSpanish(instructionEditText) 
+      : cleanToPureEnglish(instructionEditText);
+
+    const updated: Recipe = {
+      ...recipe,
+      ...(dynamicLang === 'ES'
+        ? {
+            instructions_es: sanitized,
+            instructions_en: cleanToPureEnglish(sanitized),
+          }
+        : {
+            instructions_en: sanitized,
+            instructions_es: cleanToPureSpanish(sanitized),
+          }),
+    };
+    saveLocalRecipe(updated, ingredients);
+    if (onRecipeUpdated) {
+      onRecipeUpdated(updated);
+    }
+    setTranslatedContent((prev) => ({
+      ...(prev || {}),
+      instructions: sanitized,
+    }));
+    setIsEditingInstructions(false);
+  };
 
   // Indicador de si las instrucciones mostradas en el idioma activo no están traducidas
   const needsTranslationToActiveLang =
@@ -775,12 +867,42 @@ export function RecipeDetailModal({
 
           {/* Instrucciones con detector y traductor inteligente */}
           <div className="border-t border-[#D8D3C4]/80 pt-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
               <h3 className="font-serif font-bold text-[#2C3523] text-xs uppercase tracking-wider">
                 {dynamicLang === 'ES' ? 'Instrucciones' : 'Instructions'}
               </h3>
               
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Botón Sanear Spanglish si se detecta mezcla o residuo */}
+                {(hasSpanglishInActive || hasSpanglishResidue(recipe.instructions_es) || hasSpanglishResidue(recipe.instructions_en)) && (
+                  <button
+                    type="button"
+                    onClick={handleSanitizeRecipe}
+                    disabled={isAutoSanitizing}
+                    className="text-[11px] text-emerald-800 hover:text-emerald-900 font-semibold flex items-center gap-1 cursor-pointer bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg transition-colors"
+                    title={dynamicLang === 'ES' ? 'Sanear y reparar Spanglish en ambos idiomas' : 'Fix and sanitize Spanglish in both languages'}
+                  >
+                    {isAutoSanitizing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-emerald-600" />}
+                    <span>{isAutoSanitizing ? (dynamicLang === 'ES' ? 'Saneando...' : 'Sanitizing...') : (dynamicLang === 'ES' ? 'Sanear Spanglish' : 'Fix Spanglish')}</span>
+                  </button>
+                )}
+
+                {/* Botón Editar Instrucciones en línea */}
+                {!isEditingInstructions && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInstructionEditText(displayedInstructions);
+                      setIsEditingInstructions(true);
+                    }}
+                    className="text-[11px] text-stone-700 hover:text-stone-900 font-medium flex items-center gap-1 cursor-pointer bg-[#EFECE1] hover:bg-[#E2DEC2] border border-[#D8D3C4] px-2 py-0.5 rounded-lg transition-colors"
+                    title={dynamicLang === 'ES' ? 'Editar texto de instrucciones' : 'Edit instructions text'}
+                  >
+                    <Edit className="w-3 h-3 text-[#5C6650]" />
+                    <span>{dynamicLang === 'ES' ? 'Editar' : 'Edit'}</span>
+                  </button>
+                )}
+
                 {/* Selector de idioma específico para las instrucciones */}
                 <div className="inline-flex rounded-lg border border-[#D8D3C4] p-0.5 bg-[#EFECE1]">
                   <button
@@ -850,7 +972,37 @@ export function RecipeDetailModal({
               </div>
             )}
 
-            {translatingView ? (
+            {isEditingInstructions ? (
+              <div className="space-y-2 bg-[#EFECE1] p-3 rounded-xl border border-[#D8D3C4]">
+                <div className="flex items-center justify-between text-xs text-[#5C6650] font-medium">
+                  <span>{dynamicLang === 'ES' ? 'Editando instrucciones (Español):' : 'Editing instructions (English):'}</span>
+                  <span className="text-[10px] text-stone-500">Paso a paso numerado (1., 2., 3.)</span>
+                </div>
+                <textarea
+                  value={instructionEditText}
+                  onChange={(e) => setInstructionEditText(e.target.value)}
+                  rows={6}
+                  className="w-full text-xs text-[#2C3523] bg-[#F7F5EC] p-3 rounded-lg border border-[#D8D3C4] focus:outline-none focus:ring-1 focus:ring-[#2C3523] leading-relaxed resize-y font-sans"
+                  placeholder={dynamicLang === 'ES' ? 'Escribe o ajusta las instrucciones paso a paso...' : 'Write or adjust step-by-step instructions...'}
+                />
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingInstructions(false)}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-[#D8D3C4] bg-[#F7F5EC] text-[#5C6650] hover:bg-[#EFECE1] font-medium cursor-pointer"
+                  >
+                    {dynamicLang === 'ES' ? 'Cancelar' : 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveEditedInstructions}
+                    className="px-3.5 py-1.5 text-xs rounded-lg bg-[#2C3523] text-white hover:bg-[#3D4932] font-semibold cursor-pointer active:scale-95 shadow-xs"
+                  >
+                    {dynamicLang === 'ES' ? 'Guardar Cambios' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            ) : translatingView ? (
               <div className="p-6 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] flex flex-col items-center justify-center gap-2 text-xs text-[#5C6650]">
                 <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
                 <span className="font-medium">

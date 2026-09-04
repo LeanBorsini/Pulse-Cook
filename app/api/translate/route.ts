@@ -15,7 +15,7 @@
 
 import { GoogleGenAI, Type } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
-import { translateTextSmart } from '@/lib/recipeTranslator';
+import { translateTextSmart, cleanToPureEnglish, cleanToPureSpanish } from '@/lib/recipeTranslator';
 
 interface CommentInput {
   id: string;
@@ -25,6 +25,28 @@ interface CommentInput {
 interface CommentOutput {
   id: string;
   message: string;
+}
+
+/**
+ * Fallback secundario con motor web público de traducción si Gemini no responde o se agota
+ */
+async function translateWithExternalFallback(text: string, sourceLang: 'ES' | 'EN', targetLang: 'ES' | 'EN'): Promise<string> {
+  if (!text || !text.trim()) return '';
+  try {
+    const langPair = sourceLang === 'ES' ? 'es|en' : 'en|es';
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 600))}&langpair=${langPair}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      const translated = data.responseData?.translatedText;
+      if (translated && typeof translated === 'string' && translated.trim().length > 0) {
+        return targetLang === 'EN' ? cleanToPureEnglish(translated) : cleanToPureSpanish(translated);
+      }
+    }
+  } catch (_err) {
+    // Si la llamada externa falla, recurrimos al motor local
+  }
+  return translateTextSmart(text, sourceLang, targetLang);
 }
 
 /**
@@ -56,23 +78,28 @@ export async function POST(req: NextRequest) {
     }
 
     const isTargetEn = targetLang === 'EN';
-    fallbackTitle = translateTextSmart(title, sourceLang, targetLang);
-    fallbackDesc = translateTextSmart(description, sourceLang, targetLang);
-    fallbackInst = translateTextSmart(instructions, sourceLang, targetLang);
+    const cleanPure = (val: string) => (isTargetEn ? cleanToPureEnglish(val) : cleanToPureSpanish(val));
+
+    fallbackTitle = cleanPure(translateTextSmart(title, sourceLang, targetLang));
+    fallbackDesc = cleanPure(translateTextSmart(description, sourceLang, targetLang));
+    fallbackInst = cleanPure(translateTextSmart(instructions, sourceLang, targetLang));
     fallbackComments = comments.map((c) => ({
       id: c.id,
-      message: translateTextSmart(c.message, sourceLang, targetLang) || c.message,
+      message: cleanPure(translateTextSmart(c.message, sourceLang, targetLang) || c.message),
     }));
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      // Si no hay API key, intentamos el motor externo MyMemory
+      const extInst = await translateWithExternalFallback(instructions, sourceLang, targetLang);
+      const extTitle = await translateWithExternalFallback(title, sourceLang, targetLang);
       return NextResponse.json({
-        translatedTitle: fallbackTitle || title,
-        translatedDescription: fallbackDesc || description,
-        translatedInstructions: fallbackInst || instructions,
+        translatedTitle: cleanPure(extTitle || fallbackTitle || title),
+        translatedDescription: cleanPure(fallbackDesc || description),
+        translatedInstructions: cleanPure(extInst || fallbackInst || instructions),
         translatedComments: fallbackComments,
         suggestedTags: isTargetEn ? ['Quick (<20m)', 'Healthy'] : ['Rápido (<20m)', 'Saludable'],
-        note: 'Translated via local culinary engine',
+        note: 'Translated via enhanced multi-engine fallback',
       });
     }
 
@@ -199,18 +226,25 @@ ${instructions}${commentsSection}`;
     const result = JSON.parse(rawText || '{}');
 
     return NextResponse.json({
-      translatedTitle: result.translatedTitle || fallbackTitle || title,
-      translatedDescription: result.translatedDescription || fallbackDesc || description,
-      translatedInstructions: result.translatedInstructions || fallbackInst || instructions,
-      translatedComments: result.translatedComments || fallbackComments,
+      translatedTitle: cleanPure(result.translatedTitle || fallbackTitle || title),
+      translatedDescription: cleanPure(result.translatedDescription || fallbackDesc || description),
+      translatedInstructions: cleanPure(result.translatedInstructions || fallbackInst || instructions),
+      translatedComments: (result.translatedComments || fallbackComments).map((c: CommentOutput) => ({
+        id: c.id,
+        message: cleanPure(c.message),
+      })),
       suggestedTags: result.suggestedTags || ['Saludable'],
     });
   } catch (error: unknown) {
     console.error('Translation API error, utilizing culinary engine fallback:', error);
+    const extInst = await translateWithExternalFallback(instructions, sourceLang, targetLang);
+    const extTitle = await translateWithExternalFallback(title, sourceLang, targetLang);
+    const cleanPure = (val: string) => (targetLang === 'EN' ? cleanToPureEnglish(val) : cleanToPureSpanish(val));
+
     return NextResponse.json({
-      translatedTitle: fallbackTitle || title,
-      translatedDescription: fallbackDesc || description,
-      translatedInstructions: fallbackInst || instructions,
+      translatedTitle: cleanPure(extTitle || fallbackTitle || title),
+      translatedDescription: cleanPure(fallbackDesc || description),
+      translatedInstructions: cleanPure(extInst || fallbackInst || instructions),
       translatedComments: fallbackComments,
       suggestedTags: ['Saludable'],
     });

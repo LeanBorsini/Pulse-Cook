@@ -42,6 +42,8 @@ import {
   translateTextSmart,
   hasGenuineEnglishInstructions,
   hasGenuineSpanishInstructions,
+  cleanToPureSpanish,
+  cleanToPureEnglish,
 } from '@/lib/recipeTranslator';
 import { RECIPE_CATEGORIES, getCategoryKey, getCategoryLabel } from '@/lib/categories';
 
@@ -406,8 +408,8 @@ export function RecipeFormModal({
       .filter((ing) => (ing.name_es && ing.name_es.trim() !== '') || (ing.name_en && ing.name_en.trim() !== ''))
       .map((ing) => ({
         recipe_id: recipeToEdit?.id || '',
-        name_es: ing.name_es?.trim() || ing.name_en?.trim() || '',
-        name_en: ing.name_en?.trim() || ing.name_es?.trim() || '',
+        name_es: cleanToPureSpanish(ing.name_es?.trim() || ing.name_en?.trim() || ''),
+        name_en: cleanToPureEnglish(ing.name_en?.trim() || ing.name_es?.trim() || ''),
         amount: Number(ing.amount) || 1,
         unit: ing.unit?.trim() || '',
         aisle: ing.aisle || 'General',
@@ -416,17 +418,25 @@ export function RecipeFormModal({
     const recipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const standardizedCategory = getCategoryLabel(category, 'ES');
 
+    // Sanitización obligatoria al 100% para evitar Spanglish en ambos idiomas
+    const finalInstEs = cleanToPureSpanish(inst_es || (formInputLang === 'ES' ? instructions : translateTextSmart(instructions, 'EN', 'ES')));
+    const finalInstEn = cleanToPureEnglish(inst_en || (formInputLang === 'EN' ? instructions : translateTextSmart(instructions, 'ES', 'EN')));
+    const finalTitleEs = cleanToPureSpanish(title_es || (formInputLang === 'ES' ? title : translateTextSmart(title, 'EN', 'ES')));
+    const finalTitleEn = cleanToPureEnglish(title_en || (formInputLang === 'EN' ? title : translateTextSmart(title, 'ES', 'EN')));
+    const finalDescEs = cleanToPureSpanish(desc_es || (formInputLang === 'ES' ? description : translateTextSmart(description, 'EN', 'ES')));
+    const finalDescEn = cleanToPureEnglish(desc_en || (formInputLang === 'EN' ? description : translateTextSmart(description, 'ES', 'EN')));
+
     const recipeData: Recipe = {
       id: recipeId,
-      title_es,
-      title_en,
+      title_es: finalTitleEs,
+      title_en: finalTitleEn,
       category: standardizedCategory,
       prep_time: Number(prepTime) || 20,
       servings: Number(servings) || 4,
-      description_es: desc_es,
-      description_en: desc_en,
-      instructions_es: inst_es,
-      instructions_en: inst_en,
+      description_es: finalDescEs,
+      description_en: finalDescEn,
+      instructions_es: finalInstEs,
+      instructions_en: finalInstEn,
       image_url: images[0] || '',
       images: images,
       youtube_url: validVideos[0]?.url || '',
