@@ -32,6 +32,7 @@ import { AuthModal } from './components/AuthModal';
 import { UsernameSetupModal } from './components/UsernameSetupModal';
 import ChefAssistantModal from './components/ChefAssistantModal';
 import { WelcomeLandingModal } from './components/WelcomeLandingModal';
+import { ShareAppModal } from './components/ShareAppModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 import { getCategoryKey, getCategoryLabel } from '@/lib/categories';
@@ -114,6 +115,7 @@ export default function Home() {
   const [showChefAI, setShowChefAI] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showUsernameSetup, setShowUsernameSetup] = useState<boolean>(false);
+  const [showShareApp, setShowShareApp] = useState<boolean>(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -685,6 +687,7 @@ export default function Home() {
         onOpenShoppingList={() => setShowShoppingList(true)}
         onOpenChefAI={() => setShowChefAI(true)}
         onOpenWelcome={() => setShowWelcomeModal(true)}
+        onOpenShareApp={() => setShowShareApp(true)}
       />
 
       {/* Buscador & Etiquetas Gastronómicas */}
@@ -930,6 +933,13 @@ export default function Home() {
         onClose={() => setShowWelcomeModal(false)}
         lang={lang === 'ES' ? 'es' : 'en'}
         onLanguageChange={(newLang) => handleSetLang(newLang === 'es' ? 'ES' : 'EN')}
+      />
+
+      {/* Modal Compartir PWA con Código QR y WhatsApp */}
+      <ShareAppModal
+        isOpen={showShareApp}
+        onClose={() => setShowShareApp(false)}
+        lang={lang}
       />
 
       {/* Indicador sutil de conectividad offline para PWA */}

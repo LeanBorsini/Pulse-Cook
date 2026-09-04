@@ -11,75 +11,94 @@
  */
 
 // Diccionario de frases y pasos culinarios frecuentes
+// Diccionario de frases y pasos culinarios frecuentes con límites de palabra (\b)
 const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
-  // Verbos y conjugaciones culinarias comunes (incluyendo imperativo argentino/latino y estándar)
-  [/cort[aá]\s+los\s+pimientos/gi, 'Dice the bell peppers'],
-  [/cort[aá]\s+la\s+cebolla/gi, 'Chop the onion'],
-  [/cort[aá]|cortar/gi, 'Chop'],
-  [/pic[aá]|picar/gi, 'Mince'],
-  [/cocin[aá]\s+el\s+tomate/gi, 'Cook the tomato'],
-  [/cocin[aá]|cocinar/gi, 'Cook'],
-  [/agreg[aá]\s+los\s+demás\s+vegetales/gi, 'Add the remaining vegetables'],
-  [/agreg[aá]|agregar|añad[eé]|añadir/gi, 'Add'],
-  [/incorpor[aá]|incorporar/gi, 'Incorporate'],
-  [/mezcl[aá]\s+bien/gi, 'Mix well'],
-  [/mezcl[aá]|mezclar/gi, 'Mix'],
-  [/serv[íi]\s+los\s+fideos/gi, 'Serve the noodles'],
-  [/serv[íi]\s+caliente/gi, 'Serve hot'],
-  [/serv[íi]|servir/gi, 'Serve'],
-  [/acompañ[aá]|acompañar/gi, 'Accompany with'],
-  [/calent[aá]|calentar/gi, 'Heat'],
-  [/dor[aá]|dorar/gi, 'Brown'],
-  [/horne[aá]|hornear/gi, 'Bake'],
-  [/salte[aá]|saltear/gi, 'Sauté'],
-  [/revolv[eé]|revolver/gi, 'Stir'],
+  // Pasos e imperativos completos
+  [/\b(cort[aá]|cortar)\s+los\s+pimientos\b/gi, 'dice the bell peppers'],
+  [/\b(cort[aá]|cortar)\s+la\s+cebolla\b/gi, 'chop the onion'],
+  [/\b(cocin[aá]|cocinar)\s+el\s+tomate\b/gi, 'cook the tomato'],
+  [/\b(agreg[aá]|agregar|añad[eé]|añadir)\s+los\s+demás\s+vegetales\b/gi, 'add the remaining vegetables'],
+  [/\b(mezcl[aá]|mezclar)\s+bien\b/gi, 'mix well'],
+  [/\b(serv[íi]|servir)\s+caliente\b/gi, 'serve hot'],
+  [/\b(serv[íi]|servir)\s+tibio\b/gi, 'serve warm'],
+  [/\b(serv[íi]|servir)\s+los\s+fideos\b/gi, 'serve the noodles'],
+  [/\b(dejar|dejá)\s+enfriar\b/gi, 'let cool'],
+  [/\b(dejar|dejá)\s+reposar\b/gi, 'let rest'],
+  [/\b(sazonar|sazoná)\s+con\s+sal\s+y\s+pimienta\b/gi, 'season with salt and pepper'],
+  [/\b(precalentar|precalentá)\s+el\s+horno\s+a\b/gi, 'preheat the oven to'],
+  [/\bhervir\s+durante\b/gi, 'boil for'],
+  [/\bherv[íi]\b/gi, 'boil'],
+  [/\bhasta\s+que\s+est[eé]\s+(dorada|dorado|doradas|dorados)\b/gi, 'until golden brown'],
+  [/\bhasta\s+que\s+est[eé]n?\s+tiernos?\b/gi, 'until tender'],
+  [/\bhasta\s+formar\s+una\s+salsa\s+cremosa\b/gi, 'until a creamy sauce forms'],
+  [/\bcolocamos\s+en\s+un\s+procesador\b/gi, 'place in a food processor'],
+  [/\bprocesar\s+hasta\b/gi, 'process until'],
+  [/\btriturar\s+hasta\b/gi, 'blend until'],
+  [/\bmezclar\s+en\s+un\s+bol\b/gi, 'mix in a bowl'],
+  [/\bfuente\s+apta\s+para\s+horno\b/gi, 'baking dish'],
+  [/\ben\s+cubitos|\ben\s+cubos\b/gi, 'into cubes'],
+  [/\ben\s+una\s+sartén\b/gi, 'in a skillet'],
+  [/\ba\s+fuego\s+medio\b/gi, 'over medium heat'],
+  [/\ba\s+fuego\s+lento\b/gi, 'over low heat'],
+  [/\bcon\s+un\s+chorrito\s+de\s+agua\b/gi, 'with a splash of water'],
+  [/\bal\s+gusto\b/gi, 'to taste'],
+  [/\bhierbas\s+finas\b/gi, 'fine herbs'],
 
-  // Términos y conectores culinarios
-  [/en cubitos|en cubos/gi, 'into cubes'],
-  [/en una sartén/gi, 'in a skillet'],
-  [/a fuego medio/gi, 'over medium heat'],
-  [/a fuego lento/gi, 'over low heat'],
-  [/con un chorrito de agua/gi, 'with a splash of water'],
-  [/hasta que estén tiernos/gi, 'until tender'],
-  [/hasta que esté tierno/gi, 'until tender'],
-  [/hasta formar una salsa cremosa/gi, 'until a creamy sauce forms'],
-  [/como base/gi, 'as a base'],
-  [/pollo desmenuzado/gi, 'shredded chicken'],
-  [/cubr[íi]\s+con\s+la\s+salsa/gi, 'cover with the sauce'],
-  [/con ensalada verde/gi, 'with a green salad'],
-  [/con semillas/gi, 'with seeds'],
-  [/o verduras cocidas/gi, 'or cooked vegetables'],
-  [/al gusto/gi, 'to taste'],
-  [/hierbas finas/gi, 'fine herbs'],
-  [/colocamos en un procesador/gi, 'Place in a food processor'],
-  [/procesar hasta/gi, 'process until'],
-  [/triturar hasta|trituramos hasta/gi, 'blend until'],
-  [/mezclar en un bol|mezclamos en un bol/gi, 'Mix in a bowl'],
-  [/conseguir una masa homogénea|obtener una masa homogénea/gi, 'achieving a smooth dough'],
-  [/fuente apta para horno/gi, 'baking dish'],
-  [/hasta que estén doradas|hasta que esté dorado/gi, 'until golden brown'],
-  [/sazonar con sal y pimienta/gi, 'season with salt and pepper'],
-  [/dejar enfriar/gi, 'let cool'],
-  [/precalentar el horno a/gi, 'preheat the oven to'],
-  [/hervir durante/gi, 'boil for'],
+  // Verbos y adjetivos culinarios individuales con límites de palabra estrictos (\b)
+  [/\b(dorada|dorado|doradas|dorados)\b/gi, 'golden brown'],
+  [/\b(cortar|cortá|corta)\b/gi, 'chop'],
+  [/\b(picar|picá|pica)\b/gi, 'mince'],
+  [/\b(cocinar|cociná|cocina)\b/gi, 'cook'],
+  [/\b(agregar|agregá|agrega|añadir|añadí|añade)\b/gi, 'add'],
+  [/\b(incorporar|incorporá|incorpora)\b/gi, 'incorporate'],
+  [/\b(mezclar|mezclá|mezcla)\b/gi, 'mix'],
+  [/\b(servir|serví|sirve)\b/gi, 'serve'],
+  [/\b(calentar|calentá|calienta)\b/gi, 'heat'],
+  [/\b(hornear|horneá|hornea)\b/gi, 'bake'],
+  [/\b(saltear|salteá|saltea)\b/gi, 'sauté'],
+  [/\b(revolver|revolvé|revuelve)\b/gi, 'stir'],
+  [/\b(batir|batí|bate)\b/gi, 'whisk'],
+  [/\b(verter|verté|vierte)\b/gi, 'pour'],
+  [/\b(espolvorear|espolvoreá|espolvorea)\b/gi, 'sprinkle'],
+  [/\b(derretir|derretí|derrite)\b/gi, 'melt'],
 ];
 
 const PHRASE_DICTIONARY_EN_TO_ES: [RegExp, string][] = [
-  [/place in a food processor/gi, 'Colocar en un procesador de alimentos'],
-  [/mix in a bowl/gi, 'Mezclar en un tazón'],
-  [/blend until/gi, 'triturar hasta'],
-  [/bake for/gi, 'hornear durante'],
-  [/preheat oven to/gi, 'precalentar el horno a'],
-  [/season with salt and pepper/gi, 'sazonar con sal y pimienta'],
-  [/until golden brown/gi, 'hasta que esté dorado'],
-  [/serve warm/gi, 'servir caliente'],
-  [/serve hot/gi, 'servir caliente'],
-  [/to taste/gi, 'al gusto'],
-  [/finely chop/gi, 'picar finamente'],
-  [/dice into cubes/gi, 'cortar en cubos'],
-  [/chop the/gi, 'cortar el/la'],
-  [/cook until tender/gi, 'cocinar hasta que esté tierno'],
-  [/mix well/gi, 'mezclar bien'],
+  [/\bplace in a food processor\b/gi, 'colocar en un procesador de alimentos'],
+  [/\bmix in a bowl\b/gi, 'mezclar en un tazón'],
+  [/\bblend until\b/gi, 'triturar hasta'],
+  [/\bbake for\b/gi, 'hornear durante'],
+  [/\bpreheat (the )?oven to\b/gi, 'precalentar el horno a'],
+  [/\bseason with salt and pepper\b/gi, 'sazonar con sal y pimienta'],
+  [/\buntil golden brown\b/gi, 'hasta que esté dorado'],
+  [/\bserve warm\b/gi, 'servir tibio'],
+  [/\bserve hot\b/gi, 'servir caliente'],
+  [/\bto taste\b/gi, 'al gusto'],
+  [/\bfinely chop\b/gi, 'picar finamente'],
+  [/\bdice into cubes\b/gi, 'cortar en cubos'],
+  [/\bcook until tender\b/gi, 'cocinar hasta que esté tierno'],
+  [/\bmix well\b/gi, 'mezclar bien'],
+  [/\bover medium heat\b/gi, 'a fuego medio'],
+  [/\bover low heat\b/gi, 'a fuego lento'],
+  [/\bin a skillet\b/gi, 'en una sartén'],
+  [/\bpreheat a pan\b/gi, 'precalentar una sartén'],
+
+  // Verbos individuales
+  [/\bchop\b/gi, 'picar'],
+  [/\bdice\b/gi, 'cortar en cubos'],
+  [/\bmince\b/gi, 'picar fino'],
+  [/\bcook\b/gi, 'cocinar'],
+  [/\badd\b/gi, 'agregar'],
+  [/\bmix\b/gi, 'mezclar'],
+  [/\bserve\b/gi, 'servir'],
+  [/\bheat\b/gi, 'calentar'],
+  [/\bbake\b/gi, 'hornear'],
+  [/\bsauté\b/gi, 'saltear'],
+  [/\bstir\b/gi, 'revolver'],
+  [/\bwhisk\b/gi, 'batir'],
+  [/\bpour\b/gi, 'verter'],
+  [/\bsprinkle\b/gi, 'espolvorear'],
+  [/\bboil\b/gi, 'hervir'],
 ];
 
 /**
@@ -126,17 +145,21 @@ export function isEnglishCulinaryText(text?: string | null): boolean {
 }
 
 /**
- * Determina si las instrucciones en inglés son genuinas o si son copia del español
+ * Determina si las instrucciones en inglés son genuinas o si son copia o mezcla del español
  */
 export function hasGenuineEnglishInstructions(instructionsEn?: string | null, instructionsEs?: string | null): boolean {
   if (!instructionsEn || !instructionsEn.trim()) return false;
   if (instructionsEs && instructionsEn.trim().toLowerCase() === instructionsEs.trim().toLowerCase()) {
     return false;
   }
+  // Detecta palabras o construcciones corruptas de spanglish
+  if (/brownda|mix sobre|add los|chop en|chop la|chop los|bake a \d+/i.test(instructionsEn)) {
+    return false;
+  }
   if (isSpanishCulinaryText(instructionsEn)) {
     return false;
   }
-  return true;
+  return isEnglishCulinaryText(instructionsEn);
 }
 
 /**
@@ -150,7 +173,7 @@ export function hasGenuineSpanishInstructions(instructionsEs?: string | null, in
   if (isEnglishCulinaryText(instructionsEs)) {
     return false;
   }
-  return true;
+  return isSpanishCulinaryText(instructionsEs);
 }
 
 /**

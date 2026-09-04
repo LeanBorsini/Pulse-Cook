@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, Utensils, ShoppingCart, Globe2, ChefHat, ArrowRight, X, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Utensils, ShoppingCart, Globe2, ChefHat, ArrowRight, X, CheckCircle2, QrCode } from 'lucide-react';
 import { Language } from '../types';
 
 interface WelcomeLandingModalProps {
@@ -51,6 +51,11 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
             title: 'Lista de Compras Inteligente',
             desc: 'Agrega los ingredientes que te faltan con un solo clic, organizados por pasillos y listos para exportar a WhatsApp o PDF.',
           },
+          {
+            icon: <QrCode className="w-5 h-5 text-stone-700" />,
+            title: 'Compartir PWA & Código QR',
+            desc: 'Comparte la app por WhatsApp o genera un código QR para que cualquier persona la instale al instante en Android o iPhone sin buscarla en Google.',
+          },
         ],
         cta: 'Comenzar a explorar recetas',
       }
@@ -81,6 +86,11 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
             icon: <ShoppingCart className="w-5 h-5 text-blue-600" />,
             title: 'Smart Grocery List',
             desc: 'Add missing ingredients with a single tap, sorted by supermarket aisle and ready to share via WhatsApp or printable PDF.',
+          },
+          {
+            icon: <QrCode className="w-5 h-5 text-stone-700" />,
+            title: 'PWA Sharing & QR Code',
+            desc: 'Share the app via WhatsApp or generate a QR code so anyone can instantly install it on Android or iPhone without searching.',
           },
         ],
         cta: 'Start exploring recipes',

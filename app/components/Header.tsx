@@ -1,7 +1,7 @@
 'use client';
 
 import { User } from '@supabase/supabase-js';
-import { LogOut, Plus, ShoppingCart, Globe, UserCheck, HelpCircle } from 'lucide-react';
+import { LogOut, Plus, ShoppingCart, Globe, UserCheck, HelpCircle, QrCode } from 'lucide-react';
 import { RemyIcon } from './RemyIcon';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -17,6 +17,7 @@ interface HeaderProps {
   onOpenShoppingList: () => void;
   onOpenChefAI: () => void;
   onOpenWelcome?: () => void;
+  onOpenShareApp?: () => void;
 }
 
 export function Header({
@@ -31,6 +32,7 @@ export function Header({
   onOpenShoppingList,
   onOpenChefAI,
   onOpenWelcome,
+  onOpenShareApp,
 }: HeaderProps) {
   const displayAlias = profileUsername || (user?.email ? user.email.split('@')[0] : 'chef');
 
@@ -48,6 +50,19 @@ export function Header({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        {/* Botón Compartir App con QR & WhatsApp */}
+        {onOpenShareApp && (
+          <button
+            onClick={onOpenShareApp}
+            className="flex items-center gap-1.5 px-3 py-2 border border-[#D8D3C4] rounded-xl text-xs font-bold text-[#2C3523] bg-[#EFECE1] hover:bg-[#E2DEC2] transition-all cursor-pointer active:scale-95 shadow-2xs"
+            title={lang === 'ES' ? 'Compartir app con Código QR o WhatsApp' : 'Share app via QR Code or WhatsApp'}
+            id="header-share-app-btn"
+          >
+            <QrCode className="w-3.5 h-3.5 text-[#2C3523]" />
+            <span>{lang === 'ES' ? 'Compartir App' : 'Share App'}</span>
+          </button>
+        )}
+
         {/* Botón Instalar PWA */}
         <PWAInstallButton lang={lang} />
 

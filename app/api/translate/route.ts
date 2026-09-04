@@ -5,47 +5,53 @@
  * Ruta: POST /api/translate
  *
  * Estrategia de Resiliencia:
- * 1. Validación de entrada (título, descripción, instrucciones, idiomas origen/destino).
- * 2. Cascada de modelos Gemini ('gemini-3.1-flash-lite' -> 'gemini-3.6-flash' -> 'gemini-3.8-flash').
- * 3. En caso de ausencia de API key o fallo en todos los modelos, activa automáticamente el
+ * 1. Validación de entrada (título, descripción, instrucciones, comentarios, idiomas origen/destino).
+ * 2. Cascada de modelos Gemini ('gemini-3.8-flash' -> 'gemini-3.1-flash-lite' -> 'gemini-flash-latest').
+ * 3. Traduce de manera holística: Título, Descripción, Instrucciones y Comentarios comunitarios.
+ * 4. En caso de ausencia de API key o fallo en todos los modelos, activa automáticamente el
  *    diccionario culinario inteligente (`lib/recipeTranslator.ts`) para devolver una respuesta 200
- *    completamente traducida y sin errores de interfaz.
+ *    completa y sin errores de interfaz.
  */
 
 import { GoogleGenAI, Type } from '@google/genai';
 import { NextRequest, NextResponse } from 'next/server';
 import { translateTextSmart } from '@/lib/recipeTranslator';
 
+interface CommentInput {
+  id: string;
+  message: string;
+}
+
+interface CommentOutput {
+  id: string;
+  message: string;
+}
+
 /**
- * Procesa la solicitud de traducción de una receta.
- *
- * @param {NextRequest} req - Request que contiene:
- *   - title: string
- *   - description?: string
- *   - instructions: string
- *   - sourceLang: 'ES' | 'EN'
- *   - targetLang: 'ES' | 'EN'
- * @returns {Promise<NextResponse>} JSON con los campos traducidos y etiquetas sugeridas.
+ * Procesa la solicitud de traducción de una receta y sus comentarios.
  */
 export async function POST(req: NextRequest) {
   let title = '';
   let description = '';
   let instructions = '';
+  let comments: CommentInput[] = [];
   let sourceLang: 'ES' | 'EN' = 'ES';
   let targetLang: 'ES' | 'EN' = 'EN';
   let fallbackTitle = '';
   let fallbackDesc = '';
   let fallbackInst = '';
+  let fallbackComments: CommentOutput[] = [];
 
   try {
     const body = await req.json();
     title = (body.title || '').trim();
     description = (body.description || '').trim();
     instructions = (body.instructions || '').trim();
+    comments = Array.isArray(body.comments) ? body.comments : [];
     sourceLang = body.sourceLang === 'EN' ? 'EN' : 'ES';
     targetLang = body.targetLang === 'ES' ? 'ES' : 'EN';
 
-    if (!title && !description && !instructions) {
+    if (!title && !description && !instructions && comments.length === 0) {
       return NextResponse.json({ error: 'No content provided to translate' }, { status: 400 });
     }
 
@@ -53,6 +59,10 @@ export async function POST(req: NextRequest) {
     fallbackTitle = translateTextSmart(title, sourceLang, targetLang);
     fallbackDesc = translateTextSmart(description, sourceLang, targetLang);
     fallbackInst = translateTextSmart(instructions, sourceLang, targetLang);
+    fallbackComments = comments.map((c) => ({
+      id: c.id,
+      message: translateTextSmart(c.message, sourceLang, targetLang) || c.message,
+    }));
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -60,6 +70,7 @@ export async function POST(req: NextRequest) {
         translatedTitle: fallbackTitle || title,
         translatedDescription: fallbackDesc || description,
         translatedInstructions: fallbackInst || instructions,
+        translatedComments: fallbackComments,
         suggestedTags: isTargetEn ? ['Quick (<20m)', 'Healthy'] : ['Rápido (<20m)', 'Saludable'],
         note: 'Translated via local culinary engine',
       });
@@ -77,18 +88,26 @@ export async function POST(req: NextRequest) {
     const targetLanguageName = targetLang === 'EN' ? 'English' : 'Spanish';
     const sourceLanguageName = sourceLang === 'EN' ? 'English' : 'Spanish';
 
-    const prompt = `You are an expert culinary translator and professional chef.
-Translate the following recipe content from ${sourceLanguageName} into natural, appetizing, grammatically correct ${targetLanguageName}.
-Keep culinary terms accurate, measurements clear, and instruction steps properly formatted and numbered if numbered in original.
-Do not leave any words in ${sourceLanguageName}.
+    const commentsSection = comments.length > 0
+      ? `\n\nCommunity Comments to translate:\n${JSON.stringify(comments.map((c) => ({ id: c.id, text: c.message })))}`
+      : '';
+
+    const prompt = `You are a world-class professional culinary translator and bilingual chef.
+Translate the following recipe content from ${sourceLanguageName} into natural, appetizing, fluent ${targetLanguageName}.
+Requirements:
+1. Translate the Title, Description, and Instructions completely into ${targetLanguageName}.
+2. Ensure culinary terms, cooking techniques (e.g. sauté, simmer, boil, roast, brown, fold), and ingredients are natural.
+3. Keep numbered step formats (1., 2., 3.) intact.
+4. Translate each community comment accurately preserving the user's tone and culinary feedback.
+5. NEVER leave sentences or words in the original language (${sourceLanguageName}) or mixed Spanglish.
 
 Recipe Title: "${title}"
 Recipe Description: "${description}"
 Recipe Instructions:
-${instructions}`;
+${instructions}${commentsSection}`;
 
     let responseText = '';
-    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'];
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 
     for (const modelName of candidateModels) {
       try {
@@ -112,10 +131,22 @@ ${instructions}`;
                   type: Type.STRING,
                   description: 'The translated recipe step-by-step instructions',
                 },
+                translatedComments: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      message: { type: Type.STRING },
+                    },
+                    required: ['id', 'message'],
+                  },
+                  description: 'Translated community comments',
+                },
                 suggestedTags: {
                   type: Type.ARRAY,
                   items: { type: Type.STRING },
-                  description: 'Dietary or culinary tags such as Gluten-Free, Dairy-Free, Vegetarian, Vegan, Quick, Healthy, etc.',
+                  description: 'Dietary or culinary tags',
                 },
               },
               required: ['translatedInstructions'],
@@ -153,6 +184,7 @@ ${instructions}`;
       translatedTitle: result.translatedTitle || fallbackTitle || title,
       translatedDescription: result.translatedDescription || fallbackDesc || description,
       translatedInstructions: result.translatedInstructions || fallbackInst || instructions,
+      translatedComments: result.translatedComments || fallbackComments,
       suggestedTags: result.suggestedTags || ['Saludable'],
     });
   } catch (error: unknown) {
@@ -161,6 +193,7 @@ ${instructions}`;
       translatedTitle: fallbackTitle || title,
       translatedDescription: fallbackDesc || description,
       translatedInstructions: fallbackInst || instructions,
+      translatedComments: fallbackComments,
       suggestedTags: ['Saludable'],
     });
   }
