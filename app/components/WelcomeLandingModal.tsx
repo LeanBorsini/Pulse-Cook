@@ -71,8 +71,8 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
           },
           {
             icon: <Sparkles className="w-5 h-5 text-indigo-600" />,
-            title: 'Traducción Pura & Cero Spanglish',
-            desc: 'Alterna entre Español e Inglés en cualquier momento. La app traduce de forma inteligente y cuenta con un botón para "Sanear Spanglish" y editor manual de instrucciones por si deseas personalizar el texto.',
+            title: 'Traducción 100% Automática y Limpia',
+            desc: 'Al cambiar el idioma de la app a Español o Inglés, todo se traduce y muestra automáticamente en ese idioma: título, descripción, ingredientes, instrucciones y comentarios de la comunidad, sin botones redundantes ni interfaces confusas.',
           },
           {
             icon: <Utensils className="w-5 h-5 text-orange-600" />,
@@ -122,8 +122,8 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
           },
           {
             icon: <Sparkles className="w-5 h-5 text-indigo-600" />,
-            title: 'Pure Translation & Zero Spanglish',
-            desc: 'Switch between Spanish and English anytime. The smart translation pipeline guarantees pure vocabulary, complete with a "Fix Spanglish" button and inline step editor.',
+            title: '100% Automatic & Clean Translation',
+            desc: 'When you switch between Spanish and English, everything automatically updates to match: title, description, ingredients, step-by-step instructions, and community comments, without redundant buttons or cluttered screens.',
           },
           {
             icon: <Utensils className="w-5 h-5 text-orange-600" />,

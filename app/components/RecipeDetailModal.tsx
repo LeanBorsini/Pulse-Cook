@@ -40,7 +40,17 @@ import { CookingModeModal } from './CookingModeModal';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
 import { saveLocalRecipe } from '../../lib/recipeStore';
 import { getCategoryLabel } from '@/lib/categories';
-import { translateTextSmart } from '../../lib/recipeTranslator';
+import {
+  translateTextSmart,
+  translateRecipeField,
+  translateCommentSmart,
+  getCachedTranslation,
+  setCachedTranslation,
+  fetchBackgroundTranslations,
+  hasGenuineSpanishInstructions,
+  hasGenuineEnglishInstructions,
+  isSpanishText,
+} from '../../lib/recipeTranslator';
 import {
   getLocalUserRating,
   saveLocalRating,
@@ -163,19 +173,127 @@ export function RecipeDetailModal({
 
   const isEs = lang === 'ES';
 
-  // Textos fieles según el idioma global de la app
-  const displayedTitle = isEs
-    ? (recipe.title_es || recipe.title_en || '')
-    : (recipe.title_en || recipe.title_es || '');
+  // Almacén reactivo de traducciones asíncronas para refresco instantáneo sin bloqueo
+  const [asyncTranslations, setAsyncTranslations] = useState<Record<string, string>>({});
 
-  const displayedDesc = isEs
-    ? (recipe.description_es || recipe.description_en || '')
-    : (recipe.description_en || recipe.description_es || '');
+  // 1. Título con traducción pura automática al idioma seleccionado (ES o EN)
+  const displayedTitle = useMemo(() => {
+    const cached = asyncTranslations[`title_${recipe.id}_${lang}`] || getCachedTranslation(`title_${recipe.id}_${lang}`);
+    if (cached) return cached;
+    return translateRecipeField(recipe.title_es, recipe.title_en, lang);
+  }, [recipe.id, recipe.title_es, recipe.title_en, lang, asyncTranslations]);
 
-  // Instrucciones activas para el idioma global: respetando íntegramente las palabras del usuario
-  const displayedInstructions = isEs
-    ? (recipe.instructions_es || recipe.instructions_en || '')
-    : (recipe.instructions_en || recipe.instructions_es || '');
+  // 2. Descripción con traducción pura automática
+  const displayedDesc = useMemo(() => {
+    const cached = asyncTranslations[`desc_${recipe.id}_${lang}`] || getCachedTranslation(`desc_${recipe.id}_${lang}`);
+    if (cached) return cached;
+    return translateRecipeField(recipe.description_es, recipe.description_en, lang);
+  }, [recipe.id, recipe.description_es, recipe.description_en, lang, asyncTranslations]);
+
+  // 3. Instrucciones con traducción pura automática (si está en inglés y el usuario pone español, se traduce 100% automático sin botones)
+  const displayedInstructions = useMemo(() => {
+    const cached = asyncTranslations[`inst_${recipe.id}_${lang}`] || getCachedTranslation(`inst_${recipe.id}_${lang}`);
+    if (cached) return cached;
+    return translateRecipeField(recipe.instructions_es, recipe.instructions_en, lang);
+  }, [recipe.id, recipe.instructions_es, recipe.instructions_en, lang, asyncTranslations]);
+
+  // 4. Comentarios con traducción pura automática: si el usuario cambia a inglés, los comentarios se leen en inglés; si cambia a español, en español
+  const displayedComments = useMemo(() => {
+    return comments.map((c) => {
+      const cached = asyncTranslations[`comment_${c.id}_${lang}`] || getCachedTranslation(`comment_${c.id}_${lang}`);
+      const text = cached || translateCommentSmart(c.message, lang);
+      return {
+        ...c,
+        translatedMessage: text,
+      };
+    });
+  }, [comments, lang, asyncTranslations]);
+
+  // Refresco silencioso en segundo plano sin botones ni spinners obstructivos
+  useEffect(() => {
+    let isCancelled = false;
+
+    const runBackgroundTranslation = async () => {
+      const instNeedsTranslation = isEs
+        ? (!recipe.instructions_es || !hasGenuineSpanishInstructions(recipe.instructions_es, recipe.instructions_en))
+        : (!recipe.instructions_en || !hasGenuineEnglishInstructions(recipe.instructions_en, recipe.instructions_es));
+
+      const commentsToTranslate = comments.filter((c) => {
+        const cacheKey = `comment_${c.id}_${lang}`;
+        if (getCachedTranslation(cacheKey)) return false;
+        const msgIsSpanish = isSpanishText(c.message);
+        return isEs ? !msgIsSpanish : msgIsSpanish;
+      });
+
+      const instKey = `inst_${recipe.id}_${lang}`;
+      const instCached = getCachedTranslation(instKey);
+
+      if (!instNeedsTranslation && commentsToTranslate.length === 0) return;
+      if (instCached && commentsToTranslate.length === 0) return;
+
+      const sourceInst = isEs
+        ? (recipe.instructions_en || recipe.instructions_es || '')
+        : (recipe.instructions_es || recipe.instructions_en || '');
+      const sourceTitle = isEs
+        ? (recipe.title_en || recipe.title_es || '')
+        : (recipe.title_es || recipe.title_en || '');
+      const sourceDesc = isEs
+        ? (recipe.description_en || recipe.description_es || '')
+        : (recipe.description_es || recipe.description_en || '');
+
+      const result = await fetchBackgroundTranslations({
+        title: sourceTitle,
+        description: sourceDesc,
+        instructions: sourceInst,
+        comments: commentsToTranslate.map((c) => ({ id: c.id, message: c.message })),
+        sourceLang: isEs ? 'EN' : 'ES',
+        targetLang: lang,
+      });
+
+      if (!isCancelled && result) {
+        const newTranslations: Record<string, string> = {};
+        if (result.translatedInstructions) {
+          setCachedTranslation(instKey, result.translatedInstructions);
+          newTranslations[instKey] = result.translatedInstructions;
+        }
+        if (result.translatedTitle) {
+          const titleKey = `title_${recipe.id}_${lang}`;
+          setCachedTranslation(titleKey, result.translatedTitle);
+          newTranslations[titleKey] = result.translatedTitle;
+        }
+        if (result.translatedDescription) {
+          const descKey = `desc_${recipe.id}_${lang}`;
+          setCachedTranslation(descKey, result.translatedDescription);
+          newTranslations[descKey] = result.translatedDescription;
+        }
+        if (result.translatedComments && Array.isArray(result.translatedComments)) {
+          result.translatedComments.forEach((tc) => {
+            const commentKey = `comment_${tc.id}_${lang}`;
+            setCachedTranslation(commentKey, tc.message);
+            newTranslations[commentKey] = tc.message;
+          });
+        }
+        setAsyncTranslations((prev) => ({ ...prev, ...newTranslations }));
+      }
+    };
+
+    runBackgroundTranslation();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    recipe.id,
+    recipe.instructions_es,
+    recipe.instructions_en,
+    recipe.title_es,
+    recipe.title_en,
+    recipe.description_es,
+    recipe.description_en,
+    comments,
+    lang,
+    isEs,
+  ]);
 
   const handleSaveEditedInstructions = async () => {
     const trimmed = instructionEditText.trim();
@@ -769,7 +887,7 @@ export function RecipeDetailModal({
               </p>
             ) : (
               <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                {comments.map((c) => (
+                {displayedComments.map((c) => (
                   <div key={c.id} className="bg-[#EFECE1]/60 p-3 rounded-xl border border-[#D8D3C4] text-xs">
                     <div className="flex justify-between items-center mb-1">
                       <span className="font-bold text-[#2C3523] flex items-center gap-1.5">
@@ -782,7 +900,7 @@ export function RecipeDetailModal({
                         {c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}
                       </span>
                     </div>
-                    <p className="text-[#5C6650] leading-relaxed pl-6.5">{c.message}</p>
+                    <p className="text-[#5C6650] leading-relaxed pl-6.5">{c.translatedMessage || c.message}</p>
                   </div>
                 ))}
               </div>

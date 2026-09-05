@@ -43,7 +43,7 @@ async function translateWithExternalFallback(text: string, sourceLang: 'ES' | 'E
         return targetLang === 'EN' ? cleanToPureEnglish(translated) : cleanToPureSpanish(translated);
       }
     }
-  } catch (_err) {
+  } catch {
     // Si la llamada externa falla, recurrimos al motor local
   }
   return translateTextSmart(text, sourceLang, targetLang);

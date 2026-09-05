@@ -10,9 +10,37 @@
  *    cuando la API de Gemini no está disponible o se agota la cuota temporal.
  */
 
-// Diccionario de frases y pasos culinarios frecuentes
 // Diccionario de frases y pasos culinarios frecuentes con límites de palabra (\b)
 const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
+  // Conversaciones y comentarios de la comunidad
+  [/\bya\s+aprend[íi]\s+c[oó]mo\s+hervir\s+agua!?/gi, 'I already learned how to boil water!'],
+  [/\bya\s+aprend[íi]\s+a\s+hervir\s+agua!?/gi, 'I already learned how to boil water!'],
+  [/\bya\s+aprend[íi]\b/gi, 'I already learned'],
+  [/\bc[oó]mo\s+hervir\s+agua\b/gi, 'how to boil water'],
+  [/\bhervir\s+agua\b/gi, 'boil water'],
+  [/\bdelicioso\s+plato\b/gi, 'delicious dish'],
+  [/\b(muy\s+rico|muy\s+rica)\b/gi, 'very tasty'],
+  [/\b(delicioso|deliciosa)\b/gi, 'delicious'],
+  [/\bme\s+encant[oó]\b/gi, 'I loved it'],
+  [/\bme\s+gust[oó]\s+mucho\b/gi, 'I really liked it'],
+  [/\bexcelente\s+receta\b/gi, 'great recipe'],
+  [/\bf[aá]cil\s+y\s+r[aá]pido\b/gi, 'easy and quick'],
+  [/\bqued[oó]\s+genial\b/gi, 'it turned out great'],
+  [/\bqued[oó]\s+perfecto\b/gi, 'it turned out perfect'],
+  [/\bgracias\s+por\s+compartir\b/gi, 'thanks for sharing'],
+  [/\bgracias\s+por\s+la\s+receta\b/gi, 'thanks for the recipe'],
+  [/\bmuchas\s+gracias\b/gi, 'thank you very much'],
+  [/\blo\s+hice\s+hoy\b/gi, 'I made it today'],
+  [/\blo\s+prepar[eé]\s+hoy\b/gi, 'I cooked it today'],
+  [/\ba\s+mi\s+familia\s+le\s+encant[oó]\b/gi, 'my family loved it'],
+
+  // Títulos y conexiones
+  [/\bcon\s+pistachos?\s+y\s+panceta\b/gi, 'with pistachio and bacon'],
+  [/\bcon\s+pistachos?\b/gi, 'with pistachios'],
+  [/\bcon\s+panceta\b/gi, 'with bacon'],
+  [/\bpistachos?\b/gi, 'pistachios'],
+  [/\bpanceta\b/gi, 'bacon'],
+
   // Reparaciones de Spanglish frecuente y frases compuestas
   [/\ben\s+una\s+baking\s+dish\b/gi, 'in a baking dish'],
   [/\b(lo\s+)?llevamos\s+a\s+cook\s+por\s+unos\s+minutos\b/gi, 'bake for a few minutes'],
@@ -111,6 +139,65 @@ const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
 ];
 
 const PHRASE_DICTIONARY_EN_TO_ES: [RegExp, string][] = [
+  // Conversaciones y comentarios de la comunidad
+  [/\bi\s+already\s+learned\s+how\s+to\s+boil\s+water!?/gi, '¡Ya aprendí cómo hervir agua!'],
+  [/\bi\s+already\s+learned\b/gi, 'ya aprendí'],
+  [/\bhow\s+to\s+boil\s+water\b/gi, 'cómo hervir agua'],
+  [/\bboil\s+water\b/gi, 'hervir agua'],
+  [/\bdelicious\s+dish\b/gi, 'plato delicioso'],
+  [/\b(very\s+tasty|so\s+tasty)\b/gi, 'muy rico'],
+  [/\bdelicious\b/gi, 'delicioso'],
+  [/\bi\s+loved\s+it\b/gi, '¡Me encantó!'],
+  [/\bi\s+really\s+liked\s+it\b/gi, 'Me gustó mucho'],
+  [/\bgreat\s+recipe\b/gi, 'excelente receta'],
+  [/\b(easy\s+and\s+quick|easy\s+and\s+fast)\b/gi, 'fácil y rápido'],
+  [/\bit\s+turned\s+out\s+great\b/gi, 'quedó genial'],
+  [/\bit\s+turned\s+out\s+perfect\b/gi, 'quedó perfecto'],
+  [/\bthanks\s+for\s+sharing\b/gi, 'gracias por compartir'],
+  [/\bthanks\s+for\s+the\s+recipe\b/gi, 'gracias por la receta'],
+  [/\bthank\s+you\s+very\s+much\b/gi, 'muchas gracias'],
+  [/\bi\s+made\s+it\s+today\b/gi, 'lo hice hoy'],
+  [/\bmy\s+family\s+loved\s+it\b/gi, 'a mi familia le encantó'],
+
+  // Título e instrucciones completas de Tagliatelle y platos italianos frecuentes
+  [/\bboil\s+1\s+lit(?:re|er)\s+of\s+water\s+with\s+10g\s+of\s+salt\s+per\s+100g\s+of\s+tagliatelle\b/gi, 'hervir 1 litro de agua con 10g de sal por cada 100g de tagliatelle'],
+  [/\bpreheat\s+a\s+low\s+temperature\s+pan\s+with\s+olive\s+oil\s+and\s+add\s+pistachios\s+until\s+it's\s+toasted\b/gi, 'precalentar una sartén a fuego bajo con aceite de oliva y agregar los pistachos hasta que se doren'],
+  [/\b1\s+lit(?:re|er)\s+of\s+water\b/gi, '1 litro de agua'],
+  [/\blit(?:re|er)\s+of\s+water\b/gi, 'litro de agua'],
+  [/\bwith\s+(\d+)g\s+of\s+salt\b/gi, 'con $1g de sal'],
+  [/\bper\s+(\d+)g\s+of\b/gi, 'por cada $1g de'],
+  [/\bper\s+100g\s+of\b/gi, 'por cada 100g de'],
+  [/\blow\s+temperature\s+pan\b/gi, 'sartén a fuego bajo'],
+  [/\blow\s+temperature\b/gi, 'fuego bajo'],
+  [/\buntil\s+it's\s+toasted\b/gi, 'hasta que esté tostado'],
+  [/\buntil\s+toasted\b/gi, 'hasta que esté tostado'],
+  [/\buntil\s+golden\b/gi, 'hasta que esté dorado'],
+  [/\btoasted\b/gi, 'tostado'],
+  [/\bpistachios\b/gi, 'pistachos'],
+  [/\bpistachio\b/gi, 'pistacho'],
+  [/\bbacon\b/gi, 'panceta'],
+  [/\btagliatelle\b/gi, 'tagliatelle'],
+  [/\bdrain\s+the\s+pasta\b/gi, 'escurrir la pasta'],
+  [/\bdrain\b/gi, 'escurrir'],
+  [/\bal\s+dente\b/gi, 'al dente'],
+  [/\bparmesan\s+cheese\b/gi, 'queso parmesano'],
+  [/\bparmesan\b/gi, 'parmesano'],
+  [/\bheavy\s+cream\b/gi, 'crema de leche'],
+  [/\bcream\b/gi, 'crema'],
+  [/\bgarlic\s+cloves?\b/gi, 'dientes de ajo'],
+  [/\bgarlic\b/gi, 'ajo'],
+  [/\bbutter\b/gi, 'manteca'],
+  [/\bsauce\b/gi, 'salsa'],
+  [/\bpasta\b/gi, 'pasta'],
+  [/\bnoodles\b/gi, 'fideos'],
+  [/\bwith\b/gi, 'con'],
+  [/\band\b/gi, 'y'],
+  [/\bper\b/gi, 'por'],
+  [/\bwater\b/gi, 'agua'],
+  [/\bskillet\b/gi, 'sartén'],
+  [/\bpan\b/gi, 'sartén'],
+  [/\bpot\b/gi, 'olla'],
+
   // Frases compuestas y Spanglish de preparación
   [/\bplace into a food processor the\b/gi, 'colocar en un procesador de alimentos la'],
   [/\bplace in a food processor the\b/gi, 'colocar en un procesador de alimentos la'],
@@ -352,26 +439,129 @@ export function translateTextSmart(
 }
 
 /**
- * Resuelve el texto correspondiente para un campo bilingüe según el idioma de visualización objetivo.
- * Si no existe una versión genuina en el idioma solicitado, aplica la traducción inteligente.
- *
- * @param {string | null | undefined} fieldEs - Versión en español del campo.
- * @param {string | null | undefined} fieldEn - Versión en inglés del campo.
- * @param {'ES' | 'EN'} targetLang - Idioma en el que se desea renderizar.
- * @returns {string} Texto final listo para mostrar en la interfaz.
+ * Detecta si cualquier texto genérico (incluyendo comentarios coloquiales) está redactado en español.
+ */
+export function isSpanishText(text?: string | null): boolean {
+  if (!text || !text.trim()) return false;
+  const lower = text.toLowerCase().trim();
+  // Presencia de tildes o caracteres exclusivos del español
+  if (/[áéíóúñ¿¡]/.test(lower)) return true;
+
+  // Marcadores léxicos comunes en español
+  const spanishMarkers = /\b(el|la|los|las|un|una|unos|unas|de|del|en|por|para|con|sin|que|cómo|como|ya|aprendí|aprendi|hervir|agua|receta|muy|rico|rica|delicioso|deliciosa|hice|hacer|cocinar|quedó|quedo|gracias|bueno|buena|me|te|se|lo|los|les|plato|familia)\b/;
+  return spanishMarkers.test(lower);
+}
+
+/**
+ * Detecta si cualquier texto genérico está redactado en inglés.
+ */
+export function isEnglishText(text?: string | null): boolean {
+  if (!text || !text.trim()) return false;
+  const lower = text.toLowerCase().trim();
+  if (/[áéíóúñ¿¡]/.test(lower)) return false;
+
+  const englishMarkers = /\b(the|and|with|without|for|from|about|to|in|on|at|of|learned|learn|how|boil|water|already|recipe|very|tasty|delicious|loved|liked|made|cook|turned|out|great|thanks|good|my|your|it|is|was|dish|family)\b/;
+  return englishMarkers.test(lower);
+}
+
+/**
+ * Resuelve el texto correspondiente para un campo bilingüe (título, descripción o instrucciones)
+ * según el idioma seleccionado de forma 100% automática y limpia.
+ * Si no existe una versión genuina en el idioma solicitado, aplica la traducción pura sin dejar Spanglish.
  */
 export function translateRecipeField(
   fieldEs: string | null | undefined,
   fieldEn: string | null | undefined,
   targetLang: 'ES' | 'EN'
 ): string {
+  const es = (fieldEs || '').trim();
+  const en = (fieldEn || '').trim();
+
   if (targetLang === 'ES') {
-    return fieldEs || fieldEn || '';
+    // 1. Si existe versión en español y es español genuino
+    if (es && !hasSpanglishResidue(es) && !isEnglishCulinaryText(es)) {
+      return cleanToPureSpanish(es);
+    }
+    // 2. Si solo tenemos inglés o un texto con residuos, traducimos a español puro
+    const candidate = en || es;
+    if (!candidate) return '';
+    return cleanToPureSpanish(translateTextSmart(candidate, 'EN', 'ES'));
   }
 
-  if (fieldEn && fieldEn.trim().length > 0 && fieldEn !== fieldEs) {
-    return fieldEn;
+  // targetLang === 'EN'
+  // 1. Si existe versión en inglés genuina
+  if (en && !hasSpanglishResidue(en) && !isSpanishCulinaryText(en)) {
+    return cleanToPureEnglish(en);
   }
-
-  return translateTextSmart(fieldEs, 'ES', 'EN');
+  // 2. Si solo tenemos español o un texto con residuos, traducimos a inglés puro
+  const candidate = es || en;
+  if (!candidate) return '';
+  return cleanToPureEnglish(translateTextSmart(candidate, 'ES', 'EN'));
 }
+
+/**
+ * Traduce automáticamente un comentario de la comunidad al idioma activo.
+ * Si el comentario ya está en el idioma destino, se muestra de forma nativa.
+ * Si está en otro idioma, se traduce de inmediato sin necesidad de botones manuales.
+ */
+export function translateCommentSmart(message: string, targetLang: 'ES' | 'EN'): string {
+  if (!message || !message.trim()) return '';
+  const trimmed = message.trim();
+  const msgIsSpanish = isSpanishText(trimmed);
+
+  if (targetLang === 'ES') {
+    if (msgIsSpanish) {
+      return cleanToPureSpanish(trimmed);
+    }
+    return cleanToPureSpanish(translateTextSmart(trimmed, 'EN', 'ES'));
+  } else {
+    if (!msgIsSpanish) {
+      return cleanToPureEnglish(trimmed);
+    }
+    return cleanToPureEnglish(translateTextSmart(trimmed, 'ES', 'EN'));
+  }
+}
+
+// Caché en memoria para traducciones automáticas asíncronas
+const translationMemoryCache = new Map<string, string>();
+
+export function getCachedTranslation(key: string): string | undefined {
+  return translationMemoryCache.get(key);
+}
+
+export function setCachedTranslation(key: string, value: string): void {
+  translationMemoryCache.set(key, value);
+}
+
+/**
+ * Solicita en segundo plano traducciones de alta calidad a /api/translate
+ * y alimenta la caché en memoria para refrescar sutilmente la pantalla sin botones ni bloqueos.
+ */
+export async function fetchBackgroundTranslations(params: {
+  title?: string;
+  description?: string;
+  instructions?: string;
+  comments?: Array<{ id: string; message: string }>;
+  sourceLang: 'ES' | 'EN';
+  targetLang: 'ES' | 'EN';
+}): Promise<{
+  translatedTitle?: string;
+  translatedDescription?: string;
+  translatedInstructions?: string;
+  translatedComments?: Array<{ id: string; message: string }>;
+} | null> {
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data;
+  } catch {
+    return null;
+  }
+}
+
