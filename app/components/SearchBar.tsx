@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * @file SearchBar.tsx
+ * @description Barra de búsqueda y sistema de filtros desplegable tipo Combobox para Pulse&Cook.
+ *
+ * Características:
+ * 1. Búsqueda en tiempo real por nombre de receta, ingrediente o categoría.
+ * 2. Combobox desplegable (`SlidersHorizontal`) que oculta los filtros por defecto para una UI limpia.
+ * 3. Selección múltiple e independiente de Categorías (OR) y Dietas/Preferencias (AND).
+ * 4. Chips activos en pantalla con eliminación rápida individual (`✕`) y botón "Borrar todos".
+ * 5. Cierre automático al hacer clic fuera (`click-outside`) y soporte bilingüe (ES/EN).
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, SlidersHorizontal, X, Check, ChevronDown, RotateCcw } from 'lucide-react';
 import { RECIPE_CATEGORIES } from '@/lib/categories';

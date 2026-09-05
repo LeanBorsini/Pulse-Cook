@@ -1,6 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+/**
+ * @file WelcomeLandingModal.tsx
+ * @description Modal editorial y guía de bienvenida interactiva de Pulse&Cook.
+ *
+ * Expone de forma visual y bilingüe (ES/EN) las 8 capacidades centrales del recetario:
+ * 1. Filtros inteligentes en Combobox con selección múltiple y chips activos.
+ * 2. Asistente Chef Remy (IA) para cocinar con lo que hay en el refrigerador.
+ * 3. Traducción bilingüe pura con saneamiento automático de Spanglish.
+ * 4. Modo cocina guiado a pantalla completa con temporizadores automáticos.
+ * 5. Planificador de menú semanal y lista de compras agrupada por pasillos.
+ * 6. Creación multimedia con hasta 5 fotos y videos de YouTube.
+ * 7. Impresión profesional de fichas de cocina y exportación a PDF.
+ * 8. Instalación como PWA móvil y compartir rápido por Código QR o WhatsApp.
+ */
+
+import React from 'react';
 import {
   Sparkles,
   Utensils,
@@ -14,8 +29,6 @@ import {
   SlidersHorizontal,
   Printer,
   BookOpen,
-  CalendarDays,
-  ShieldCheck,
 } from 'lucide-react';
 import { Language } from '../types';
 

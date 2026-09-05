@@ -26,6 +26,23 @@
 - **Solución Implementada**: Cascada de modelos (`gemini-3.1-flash-lite`, `gemini-3.6-flash`, `gemini-3.8-flash`), saneamiento de textos clonados, diccionario offline de respaldo y conmutador `[ES | EN]` con botón interactivo de traducción en `RecipeDetailModal.tsx`.
 - **Servidor Dev**: Operando en `http://localhost:3000` con respuesta HTTP 200 OK.
 
+### ✅ Erradicación de Spanglish y Limpieza Léxica en Tiempo Real
+- **Problema Detectado**: Ciertas recetas arrastraban términos en inglés en la vista en español (ej. *chicken breast*, *butternut squash*) o términos en español en la vista en inglés (ej. *cebolla*).
+- **Causa Raíz**: Contaminación léxica en la ingesta inicial de recetas y traducciones literales de ingredientes aislados.
+- **Solución Implementada**: 
+  1. Funciones de limpieza léxica profunda `cleanToPureSpanish` y `cleanToPureEnglish` en `lib/recipeTranslator.ts` que se aplican automáticamente en runtime (tarjetas, modales, vista de impresión).
+  2. Botón interactivo *"Sanear Spanglish"* en `RecipeDetailModal.tsx` que detecta términos cruzados, los corrige y guarda la versión pura tanto en Supabase como en `localStorage`.
+  3. Editor manual directo de instrucciones paso a paso dentro del modal para control total del usuario.
+  4. Fallback externo de traducción alternativa (MyMemory API) integrado en `/api/translate/route.ts` cuando la cuota de Gemini se satura temporalmente.
+
+### ✅ Filtros en Combobox Desplegable y Rediseño Minimalista de Búsqueda
+- **Requerimiento del Usuario**: Los filtros de categorías y dietas ocupaban demasiado espacio visual en pantalla. El usuario solicitó mantener la pantalla limpia por defecto, agrupándolos dentro de un combobox/menú desplegable, con soporte para seleccionar múltiples categorías/dietas, una sola, o ninguna, y mostrar únicamente los filtros activos como chips.
+- **Solución Implementada**:
+  1. Refactorización completa de `app/components/SearchBar.tsx` con un botón desplegable (`SlidersHorizontal`) y menú flotante con pestañas (Categorías y Dietas) y checkboxes accesibles.
+  2. Soporte de selección múltiple con chips interactivos con botón `✕` de eliminación rápida y botón `Borrar todos`.
+  3. Actualización de `app/page.tsx` con estado `selectedCategories: string[]` (lógica OR) y `selectedTags: string[]` (lógica AND).
+  4. Rediseño y expansión del modal de ayuda `WelcomeLandingModal.tsx` abarcando las 8 capacidades centrales del recetario.
+
 ---
 
 ## 🔑 Variables de Entorno Requeridas
@@ -307,4 +324,45 @@ create policy "Users can update or delete their own recipe images."
   - Documentación de tipos e interfaces clave (`app/types.ts`).
   - Comentarios explicativos en módulos de lógica de negocio (`lib/recipeStore.ts`, `lib/supabase.ts`, `lib/storage.ts`, `lib/groceryConsolidator.ts`, `lib/recipeTranslator.ts`, `lib/chefRemyOffline.ts`).
   - Documentación a nivel de archivo y props en rutas de API (`/api/chef-ai`, `/api/translate`) y componentes principales (`app/page.tsx`, `RecipeDetailModal.tsx`, `CookingModeModal.tsx`, `ShoppingListModal.tsx`, `ChefAssistantModal.tsx`, `RecipeFormModal.tsx`).
+
+---
+
+### ✅ Fase 13: Erradicación de Spanglish & Sanitización Léxica Culinaria (COMPLETADA)
+- [x] **Limpieza Léxica Automática en Runtime (`lib/recipeTranslator.ts`)**:
+  - Funciones `cleanToPureSpanish` y `cleanToPureEnglish` que sanean términos cruzados rebeldes (como *cebolla / onion*, *chicken breast / pechuga de pollo*, *butternut squash / calabaza/zapallo*, *egg / huevo*, etc.).
+  - Aplicación consistente en el renderizado de tarjetas (`RecipeCard.tsx`), detalle de receta (`RecipeDetailModal.tsx`), modo cocina y vista de impresión.
+- [x] **Botón de Auto-Reparación "Sanear Spanglish" (`RecipeDetailModal.tsx`)**:
+  - Detección en tiempo real de mezclas léxicas dentro de las instrucciones de la receta abierta.
+  - Al presionar el botón, se purga el texto mixto y se guarda la versión corregida tanto en Supabase como en `localStorage`.
+- [x] **Editor Manual de Instrucciones en el Modal de Detalle**:
+  - Permite al usuario editar o ajustar directamente las instrucciones paso a paso en caso de querer redactar matices específicos.
+- [x] **Traductor Alternativo Multicapa (`/api/translate/route.ts`)**:
+  - Adición de respaldo con MyMemory API y diccionario offline para garantizar traducción culinaria ininterrumpida aun en momentos de cuota agotada de Gemini.
+
+---
+
+### ✅ Fase 14: Filtros en Combobox Desplegable, Selección Múltiple & Guía de Ayuda (COMPLETADA)
+- [x] **Filtros en Menú Desplegable Tipo Combobox (`SearchBar.tsx`)**:
+  - La pantalla principal se mantiene 100% limpia y despejada por defecto, sin hileras de botones estáticos que sobrecarguen la vista.
+  - Al hacer clic en el botón *"Filtros"* (`SlidersHorizontal`), se despliega un panel flotante organizado por pestañas (**Categorías** y **Dietas / Preferencias**).
+  - Cierre automático al hacer clic fuera del panel (`click-outside handler`) o presionar Escape.
+- [x] **Soporte para Selección Múltiple, Única o Ninguna**:
+  - Permite seleccionar múltiples categorías a la vez (lógica OR: ej. ver platos que sean *Desayuno* o *Postre*).
+  - Permite seleccionar múltiples dietas a la vez (lógica AND: ej. recetas que cumplan con *Sin Gluten* y *Vegano*).
+  - Contador numérico visual en el botón de filtros indicando la cantidad total de filtros activos.
+- [x] **Chips Activos Dinámicos en Pantalla**:
+  - Únicamente los filtros seleccionados se despliegan debajo de la barra de búsqueda en formato de píldoras/chips.
+  - Cada chip incluye un botón interactivo `✕` para removerlo individualmente, además de un botón *"Borrar todos"* / *"Clear all"*.
+- [x] **Actualización de la Guía de Ayuda / Modal de Bienvenida (`WelcomeLandingModal.tsx`)**:
+  - Rediseño editorial y estructuración exhaustiva con las **8 capacidades completas** de Pulse & Cook:
+    1. Filtros Inteligentes en Combobox con selección múltiple.
+    2. Chef Asistente Remy con IA.
+    3. Traducción Pura bilingüe sin Spanglish y saneamiento en un clic.
+    4. Modo Cocina Guiado con temporizadores de sonido.
+    5. Menú Semanal y Lista de Compras clasificada por pasillos.
+    6. Creación Multimedia con hasta 5 fotos y videos de YouTube.
+    7. Fichas Imprimibles gourmet y exportación a PDF.
+    8. Instalación como PWA móvil y compartir rápido por Código QR o WhatsApp.
+  - Accesible en cualquier momento desde el botón *"Guía"* en la cabecera principal.
+
 
