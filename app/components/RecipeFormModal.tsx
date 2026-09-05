@@ -29,7 +29,6 @@ import {
   Video,
   UploadCloud,
   Check,
-  Globe,
   Utensils,
   ChefHat,
   Camera,
@@ -40,8 +39,6 @@ import { uploadRecipeImage } from '@/lib/storage';
 import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
 import {
   translateTextSmart,
-  hasGenuineEnglishInstructions,
-  hasGenuineSpanishInstructions,
   cleanToPureSpanish,
   cleanToPureEnglish,
 } from '@/lib/recipeTranslator';
@@ -78,9 +75,6 @@ export function RecipeFormModal({
   onSuccess,
 }: RecipeFormModalProps) {
   const isEs = lang === 'ES';
-
-  // Identificar el idioma inicial en el que se redactará la receta
-  const [formInputLang, setFormInputLang] = useState<'ES' | 'EN'>(lang);
 
   // Un solo campo de texto principal espacioso para el usuario
   const [title, setTitle] = useState(() => {
@@ -314,7 +308,7 @@ export function RecipeFormModal({
     setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
-  // Guardar receta con Auto-Traducción transparente en segundo plano
+  // Guardar receta respetando fielmente el texto escrito por el usuario y generando traducción en segundo plano
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
@@ -323,83 +317,86 @@ export function RecipeFormModal({
     }
 
     setSaving(true);
-    setStatusMessage(isEs ? 'Sincronizando y auto-traduciendo receta...' : 'Syncing & auto-translating recipe...');
+    setStatusMessage(isEs ? 'Guardando receta...' : 'Saving recipe...');
 
     const validVideos = videos.filter((v) => v.url.trim() !== '');
 
-    // Valores iniciales según el idioma en el que redactó el usuario
-    let title_es = formInputLang === 'ES' ? title : '';
-    let title_en = formInputLang === 'EN' ? title : '';
-    let desc_es = formInputLang === 'ES' ? description : '';
-    let desc_en = formInputLang === 'EN' ? description : '';
-    let inst_es = formInputLang === 'ES' ? instructions : '';
-    let inst_en = formInputLang === 'EN' ? instructions : '';
+    // Texto exacto y fiel escrito por el usuario en el idioma activo
+    const rawTitle = title.trim();
+    const rawDescription = description.trim();
+    const rawInstructions = instructions.trim();
 
-    // Llamada automática al motor Gemini para traducir el idioma faltante
-    try {
-      const sourceLang = formInputLang;
-      const targetLang = formInputLang === 'ES' ? 'EN' : 'ES';
+    let finalTitleEs = isEs ? rawTitle : (recipeToEdit?.title_es || '');
+    let finalTitleEn = !isEs ? rawTitle : (recipeToEdit?.title_en || '');
+    let finalDescEs = isEs ? rawDescription : (recipeToEdit?.description_es || '');
+    let finalDescEn = !isEs ? rawDescription : (recipeToEdit?.description_en || '');
+    let finalInstEs = isEs ? rawInstructions : (recipeToEdit?.instructions_es || '');
+    let finalInstEn = !isEs ? rawInstructions : (recipeToEdit?.instructions_en || '');
 
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description,
-          instructions,
-          sourceLang,
-          targetLang,
-        }),
-      });
+    // Si falta la traducción en el otro idioma o si se redactó nuevo contenido, traducimos SOLO el otro idioma
+    const needOppositeTranslation = isEs
+      ? (!finalInstEn || rawInstructions !== recipeToEdit?.instructions_es)
+      : (!finalInstEs || rawInstructions !== recipeToEdit?.instructions_en);
 
-      if (res.ok) {
-        const translated = await res.json();
-        if (sourceLang === 'ES') {
-          title_en = translated.translatedTitle || translateTextSmart(title, 'ES', 'EN');
-          desc_en = translated.translatedDescription || translateTextSmart(description, 'ES', 'EN');
-          inst_en = (translated.translatedInstructions || translateTextSmart(instructions, 'ES', 'EN')).trim();
-          if (inst_en && !hasGenuineEnglishInstructions(inst_en, instructions)) {
-            inst_en = translateTextSmart(inst_en, 'ES', 'EN');
+    if (needOppositeTranslation) {
+      try {
+        const sourceLang = lang;
+        const targetLang = isEs ? 'EN' : 'ES';
+
+        const res = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: rawTitle,
+            description: rawDescription,
+            instructions: rawInstructions,
+            sourceLang,
+            targetLang,
+          }),
+        });
+
+        if (res.ok) {
+          const translated = await res.json();
+          if (isEs) {
+            finalTitleEn = translated.translatedTitle || translateTextSmart(rawTitle, 'ES', 'EN');
+            finalDescEn = translated.translatedDescription || translateTextSmart(rawDescription, 'ES', 'EN');
+            finalInstEn = (translated.translatedInstructions || translateTextSmart(rawInstructions, 'ES', 'EN')).trim();
+          } else {
+            finalTitleEs = translated.translatedTitle || translateTextSmart(rawTitle, 'EN', 'ES');
+            finalDescEs = translated.translatedDescription || translateTextSmart(rawDescription, 'EN', 'ES');
+            finalInstEs = (translated.translatedInstructions || translateTextSmart(rawInstructions, 'EN', 'ES')).trim();
+          }
+
+          if (translated.suggestedTags && Array.isArray(translated.suggestedTags)) {
+            translated.suggestedTags.forEach((t: string) => {
+              if (t && !selectedTags.includes(t) && selectedTags.length < 8) {
+                selectedTags.push(t);
+              }
+            });
           }
         } else {
-          title_es = translated.translatedTitle || translateTextSmart(title, 'EN', 'ES');
-          desc_es = translated.translatedDescription || translateTextSmart(description, 'EN', 'ES');
-          inst_es = (translated.translatedInstructions || translateTextSmart(instructions, 'EN', 'ES')).trim();
-          if (inst_es && !hasGenuineSpanishInstructions(inst_es, instructions)) {
-            inst_es = translateTextSmart(inst_es, 'EN', 'ES');
+          // Fallback offline si la API no responde
+          if (isEs) {
+            finalTitleEn = translateTextSmart(rawTitle, 'ES', 'EN');
+            finalDescEn = translateTextSmart(rawDescription, 'ES', 'EN');
+            finalInstEn = translateTextSmart(rawInstructions, 'ES', 'EN');
+          } else {
+            finalTitleEs = translateTextSmart(rawTitle, 'EN', 'ES');
+            finalDescEs = translateTextSmart(rawDescription, 'EN', 'ES');
+            finalInstEs = translateTextSmart(rawInstructions, 'EN', 'ES');
           }
         }
-
-        // Si la IA sugiere nuevas etiquetas que enriquezcan la receta
-        if (translated.suggestedTags && Array.isArray(translated.suggestedTags)) {
-          translated.suggestedTags.forEach((t: string) => {
-            if (t && !selectedTags.includes(t) && selectedTags.length < 8) {
-              selectedTags.push(t);
-            }
-          });
-        }
-      } else {
-        // Fallback: usar el diccionario inteligente culinario si la API de traducción no responde
-        if (sourceLang === 'ES') {
-          title_en = translateTextSmart(title, 'ES', 'EN');
-          desc_en = translateTextSmart(description, 'ES', 'EN');
-          inst_en = translateTextSmart(instructions, 'ES', 'EN');
+      } catch (err) {
+        console.warn('Opposite translation fallback triggered:', err);
+        if (isEs) {
+          finalTitleEn = translateTextSmart(rawTitle, 'ES', 'EN');
+          finalDescEn = translateTextSmart(rawDescription, 'ES', 'EN');
+          finalInstEn = translateTextSmart(rawInstructions, 'ES', 'EN');
         } else {
-          title_es = translateTextSmart(title, 'EN', 'ES');
-          desc_es = translateTextSmart(description, 'EN', 'ES');
-          inst_es = translateTextSmart(instructions, 'EN', 'ES');
+          finalTitleEs = translateTextSmart(rawTitle, 'EN', 'ES');
+          finalDescEs = translateTextSmart(rawDescription, 'EN', 'ES');
+          finalInstEs = translateTextSmart(rawInstructions, 'EN', 'ES');
         }
-      }
-    } catch (err) {
-      console.warn('Auto-translation failed during save, falling back to smart culinary dictionary:', err);
-      if (formInputLang === 'ES') {
-        title_en = translateTextSmart(title, 'ES', 'EN');
-        desc_en = translateTextSmart(description, 'ES', 'EN');
-        inst_en = translateTextSmart(instructions, 'ES', 'EN');
-      } else {
-        title_es = translateTextSmart(title, 'EN', 'ES');
-        desc_es = translateTextSmart(description, 'EN', 'ES');
-        inst_es = translateTextSmart(instructions, 'EN', 'ES');
       }
     }
 
@@ -408,8 +405,8 @@ export function RecipeFormModal({
       .filter((ing) => (ing.name_es && ing.name_es.trim() !== '') || (ing.name_en && ing.name_en.trim() !== ''))
       .map((ing) => ({
         recipe_id: recipeToEdit?.id || '',
-        name_es: cleanToPureSpanish(ing.name_es?.trim() || ing.name_en?.trim() || ''),
-        name_en: cleanToPureEnglish(ing.name_en?.trim() || ing.name_es?.trim() || ''),
+        name_es: isEs ? (ing.name_es?.trim() || ing.name_en?.trim() || '') : cleanToPureSpanish(ing.name_es?.trim() || ing.name_en?.trim() || ''),
+        name_en: !isEs ? (ing.name_en?.trim() || ing.name_es?.trim() || '') : cleanToPureEnglish(ing.name_en?.trim() || ing.name_es?.trim() || ''),
         amount: Number(ing.amount) || 1,
         unit: ing.unit?.trim() || '',
         aisle: ing.aisle || 'General',
@@ -417,14 +414,6 @@ export function RecipeFormModal({
 
     const recipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const standardizedCategory = getCategoryLabel(category, 'ES');
-
-    // Sanitización obligatoria al 100% para evitar Spanglish en ambos idiomas
-    const finalInstEs = cleanToPureSpanish(inst_es || (formInputLang === 'ES' ? instructions : translateTextSmart(instructions, 'EN', 'ES')));
-    const finalInstEn = cleanToPureEnglish(inst_en || (formInputLang === 'EN' ? instructions : translateTextSmart(instructions, 'ES', 'EN')));
-    const finalTitleEs = cleanToPureSpanish(title_es || (formInputLang === 'ES' ? title : translateTextSmart(title, 'EN', 'ES')));
-    const finalTitleEn = cleanToPureEnglish(title_en || (formInputLang === 'EN' ? title : translateTextSmart(title, 'ES', 'EN')));
-    const finalDescEs = cleanToPureSpanish(desc_es || (formInputLang === 'ES' ? description : translateTextSmart(description, 'EN', 'ES')));
-    const finalDescEn = cleanToPureEnglish(desc_en || (formInputLang === 'EN' ? description : translateTextSmart(description, 'ES', 'EN')));
 
     const recipeData: Recipe = {
       id: recipeId,
@@ -460,15 +449,15 @@ export function RecipeFormModal({
     // 2. Intentar guardar en Supabase en segundo plano si está disponible
     try {
       const supabasePayload = {
-        title_es,
-        title_en,
+        title_es: finalTitleEs,
+        title_en: finalTitleEn,
         category: standardizedCategory,
         prep_time: Number(prepTime) || 20,
         servings: Number(servings) || 4,
-        description_es: desc_es,
-        description_en: desc_en,
-        instructions_es: inst_es,
-        instructions_en: inst_en,
+        description_es: finalDescEs,
+        description_en: finalDescEn,
+        instructions_es: finalInstEs,
+        instructions_en: finalInstEn,
         image_url: images[0] || '',
         images: images,
         youtube_url: validVideos[0]?.url || '',
@@ -478,26 +467,51 @@ export function RecipeFormModal({
       };
 
       if (recipeToEdit?.id && !recipeToEdit.id.startsWith('user_') && !recipeToEdit.id.startsWith('rec_')) {
+        // Actualizar receta existente en Supabase
         await supabase
           .from('recipes')
           .update(supabasePayload)
           .eq('id', recipeToEdit.id);
+
+        // Actualizar ingredientes en Supabase
+        try {
+          await supabase.from('ingredients').delete().eq('recipe_id', recipeToEdit.id);
+          if (validIngredients.length > 0) {
+            const ingPayload = validIngredients.map((ing) => ({
+              recipe_id: recipeToEdit.id,
+              name_es: ing.name_es,
+              name_en: ing.name_en,
+              amount: ing.amount,
+              unit: ing.unit,
+            }));
+            await supabase.from('ingredients').insert(ingPayload);
+          }
+        } catch (ingErr) {
+          console.warn('Ingredients sync note:', ingErr);
+        }
       } else if (user) {
-        const { data: supaRecipe } = await supabase
+        // Crear nueva receta en Supabase (o subir receta local previamente no sincronizada)
+        const { data: supaRecipe, error: supaErr } = await supabase
           .from('recipes')
           .insert([supabasePayload])
           .select()
           .single();
 
-        if (supaRecipe && validIngredients.length > 0) {
-          const ingPayload = validIngredients.map((ing) => ({
-            recipe_id: supaRecipe.id,
-            name_es: ing.name_es,
-            name_en: ing.name_en,
-            amount: ing.amount,
-            unit: ing.unit,
-          }));
-          await supabase.from('ingredients').insert(ingPayload);
+        if (!supaErr && supaRecipe) {
+          // Asignar el ID real de Supabase a la receta guardada localmente para mantener concordancia
+          recipeData.id = supaRecipe.id;
+          saveLocalRecipe(recipeData, validIngredients);
+
+          if (validIngredients.length > 0) {
+            const ingPayload = validIngredients.map((ing) => ({
+              recipe_id: supaRecipe.id,
+              name_es: ing.name_es,
+              name_en: ing.name_en,
+              amount: ing.amount,
+              unit: ing.unit,
+            }));
+            await supabase.from('ingredients').insert(ingPayload);
+          }
         }
       }
     } catch (supaErr) {
@@ -532,18 +546,6 @@ export function RecipeFormModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Selector de idioma de redacción */}
-            <button
-              type="button"
-              onClick={() => setFormInputLang(formInputLang === 'ES' ? 'EN' : 'ES')}
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2C3523] bg-[#EFECE1] hover:bg-[#E2DEC2] px-2.5 py-1.5 rounded-xl border border-[#D8D3C4] shadow-2xs transition-colors cursor-pointer"
-              title={isEs ? 'Cambiar idioma de redacción' : 'Change writing language'}
-            >
-              <Globe className="w-3 h-3 text-[#5C6650]" />
-              <span className="hidden xs:inline">{formInputLang === 'ES' ? 'Redactar en ES' : 'Writing in EN'}</span>
-              <span className="xs:hidden">{formInputLang}</span>
-            </button>
-
             {/* Botón Cerrar (X) - SIEMPRE VISIBLE */}
             <button
               type="button"
@@ -577,7 +579,7 @@ export function RecipeFormModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={
-                formInputLang === 'ES'
+                isEs
                   ? 'Ej. Risotto cremoso de setas y parmesano'
                   : 'e.g. Creamy Mushroom and Parmesan Risotto'
               }
@@ -599,7 +601,7 @@ export function RecipeFormModal({
                 >
                   {RECIPE_CATEGORIES.map((cat) => (
                     <option key={cat.id} value={cat.id} className="bg-[#FAF8F2] text-[#2C3523]">
-                      {formInputLang === 'ES' ? cat.label_es : cat.label_en}
+                      {isEs ? cat.label_es : cat.label_en}
                     </option>
                   ))}
                 </select>
@@ -644,7 +646,7 @@ export function RecipeFormModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={
-                formInputLang === 'ES'
+                isEs
                   ? 'Un clásico reconfortante ideal para cenas especiales...'
                   : 'A comforting classic perfect for cozy dinner nights...'
               }
@@ -729,7 +731,7 @@ export function RecipeFormModal({
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder={
-                formInputLang === 'ES'
+                isEs
                   ? '1. En una sartén honda, dorar la cebolla y el ajo picados finamente con un chorrito de aceite de oliva.\n2. Añadir las setas laminadas y cocinar a fuego medio hasta que suelten su agua.\n3. Incorporar el arroz, tostar 1 minuto y verter el caldo poco a poco removiendo constantemente.\n4. Terminar con mantequilla y parmesano rallado.'
                   : '1. In a deep pan, sauté finely chopped onion and garlic in olive oil until translucent.\n2. Add sliced mushrooms and cook over medium heat until golden.\n3. Add the rice, toast for 1 minute, then pour warm broth gradually while stirring.\n4. Finish with butter and freshly grated parmesan.'
               }

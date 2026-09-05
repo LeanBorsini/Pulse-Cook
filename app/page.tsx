@@ -22,6 +22,13 @@ import {
   deleteLocalRecipe,
   getLocalIngredients,
 } from '@/lib/recipeStore';
+import {
+  getLocalUserRating,
+  saveLocalRating,
+  syncRatingToSupabase,
+  fetchCommunityRatings,
+  getConsolidatedRating,
+} from '@/lib/ratingStore';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { RecipeCard } from './components/RecipeCard';
@@ -241,40 +248,26 @@ export default function Home() {
           console.warn('Profiles lookup optional note:', profErr);
         }
 
-        // 3. Obtener valoraciones si la tabla ratings existe
-        const ratingsMap = new Map<string, { stars: number; user_id: string }[]>();
+        // 3. Obtener valoraciones comunitarias sincronizadas en la nube
+        let ratingsMap = new Map<string, { userId: string; stars: number }[]>();
         try {
-          const recipeIds = rawRecipes.map((r) => r.id);
-          const { data: ratingsData } = await supabase
-            .from('ratings')
-            .select('recipe_id, stars, user_id')
-            .in('recipe_id', recipeIds);
-
-          if (ratingsData) {
-            ratingsData.forEach((rt: SupabaseRatingRow) => {
-              if (rt.recipe_id) {
-                const list = ratingsMap.get(rt.recipe_id) || [];
-                list.push({ stars: rt.stars, user_id: rt.user_id });
-                ratingsMap.set(rt.recipe_id, list);
-              }
-            });
-          }
-        } catch {
-          // ratings table might be optional
+          ratingsMap = await fetchCommunityRatings();
+        } catch (ratErr) {
+          console.warn('Community ratings lookup note:', ratErr);
         }
 
         // 4. Formatear y normalizar cada receta
         const currentUser = userOverride !== undefined ? userOverride : userRef.current;
         const formatted: Recipe[] = rawRecipes.map((item) => {
-          const allRatings = ratingsMap.get(item.id) || item.ratings || [];
-          const count = allRatings.length;
+          const communityRatings = ratingsMap.get(item.id) || [];
+          const count = communityRatings.length;
           const avg = count > 0 
-            ? allRatings.reduce((acc: number, r: SupabaseRatingRow) => acc + (r.stars || 0), 0) / count 
+            ? communityRatings.reduce((acc, r) => acc + r.stars, 0) / count 
             : (typeof item.avg_rating === 'number' ? item.avg_rating : 0);
-          
+
           let myRating = 0;
-          if (currentUser && allRatings.length > 0) {
-            const userRat = allRatings.find((r: SupabaseRatingRow) => r.user_id === currentUser.id);
+          if (currentUser && communityRatings.length > 0) {
+            const userRat = communityRatings.find((r) => r.userId === currentUser.id);
             if (userRat) myRating = userRat.stars;
           }
 
@@ -336,17 +329,36 @@ export default function Home() {
         });
 
         // Combinar recetas locales con las de Supabase sin duplicados
+        // Las ediciones y creaciones locales del usuario tienen prioridad sobre registros remotos no actualizados
         const combined = [...localList];
         formatted.forEach((remoteRecipe) => {
           const existsIndex = combined.findIndex((r) => r.id === remoteRecipe.id);
           if (existsIndex === -1) {
             combined.push(remoteRecipe);
           } else {
-            // Actualizar datos con los remotos
-            combined[existsIndex] = { ...combined[existsIndex], ...remoteRecipe };
+            // Preservar las modificaciones locales del usuario sobre la versión remota
+            combined[existsIndex] = {
+              ...remoteRecipe,
+              ...combined[existsIndex],
+              avg_rating: remoteRecipe.avg_rating || combined[existsIndex].avg_rating,
+              ratings_count: remoteRecipe.ratings_count || combined[existsIndex].ratings_count,
+              user_rating: remoteRecipe.user_rating || combined[existsIndex].user_rating,
+            };
           }
         });
-        setRecipes(combined);
+
+        // Asegurar que cada receta del listado tenga su calificación consolidada al día
+        const finalizedRecipes = combined.map((r) => {
+          const ratingSummary = getConsolidatedRating(r.id, r.avg_rating, r.ratings_count, currentUser?.id);
+          return {
+            ...r,
+            avg_rating: ratingSummary.avgRating,
+            ratings_count: ratingSummary.ratingsCount,
+            user_rating: ratingSummary.userRating > 0 ? ratingSummary.userRating : r.user_rating,
+          };
+        });
+
+        setRecipes(finalizedRecipes);
       }
     } catch (err) {
       console.warn('Error fetching Supabase recipes:', err);
@@ -387,6 +399,25 @@ export default function Home() {
 
     initAuthAndRecipes();
 
+    // Suscripción en tiempo real: recetas y valoraciones de la comunidad
+    const recipesChannel = supabase
+      .channel('recipes_realtime_sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'recipes' },
+        () => {
+          fetchRecipes();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'comments' },
+        () => {
+          fetchRecipes();
+        }
+      )
+      .subscribe();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
       const currentUser = session?.user || null;
@@ -407,6 +438,7 @@ export default function Home() {
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      supabase.removeChannel(recipesChannel);
     };
   }, [loadUserProfile, fetchRecipes]);
 
@@ -420,8 +452,9 @@ export default function Home() {
       setLoadingIngredients(true);
       setLoadingComments(true);
 
-      // User rating check
-      setCurrentUserRating(activeRecipe.user_rating || 0);
+      // User rating check (local y remoto)
+      const localVote = getLocalUserRating(activeRecipe.id, user?.id);
+      setCurrentUserRating(activeRecipe.user_rating || localVote || 0);
 
       // Load Ingredients (check local persistent store first, then Supabase)
       const localIngs = getLocalIngredients(activeRecipe.id);
@@ -452,7 +485,7 @@ export default function Home() {
         }
       }
 
-      // Load Comments
+      // Load Comments (filtrando registros técnicos de ratings)
       try {
         const { data, error } = await supabase
           .from('comments')
@@ -463,7 +496,10 @@ export default function Home() {
         if (!isMounted) return;
 
         if (!error && data) {
-          setActiveComments(data);
+          const genuineComments = data.filter(
+            (c) => !c.user_name?.startsWith('__rating__') && !c.message?.startsWith('[RATING:')
+          );
+          setActiveComments(genuineComments);
         } else {
           setActiveComments([]);
         }
@@ -479,7 +515,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, [activeRecipe]);
+  }, [activeRecipe, user?.id]);
 
   // Toggle Recipe into Shopping Menu
   const handleToggleMenu = (recipeId: string) => {
@@ -488,27 +524,33 @@ export default function Home() {
     );
   };
 
-  // Rate a recipe
+  // Calificar una receta (soporta re-calificar y actualizar votos, recalculando promedio y votos)
   const handleRateRecipe = async (stars: number) => {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
     if (!activeRecipe) return;
 
+    // 1. Guardar de forma inmediata en almacenamiento local persistente
+    const summary = saveLocalRating(activeRecipe.id, stars, user?.id);
     setCurrentUserRating(stars);
 
-    try {
-      await supabase
-        .from('ratings')
-        .upsert(
-          { recipe_id: activeRecipe.id, user_id: user.id, stars },
-          { onConflict: 'recipe_id,user_id' }
-        );
+    // 2. Actualizar la receta activa inmediatamente
+    const updatedRecipe: Recipe = {
+      ...activeRecipe,
+      user_rating: stars,
+      avg_rating: summary.avgRating,
+      ratings_count: summary.ratingsCount,
+    };
+    setActiveRecipe(updatedRecipe);
 
-      fetchRecipes();
+    // 3. Actualizar la receta en el listado general en memoria
+    setRecipes((prev) =>
+      prev.map((r) => (r.id === activeRecipe.id ? updatedRecipe : r))
+    );
+
+    // 4. Sincronizar en Supabase en segundo plano
+    try {
+      await syncRatingToSupabase(activeRecipe.id, stars, user?.id);
     } catch (err) {
-      console.warn('Rating save error:', err);
+      console.warn('Rating sync note:', err);
     }
   };
 
