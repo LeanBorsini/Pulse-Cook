@@ -446,11 +446,28 @@ export function isEnglishCulinaryText(text?: string | null): boolean {
 }
 
 /**
+ * Detecta si un texto contiene mensajes de error de APIs externas (como MyMemory, cuotas o límites).
+ */
+export function isApiErrorMessage(text?: string | null): boolean {
+  if (!text) return false;
+  const upper = text.toUpperCase();
+  return (
+    upper.includes('LIMIT EXCEEDED') ||
+    upper.includes('QUERY LENGTH') ||
+    upper.includes('MAX ALLOWED QUERY') ||
+    upper.includes('MYMEMORY WARNING') ||
+    upper.includes('TOO MANY REQUESTS') ||
+    upper.includes('QUOTA EXCEEDED')
+  );
+}
+
+/**
  * Determina si las instrucciones en inglés son genuinas o si son copia o mezcla del español
  */
 export function hasGenuineEnglishInstructions(instructionsEn?: string | null, instructionsEs?: string | null): boolean {
   if (!instructionsEn || !instructionsEn.trim()) return false;
   const trimmed = instructionsEn.trim();
+  if (isApiErrorMessage(trimmed)) return false;
   if (instructionsEs && trimmed.toLowerCase() === instructionsEs.trim().toLowerCase()) {
     return false;
   }
@@ -478,6 +495,7 @@ export function hasGenuineEnglishInstructions(instructionsEn?: string | null, in
 export function hasGenuineSpanishInstructions(instructionsEs?: string | null, instructionsEn?: string | null): boolean {
   if (!instructionsEs || !instructionsEs.trim()) return false;
   const trimmed = instructionsEs.trim();
+  if (isApiErrorMessage(trimmed)) return false;
   if (instructionsEn && trimmed.toLowerCase() === instructionsEn.trim().toLowerCase()) {
     return false;
   }
@@ -563,6 +581,7 @@ export function isEnglishText(text?: string | null): boolean {
 export function hasGenuineEnglishDescription(descEn?: string | null, descEs?: string | null): boolean {
   if (!descEn || !descEn.trim()) return false;
   const trimmed = descEn.trim();
+  if (isApiErrorMessage(trimmed)) return false;
   if (descEs && trimmed.toLowerCase() === descEs.trim().toLowerCase()) {
     return false;
   }
@@ -579,6 +598,7 @@ export function hasGenuineEnglishDescription(descEn?: string | null, descEs?: st
 export function hasGenuineSpanishDescription(descEs?: string | null, descEn?: string | null): boolean {
   if (!descEs || !descEs.trim()) return false;
   const trimmed = descEs.trim();
+  if (isApiErrorMessage(trimmed)) return false;
   if (descEn && trimmed.toLowerCase() === descEn.trim().toLowerCase()) {
     return false;
   }
@@ -598,8 +618,12 @@ export function translateRecipeField(
   fieldEn: string | null | undefined,
   targetLang: 'ES' | 'EN'
 ): string {
-  const es = (fieldEs || '').trim();
-  const en = (fieldEn || '').trim();
+  let es = (fieldEs || '').trim();
+  let en = (fieldEn || '').trim();
+
+  // Filtrar de raíz cualquier mensaje de error de APIs externas
+  if (isApiErrorMessage(es)) es = '';
+  if (isApiErrorMessage(en)) en = '';
 
   if (targetLang === 'ES') {
     // 1. Si existe versión en español y es español genuino
@@ -631,6 +655,7 @@ export function translateRecipeField(
 export function translateCommentSmart(message: string, targetLang: 'ES' | 'EN'): string {
   if (!message || !message.trim()) return '';
   const trimmed = message.trim();
+  if (isApiErrorMessage(trimmed)) return '';
   const msgIsSpanish = isSpanishText(trimmed);
 
   if (targetLang === 'ES') {
@@ -650,10 +675,16 @@ export function translateCommentSmart(message: string, targetLang: 'ES' | 'EN'):
 const translationMemoryCache = new Map<string, string>();
 
 export function getCachedTranslation(key: string): string | undefined {
-  return translationMemoryCache.get(key);
+  const val = translationMemoryCache.get(key);
+  if (val && isApiErrorMessage(val)) {
+    translationMemoryCache.delete(key);
+    return undefined;
+  }
+  return val;
 }
 
 export function setCachedTranslation(key: string, value: string): void {
+  if (!value || isApiErrorMessage(value)) return;
   translationMemoryCache.set(key, value);
 }
 
@@ -691,6 +722,24 @@ export async function fetchBackgroundTranslations(params: {
 
     if (!res.ok) return null;
     const data = await res.json();
+    if (!data) return null;
+
+    // Sanear respuestas que contengan mensajes de cuotas o límites
+    if (data.translatedTitle && isApiErrorMessage(data.translatedTitle)) {
+      delete data.translatedTitle;
+    }
+    if (data.translatedDescription && isApiErrorMessage(data.translatedDescription)) {
+      delete data.translatedDescription;
+    }
+    if (data.translatedInstructions && isApiErrorMessage(data.translatedInstructions)) {
+      delete data.translatedInstructions;
+    }
+    if (Array.isArray(data.translatedComments)) {
+      data.translatedComments = data.translatedComments.filter(
+        (c: { id: string; message: string }) => !isApiErrorMessage(c.message)
+      );
+    }
+
     return data;
   } catch {
     return null;

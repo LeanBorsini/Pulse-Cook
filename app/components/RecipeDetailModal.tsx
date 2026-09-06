@@ -54,6 +54,7 @@ import {
   hasGenuineEnglishDescription,
   isSpanishText,
   isEnglishText,
+  isApiErrorMessage,
 } from '../../lib/recipeTranslator';
 import {
   getLocalUserRating,
@@ -242,21 +243,21 @@ export function RecipeDetailModal({
   // 1. Título con traducción pura automática al idioma seleccionado (ES o EN)
   const displayedTitle = useMemo(() => {
     const cached = asyncTranslations[`title_${recipe.id}_${lang}`] || getCachedTranslation(`title_${recipe.id}_${lang}`);
-    if (cached) return cached;
+    if (cached && !isApiErrorMessage(cached)) return cached;
     return translateRecipeField(recipe.title_es, recipe.title_en, lang);
   }, [recipe.id, recipe.title_es, recipe.title_en, lang, asyncTranslations]);
 
   // 2. Descripción con traducción pura automática
   const displayedDesc = useMemo(() => {
     const cached = asyncTranslations[`desc_${recipe.id}_${lang}`] || getCachedTranslation(`desc_${recipe.id}_${lang}`);
-    if (cached) return cached;
+    if (cached && !isApiErrorMessage(cached)) return cached;
     return translateRecipeField(recipe.description_es, recipe.description_en, lang);
   }, [recipe.id, recipe.description_es, recipe.description_en, lang, asyncTranslations]);
 
   // 3. Instrucciones con traducción pura automática (si está en inglés y el usuario pone español, se traduce 100% automático sin botones)
   const displayedInstructions = useMemo(() => {
     const cached = asyncTranslations[`inst_${recipe.id}_${lang}`] || getCachedTranslation(`inst_${recipe.id}_${lang}`);
-    if (cached) return cached;
+    if (cached && !isApiErrorMessage(cached)) return cached;
     return translateRecipeField(recipe.instructions_es, recipe.instructions_en, lang);
   }, [recipe.id, recipe.instructions_es, recipe.instructions_en, lang, asyncTranslations]);
 
@@ -264,7 +265,8 @@ export function RecipeDetailModal({
   const displayedComments = useMemo(() => {
     return comments.map((c) => {
       const cached = asyncTranslations[`comment_${c.id}_${lang}`] || getCachedTranslation(`comment_${c.id}_${lang}`);
-      const text = cached || translateCommentSmart(c.message, lang);
+      const validCached = cached && !isApiErrorMessage(cached) ? cached : undefined;
+      const text = validCached || translateCommentSmart(c.message, lang);
       return {
         ...c,
         translatedMessage: text,

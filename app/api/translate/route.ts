@@ -28,25 +28,83 @@ interface CommentOutput {
 }
 
 /**
- * Fallback secundario con motor web público de traducción si Gemini no responde o se agota
+ * Fallback secundario con motor web público de traducción si Gemini no responde o se agota.
+ * Maneja textos largos dividiéndolos en fragmentos <= 400 caracteres y rechaza errores de cuota.
  */
 async function translateWithExternalFallback(text: string, sourceLang: 'ES' | 'EN', targetLang: 'ES' | 'EN'): Promise<string> {
   if (!text || !text.trim()) return '';
+
+  const cleanPure = (val: string) => (targetLang === 'EN' ? cleanToPureEnglish(val) : cleanToPureSpanish(val));
+  const fallback = cleanPure(translateTextSmart(text, sourceLang, targetLang));
+
   try {
     const langPair = sourceLang === 'ES' ? 'es|en' : 'en|es';
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 600))}&langpair=${langPair}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
-    if (res.ok) {
+
+    // Función auxiliar para traducir un fragmento individual <= 400 caracteres
+    const fetchChunk = async (chunk: string): Promise<string | null> => {
+      if (!chunk.trim()) return chunk;
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk.trim())}&langpair=${langPair}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
+      if (!res.ok) return null;
       const data = await res.json();
+      if (data.responseStatus !== 200 && data.responseStatus !== '200') return null;
       const translated = data.responseData?.translatedText;
-      if (translated && typeof translated === 'string' && translated.trim().length > 0) {
-        return targetLang === 'EN' ? cleanToPureEnglish(translated) : cleanToPureSpanish(translated);
+      if (!translated || typeof translated !== 'string') return null;
+      const upper = translated.toUpperCase();
+      if (upper.includes('LIMIT EXCEEDED') || upper.includes('MYMEMORY') || upper.includes('QUERY LENGTH')) {
+        return null;
+      }
+      return cleanPure(translated);
+    };
+
+    // Si el texto es corto (<= 400 chars), se traduce directamente
+    if (text.length <= 400) {
+      const translated = await fetchChunk(text);
+      if (translated) return translated;
+      return fallback;
+    }
+
+    // Para textos largos como instrucciones con múltiples pasos, dividimos por líneas o oraciones
+    const lines = text.split('\n');
+    const chunks: string[] = [];
+    let currentChunk = '';
+
+    for (const line of lines) {
+      if ((currentChunk + '\n' + line).length > 380) {
+        if (currentChunk) chunks.push(currentChunk);
+        currentChunk = line;
+      } else {
+        currentChunk = currentChunk ? currentChunk + '\n' + line : line;
       }
     }
+    if (currentChunk) chunks.push(currentChunk);
+
+    const translatedChunks: string[] = [];
+    for (const chunk of chunks) {
+      if (chunk.length > 400) {
+        // Subdividir por oraciones si una sola línea excede 400
+        const sentences = chunk.match(/[^.!?]+[.!?]+|\s*[^.!?]+$/g) || [chunk];
+        const subParts: string[] = [];
+        for (const s of sentences) {
+          const trans = await fetchChunk(s.slice(0, 390));
+          subParts.push(trans || cleanPure(translateTextSmart(s, sourceLang, targetLang)));
+        }
+        translatedChunks.push(subParts.join(' '));
+      } else {
+        const trans = await fetchChunk(chunk);
+        translatedChunks.push(trans || cleanPure(translateTextSmart(chunk, sourceLang, targetLang)));
+      }
+    }
+
+    const result = translatedChunks.join('\n');
+    if (result && !result.toUpperCase().includes('LIMIT EXCEEDED')) {
+      return result;
+    }
   } catch {
-    // Si la llamada externa falla, recurrimos al motor local
+    // En caso de fallo o timeout de red, utilizar el motor culinario
   }
-  return translateTextSmart(text, sourceLang, targetLang);
+
+  return fallback;
 }
 
 /**
