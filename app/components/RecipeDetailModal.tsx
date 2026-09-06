@@ -34,14 +34,11 @@ import {
 } from 'lucide-react';
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
 import { RecipePrintView } from './RecipePrintView';
 import { CookingModeModal } from './CookingModeModal';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
-import { saveLocalRecipe } from '../../lib/recipeStore';
 import { getCategoryLabel } from '@/lib/categories';
 import {
-  translateTextSmart,
   translateRecipeField,
   translateCommentSmart,
   getCachedTranslation,
@@ -77,7 +74,7 @@ interface RecipeDetailModalProps {
   userRating?: number;
   onRate?: (stars: number) => void;
   onClose: () => void;
-  onEdit: (recipe: Recipe) => void;
+  onEdit: (recipe: Recipe, ingredients?: Ingredient[]) => void;
   onDelete: (id: string) => void;
   onAddComment?: (e: React.FormEvent) => void;
   onUpdateComment?: (commentId: string, newMessage: string) => Promise<void> | void;
@@ -85,7 +82,6 @@ interface RecipeDetailModalProps {
   onOpenAuth: () => void;
   isInMenu?: boolean;
   onToggleMenu?: (id: string) => void;
-  onRecipeUpdated?: (updated: Recipe) => void;
 }
 
 export function RecipeDetailModal({
@@ -110,7 +106,6 @@ export function RecipeDetailModal({
   onOpenAuth,
   isInMenu = false,
   onToggleMenu,
-  onRecipeUpdated,
 }: RecipeDetailModalProps) {
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
@@ -178,9 +173,8 @@ export function RecipeDetailModal({
   const currentVideo = videoList[activeVideoIndex] || videoList[0];
   const youtubeEmbed = getEmbedYoutubeUrl(currentVideo?.url);
 
-  // Estados de edición manual directa de instrucciones
-  const [isEditingInstructions, setIsEditingInstructions] = useState(false);
-  const [instructionEditText, setInstructionEditText] = useState('');
+  // Estado para confirmación visual de eliminación de receta
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Estados para edición y borrado de comentarios por su autor
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
@@ -370,42 +364,6 @@ export function RecipeDetailModal({
     isEs,
   ]);
 
-  const handleSaveEditedInstructions = async () => {
-    const trimmed = instructionEditText.trim();
-    const updated: Recipe = {
-      ...recipe,
-      ...(isEs
-        ? {
-            instructions_es: trimmed,
-            instructions_en: recipe.instructions_en || translateTextSmart(trimmed, 'ES', 'EN'),
-          }
-        : {
-            instructions_en: trimmed,
-            instructions_es: recipe.instructions_es || translateTextSmart(trimmed, 'EN', 'ES'),
-          }),
-    };
-    saveLocalRecipe(updated, ingredients);
-    if (onRecipeUpdated) {
-      onRecipeUpdated(updated);
-    }
-
-    // Sincronizar en Supabase para que todos los usuarios vean el cambio en tiempo real
-    try {
-      if (recipe.id && !recipe.id.startsWith('user_') && !recipe.id.startsWith('rec_')) {
-        await supabase
-          .from('recipes')
-          .update({
-            instructions_es: updated.instructions_es,
-          })
-          .eq('id', recipe.id);
-      }
-    } catch (supaErr) {
-      console.warn('Error syncing edited instructions to Supabase:', supaErr);
-    }
-
-    setIsEditingInstructions(false);
-  };
-
   const handleShareWhatsApp = () => {
     const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
     const text = isEs
@@ -429,15 +387,35 @@ export function RecipeDetailModal({
   // Author & Owner check - Cada usuario puede editar sus recetas originales
   const authorName =
     recipe.profiles?.username ||
+    (recipe as unknown as { author_name?: string }).author_name ||
     (recipe.user_id === user?.id
-      ? (user?.user_metadata?.username || user?.email?.split('@')[0] || 'Tú')
+      ? (user?.user_metadata?.username || user?.email?.split('@')[0] || 'leanBorsini')
       : 'leanBorsini');
 
   // Solo el autor original puede editar o eliminar su receta
-  const isOwner = Boolean(
-    (user && (recipe.user_id === user.id || recipe.profiles?.id === user.id)) ||
-    (recipe.user_id === 'local_user' || (!recipe.user_id && recipe.id.startsWith('user_')))
-  );
+  const isOwner = useMemo(() => {
+    // Si el usuario es el autor principal del proyecto (leoborsini12@gmail.com o leanBorsini)
+    const isMainAdminAuthor =
+      user &&
+      (user.email?.toLowerCase() === 'leoborsini12@gmail.com' ||
+        user.user_metadata?.username?.toLowerCase() === 'leanborsini' ||
+        profileUsername?.toLowerCase() === 'leanborsini');
+
+    if (isMainAdminAuthor) {
+      return true;
+    }
+
+    // Coincidencia estándar por ID de usuario autenticado
+    if (user && recipe.user_id && recipe.user_id === user.id) return true;
+    if (user && recipe.profiles?.id && recipe.profiles.id === user.id) return true;
+
+    // Receta local sin usuario remoto asignado o creada en el navegador
+    if (recipe.user_id === 'local_user' || !recipe.user_id || recipe.id.startsWith('user_')) {
+      return true;
+    }
+
+    return false;
+  }, [user, recipe, profileUsername]);
 
   const handlePrint = () => {
     window.print();
@@ -602,6 +580,66 @@ export function RecipeDetailModal({
             </div>
           </div>
 
+          {/* Panel de Gestión del Autor (Editar Receta Completa y Eliminar con Confirmación) */}
+          {isOwner && (
+            <div className="bg-[#EAE5D6]/90 border border-[#D8D3C4] rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap shadow-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
+                <span className="text-xs font-bold text-[#2C3523] tracking-wide">
+                  {lang === 'ES' ? 'Tu Receta (Autor)' : 'Your Recipe (Author)'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Botón Editar Receta Completa */}
+                <button
+                  type="button"
+                  onClick={() => onEdit(recipe, ingredients)}
+                  className="px-3.5 py-2 rounded-xl bg-[#2C3523] text-[#F7F5EC] hover:bg-[#3D4932] transition-colors flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer active:scale-95"
+                  title={lang === 'ES' ? 'Editar toda la receta (ingredientes, descripción, porciones, fotos, etc.)' : 'Edit full recipe (ingredients, description, servings, photos, etc.)'}
+                >
+                  <Edit className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{lang === 'ES' ? 'Editar Receta' : 'Edit Recipe'}</span>
+                </button>
+
+                {/* Botón Eliminar con confirmación interactiva visual */}
+                {showDeleteConfirm ? (
+                  <div className="flex items-center gap-1.5 bg-red-100/90 border border-red-300 px-2.5 py-1.5 rounded-xl">
+                    <span className="text-[11px] font-bold text-red-900">
+                      {lang === 'ES' ? '¿Eliminar receta?' : 'Delete recipe?'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDelete(recipe.id);
+                        setShowDeleteConfirm(false);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors text-xs font-bold cursor-pointer shadow-xs active:scale-95"
+                    >
+                      {lang === 'ES' ? 'Sí, eliminar' : 'Yes, delete'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-2 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors text-xs font-medium cursor-pointer"
+                    >
+                      {lang === 'ES' ? 'Cancelar' : 'Cancel'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95"
+                    title={lang === 'ES' ? 'Eliminar esta receta' : 'Delete this recipe'}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Barra de Acciones Gastronómicas (Diseñada para envolver limpiamente en móvil sin desbordar) */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Botón Cocinar Paso a Paso */}
@@ -667,18 +705,20 @@ export function RecipeDetailModal({
             {isOwner && (
               <div className="flex items-center gap-1.5 ml-auto">
                 <button
-                  onClick={() => onEdit(recipe)}
-                  title={lang === 'ES' ? 'Editar' : 'Edit'}
-                  className="p-2 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors cursor-pointer"
+                  onClick={() => onEdit(recipe, ingredients)}
+                  title={lang === 'ES' ? 'Editar Receta Completa' : 'Edit Full Recipe'}
+                  className="p-2 px-2.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3.5 h-3.5 text-[#425035]" />
+                  <span className="hidden sm:inline">{lang === 'ES' ? 'Editar' : 'Edit'}</span>
                 </button>
                 <button
-                  onClick={() => onDelete(recipe.id)}
-                  title={lang === 'ES' ? 'Eliminar' : 'Delete'}
-                  className="p-2 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors cursor-pointer"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  title={lang === 'ES' ? 'Eliminar Receta' : 'Delete Recipe'}
+                  className="p-2 px-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
                 </button>
               </div>
             )}
@@ -855,54 +895,21 @@ export function RecipeDetailModal({
                 {isEs ? 'Instrucciones' : 'Instructions'}
               </h3>
               
-              {/* Botón Editar Instrucciones en línea - Solo visible para el autor/dueño */}
-              {isOwner && !isEditingInstructions && (
+              {/* Botón para editar receta completa desde la sección de instrucciones */}
+              {isOwner && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setInstructionEditText(displayedInstructions);
-                    setIsEditingInstructions(true);
-                  }}
-                  className="text-[11px] text-stone-700 hover:text-stone-900 font-medium flex items-center gap-1 cursor-pointer bg-[#EFECE1] hover:bg-[#E2DEC2] border border-[#D8D3C4] px-2.5 py-1 rounded-lg transition-colors"
-                  title={isEs ? 'Editar texto de instrucciones' : 'Edit instructions text'}
+                  onClick={() => onEdit(recipe, ingredients)}
+                  className="text-[11px] text-[#2C3523] hover:text-black font-semibold flex items-center gap-1 cursor-pointer bg-[#EFECE1] hover:bg-[#E2DEC2] border border-[#D8D3C4] px-2.5 py-1 rounded-lg transition-colors"
+                  title={isEs ? 'Editar toda la receta (ingredientes, descripción, porciones, instrucciones)' : 'Edit full recipe (ingredients, description, servings, instructions)'}
                 >
-                  <Edit className="w-3 h-3 text-[#5C6650]" />
-                  <span>{isEs ? 'Editar' : 'Edit'}</span>
+                  <Edit className="w-3 h-3 text-[#425035]" />
+                  <span>{isEs ? 'Editar receta completa' : 'Edit full recipe'}</span>
                 </button>
               )}
             </div>
 
-            {isEditingInstructions ? (
-              <div className="space-y-2 bg-[#EFECE1] p-3 rounded-xl border border-[#D8D3C4]">
-                <div className="flex items-center justify-between text-xs text-[#5C6650] font-medium">
-                  <span>{isEs ? 'Editando instrucciones (Español):' : 'Editing instructions (English):'}</span>
-                  <span className="text-[10px] text-stone-500">Paso a paso numerado (1., 2., 3.)</span>
-                </div>
-                <textarea
-                  value={instructionEditText}
-                  onChange={(e) => setInstructionEditText(e.target.value)}
-                  rows={6}
-                  className="w-full text-xs text-[#2C3523] bg-[#F7F5EC] p-3 rounded-lg border border-[#D8D3C4] focus:outline-none focus:ring-1 focus:ring-[#2C3523] leading-relaxed resize-y font-sans"
-                  placeholder={isEs ? 'Escribe o ajusta las instrucciones paso a paso...' : 'Write or adjust step-by-step instructions...'}
-                />
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingInstructions(false)}
-                    className="px-3 py-1.5 text-xs rounded-lg border border-[#D8D3C4] bg-[#F7F5EC] text-[#5C6650] hover:bg-[#EFECE1] font-medium cursor-pointer"
-                  >
-                    {isEs ? 'Cancelar' : 'Cancel'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveEditedInstructions}
-                    className="px-3.5 py-1.5 text-xs rounded-lg bg-[#2C3523] text-white hover:bg-[#3D4932] font-semibold cursor-pointer active:scale-95 shadow-xs"
-                  >
-                    {isEs ? 'Guardar Cambios' : 'Save Changes'}
-                  </button>
-                </div>
-              </div>
-            ) : displayedInstructions ? (
+            {displayedInstructions ? (
               <div className="text-xs text-[#2C3523] whitespace-pre-line leading-relaxed bg-[#EFECE1] p-3.5 rounded-xl border border-[#D8D3C4]">
                 {displayedInstructions}
               </div>

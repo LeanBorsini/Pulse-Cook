@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
-import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
+import { saveLocalRecipe, getLocalIngredients, saveLocalIngredients } from '@/lib/recipeStore';
 import {
   translateTextSmart,
 } from '@/lib/recipeTranslator';
@@ -45,6 +45,7 @@ import { RECIPE_CATEGORIES, getCategoryKey, getCategoryLabel } from '@/lib/categ
 
 interface RecipeFormModalProps {
   recipeToEdit?: Recipe | null;
+  initialIngredients?: Ingredient[];
   lang: 'ES' | 'EN';
   user: User | null;
   onClose: () => void;
@@ -68,6 +69,7 @@ const COMMON_TAGS = [
 
 export function RecipeFormModal({
   recipeToEdit,
+  initialIngredients,
   lang,
   user,
   onClose,
@@ -99,13 +101,49 @@ export function RecipeFormModal({
 
   // Ingredientes
   const [ingredients, setIngredients] = useState<Ingredient[]>(() => {
+    if (initialIngredients && initialIngredients.length > 0) {
+      return initialIngredients;
+    }
     if (recipeToEdit?.id) {
-      return getLocalIngredients(recipeToEdit.id);
+      const local = getLocalIngredients(recipeToEdit.id);
+      if (local && local.length > 0) return local;
     }
     return [
       { name_es: '', name_en: '', amount: 1, unit: '' }
     ];
   });
+
+  // Carga complementaria de ingredientes desde Supabase si la receta editada no los tenía en memoria local
+  useEffect(() => {
+    if (!recipeToEdit?.id) return;
+
+    let isMounted = true;
+    async function loadRemoteIngredients() {
+      try {
+        const { data, error } = await supabase
+          .from('ingredients')
+          .select('*')
+          .eq('recipe_id', recipeToEdit!.id);
+
+        if (!error && data && data.length > 0 && isMounted) {
+          setIngredients((current) => {
+            if (current.some((ing) => ing.name_es?.trim() || ing.name_en?.trim())) {
+              return current;
+            }
+            saveLocalIngredients(recipeToEdit!.id, data);
+            return data;
+          });
+        }
+      } catch (err) {
+        console.warn('Error loading ingredients from Supabase:', err);
+      }
+    }
+
+    loadRemoteIngredients();
+    return () => {
+      isMounted = false;
+    };
+  }, [recipeToEdit?.id]);
 
   // Campos complementarios (Categoría normalizada mediante catálogo fijo)
   const [category, setCategory] = useState(() => {
@@ -443,10 +481,10 @@ export function RecipeFormModal({
       images: images,
       youtube_url: validVideos[0]?.url || '',
       video_links: validVideos,
-      user_id: user?.id || 'local_user',
-      profiles: {
+      user_id: user?.id || recipeToEdit?.user_id || 'local_user',
+      profiles: recipeToEdit?.profiles || {
         id: user?.id || 'local_user',
-        username: user?.email ? user.email.split('@')[0] : 'Mi Cocina',
+        username: (user?.user_metadata as { username?: string })?.username || (user?.email ? user.email.split('@')[0] : 'leanBorsini'),
         avatar_url: '',
       },
       dietary_tags: selectedTags,
@@ -475,7 +513,7 @@ export function RecipeFormModal({
         images: images,
         youtube_url: validVideos[0]?.url || '',
         video_links: validVideos,
-        user_id: user?.id || null,
+        user_id: user?.id || recipeToEdit?.user_id || null,
         dietary_tags: selectedTags,
       };
 

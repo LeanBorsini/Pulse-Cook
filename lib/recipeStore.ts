@@ -103,10 +103,28 @@ export function deleteLocalRecipe(recipeId: string): Recipe[] {
     const customRecipes: Recipe[] = getLocalRecipes();
     const filtered = customRecipes.filter((r) => r.id !== recipeId);
     localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(filtered));
+    deleteLocalIngredients(recipeId);
     return filtered;
   } catch (err) {
     console.warn('Error deleting local recipe:', err);
     return [];
+  }
+}
+
+/**
+ * Elimina los ingredientes guardados para una receta
+ */
+export function deleteLocalIngredients(recipeId: string) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const allIngredientsMap: Record<string, Ingredient[]> = JSON.parse(
+      localStorage.getItem(INGREDIENTS_STORAGE_KEY) || '{}'
+    );
+    delete allIngredientsMap[recipeId];
+    localStorage.setItem(INGREDIENTS_STORAGE_KEY, JSON.stringify(allIngredientsMap));
+  } catch (err) {
+    console.warn('Error deleting local ingredients:', err);
   }
 }
 

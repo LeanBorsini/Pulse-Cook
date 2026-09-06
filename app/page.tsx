@@ -155,6 +155,7 @@ export default function Home() {
   // Modals
   const [activeRecipe, setActiveRecipe] = useState<Recipe | null>(null);
   const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
+  const [recipeToEditIngredients, setRecipeToEditIngredients] = useState<Ingredient[]>([]);
   const [isCreatingRecipe, setIsCreatingRecipe] = useState<boolean>(false);
   const [showShoppingList, setShowShoppingList] = useState<boolean>(false);
   const [showChefAI, setShowChefAI] = useState<boolean>(false);
@@ -648,6 +649,9 @@ export default function Home() {
     setRecipes(updated);
     setSelectedRecipeIds((prev) => prev.filter((id) => id !== recipeId));
     setActiveRecipe(null);
+    setActiveIngredients([]);
+    setActiveComments([]);
+    setCurrentUserRating(0);
   };
 
   // Save generated recipe from Chef AI Assistant
@@ -981,22 +985,19 @@ export default function Home() {
             setActiveComments([]);
             setCurrentUserRating(0);
           }}
-          onEdit={(r) => {
+          onEdit={(r, ings) => {
             setActiveRecipe(null);
             setActiveIngredients([]);
             setActiveComments([]);
             setCurrentUserRating(0);
             setRecipeToEdit(r);
+            setRecipeToEditIngredients(ings || []);
           }}
           onDelete={handleDeleteRecipe}
           onAddComment={handleAddComment}
           onUpdateComment={handleUpdateComment}
           onDeleteComment={handleDeleteComment}
           onOpenAuth={() => setShowAuthModal(true)}
-          onRecipeUpdated={(updated) => {
-            setRecipes((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-            setActiveRecipe(updated);
-          }}
         />
       )}
 
@@ -1004,15 +1005,18 @@ export default function Home() {
       {(isCreatingRecipe || recipeToEdit) && (
         <RecipeFormModal
           recipeToEdit={recipeToEdit}
+          initialIngredients={recipeToEditIngredients}
           lang={lang}
           user={user}
           onClose={() => {
             setIsCreatingRecipe(false);
             setRecipeToEdit(null);
+            setRecipeToEditIngredients([]);
           }}
           onSuccess={() => {
             setIsCreatingRecipe(false);
             setRecipeToEdit(null);
+            setRecipeToEditIngredients([]);
             fetchRecipes();
           }}
         />
