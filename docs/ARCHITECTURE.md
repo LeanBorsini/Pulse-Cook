@@ -143,3 +143,68 @@ Diseñado con ergonomía para cocinar con el móvil o tablet cerca del fuego:
 - Tipografía ampliada de alto contraste.
 - **Detector automático de tiempos**: Expresiones regulares analizan el texto del paso (ej. `\b(\d+)\s*(?:minutos|min|minutes)\b`) y renderizan un botón de temporizador de un toque.
 - Al activarse, un temporizador con cuenta regresiva en segundos emite una alerta sonora (`Web Audio API` con oscilador sintetizado sin dependencias de archivos de audio externos) para avisar al cocinero cuando la cocción ha concluido.
+
+---
+
+## 8. Modelo de Permisos y Autoría de Recetas (`RecipeDetailModal.tsx`)
+
+Pulse&Cook garantiza que cada usuario pueda gestionar únicamente sus propias recetas, reservando los privilegios administrativos al autor y creador del recetario:
+
+1. **Autor Principal (`leanBorsini`)**:
+   - Reconocido globalmente a través de su correo (`leoborsini12@gmail.com`), nombre de usuario (`leanBorsini`) o UUID administrativo (`1afb8de4-9294-4f57-af9f-dc50b3e6e768`).
+   - Posee autorización para editar o eliminar las recetas base creadas para la plataforma.
+
+2. **Usuarios Autenticados**:
+   - Sus recetas quedan vinculadas a su `user.id` de Supabase Auth.
+   - Pueden editar y eliminar todas las recetas cuyo `user_id` coincida con su sesión activa.
+
+3. **Usuarios Invitados / Offline**:
+   - Las recetas creadas localmente reciben identificadores con prefijo `user_` o `local_` y quedan almacenadas en el `localStorage` del dispositivo.
+   - Tienen permiso completo para editarlas o eliminarlas localmente en cualquier momento.
+
+---
+
+## 9. Flujo de Edición Integral e Hidratación de Datos
+
+A diferencia de editores parciales que solo modificaban texto de instrucciones, Pulse&Cook implementa un flujo de edición completa en dos capas:
+
+```
+[ RecipeDetailModal ] 
+        │
+        ├── Al pulsar "Editar Receta"
+        │     ▼
+[ RecipeFormModal (initialIngredients) ]
+        │
+        ├── 1. Intenta cargar ingredientes de cache local (recipeStore.ts)
+        ├── 2. Si no están en cache, consulta Supabase (table: ingredients)
+        ├── 3. Precarga: Títulos, Descripciones, Ingredientes, Categoría,
+        │       Tiempos, Porciones, Dietas, Fotos, Videos e Instrucciones
+        │
+        ├── Al guardar:
+        │     ├── Guarda en localStorage v3 (recipeStore.ts)
+        │     ├── Traduce automáticamente campos bilingües faltantes
+        │     └── Sincroniza en Supabase (recipes + ingredients)
+        ▼
+[ Refresco Optimista en app/page.tsx ]
+```
+
+---
+
+## 10. Mapa de Componentes y Responsabilidades
+
+| Componente / Archivo | Ubicación | Responsabilidad Principal |
+| :--- | :--- | :--- |
+| `app/page.tsx` | Página raíz | Orquestador de estado (recetas, usuario, filtros, modales activos, menú semanal). |
+| `app/components/RecipeCard.tsx` | Tarjeta | Representación visual en la cuadrícula, cálculo de tiempo, calificación y etiquetas. |
+| `app/components/RecipeDetailModal.tsx` | Modal | Vista detallada: fotos, videos, ingredientes escalables, panel de autor, comentarios. |
+| `app/components/RecipeFormModal.tsx` | Modal | Creador y editor integral de recetas con auto-traducción e hidratación de ingredientes. |
+| `app/components/CookingModeModal.tsx` | Modal | Modo cocina a pantalla completa, síntesis de voz, reconocimiento de comandos y temporizador. |
+| `app/components/ShoppingListModal.tsx` | Modal | Lista de compras consolidada por pasillos con exportación a WhatsApp y modo checklist. |
+| `app/components/ChefAssistantModal.tsx` | Modal | Asistente IA "Chef Remy" para recetas por ingredientes en la nevera o sustituciones. |
+| `app/components/SearchBar.tsx` | Barra de búsqueda | Búsqueda por texto y menú desplegable tipo combobox para categorías y dietas. |
+| `app/components/RecipePrintView.tsx` | Impresión | Ficha técnica optimizada para impresión física o guardado en PDF de alta calidad. |
+| `lib/recipeStore.ts` | Almacenamiento | Persistencia local offline-first (`localStorage` v3) de recetas e ingredientes. |
+| `lib/recipeTranslator.ts` | Traducción | Motor de detección lingüística, saneamiento léxico anti-Spanglish y traducción. |
+| `lib/groceryConsolidator.ts` | Consolidación | Fusión matemática de cantidades, normalización de unidades y clasificación en pasillos. |
+| `lib/supabase.ts` | Base de datos | Cliente Supabase tipado y detección de estado de configuración remota. |
+

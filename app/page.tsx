@@ -77,6 +77,20 @@ interface SupabaseRecipeRow {
   created_at?: string;
 }
 
+/**
+ * Componente Principal de Pulse&Cook (Home / app/page.tsx)
+ *
+ * Responsabilidades Arquitectónicas:
+ * 1. Orquestación del estado global (sesión de usuario, idioma ES/EN, catálogo de recetas, filtros activos).
+ * 2. Carga reactiva de recetas e ingredientes híbrida (Supabase DB + LocalStorage v3 offline-first).
+ * 3. Gestión de modales de la aplicación:
+ *    - Detalle de receta (`RecipeDetailModal`) con panel de autor y confirmación de borrado.
+ *    - Creación / Edición integral (`RecipeFormModal`) con hidratación de ingredientes.
+ *    - Asistente culinario IA Remy (`ChefAssistantModal`).
+ *    - Planificador de menú semanal y compras (`ShoppingListModal`).
+ *    - Autenticación segura (`AuthModal`) y Guía de usuario (`WelcomeLandingModal`).
+ * 4. Suscripción y ciclo de vida de Supabase Auth sin bucles reactivos.
+ */
 export default function Home() {
   const [lang, setLang] = useState<'ES' | 'EN'>(() => {
     if (typeof window !== 'undefined') {

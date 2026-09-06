@@ -400,6 +400,25 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
+### ✅ Fase 16: Panel de Gestión Integral de Autor (Edición Completa & Eliminación Segura) (COMPLETADA)
+- [x] **Resolución de Autoría Global para el Autor Principal (`leanBorsini`)**:
+  - Corrección del bug donde solo una receta mostraba controles de edición.
+  - Se flexibilizó y robusteció el cálculo `isOwner` en `RecipeDetailModal.tsx`, reconociendo explícitamente el perfil y correo del autor principal (`leoborsini12@gmail.com`, `leanBorsini`, o UUID `1afb8de4-9294-4f57-af9f-dc50b3e6e768`), así como el match por ID de sesión y recetas locales.
+- [x] **Transición a Edición Completa e Integral (No solo instrucciones)**:
+  - Eliminación de la edición inline restrictiva de solo instrucciones.
+  - Implementación del botón *"Editar Receta"* que abre el modal integral `RecipeFormModal.tsx` con todos los atributos precargados: títulos, descripciones bilingües, ingredientes, tiempos, porciones, categorías, etiquetas dietéticas, fotos y videos.
+- [x] **Hidratación y Carga Remota de Ingredientes en Edición**:
+  - Se añadió la prop `initialIngredients` al `RecipeFormModal`.
+  - Se implementó un `useEffect` con guardas de ciclo de vida (`isMounted`) que consulta automáticamente a Supabase si la receta a editar carecía de ingredientes en el almacenamiento local, garantizando que nunca se pierdan al guardar.
+- [x] **Panel de Gestión de Autor con Confirmación Interactiva de Borrado**:
+  - Inclusión de un bloque visual destacado en la cabecera de `RecipeDetailModal.tsx` (`🟢 Tu Receta (Autor)`).
+  - Botón de borrado con confirmación en 2 pasos (`¿Eliminar receta? [Sí, eliminar] [Cancelar]`) que previene eliminaciones accidentales.
+  - Limpieza coordinada: borrado en Supabase (`recipes` y en cascada `ingredients`), remoción de `localStorage` v3 y purga inmediata del estado activo en `app/page.tsx` (`activeRecipe`, `activeIngredients`, `activeComments`, `currentUserRating`).
+- [x] **Saneamiento de Claves Foráneas en Migraciones de Supabase**:
+  - Documentación y solución al error `23503 foreign key constraint recipes_user_id_fkey` mediante la creación previa e idempotente de registros en `public.profiles`.
+
+---
+
 ## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.

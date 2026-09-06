@@ -67,6 +67,18 @@ const COMMON_TAGS = [
   'Saludable',
 ];
 
+/**
+ * Modal de Creación y Edición Integral de Recetas (RecipeFormModal)
+ *
+ * Responsabilidades:
+ * 1. Formulario unificado para altas y modificaciones de recetas existentes.
+ * 2. Hidratación bidireccional de ingredientes (prop `initialIngredients` -> caché `recipeStore` -> consulta remota Supabase).
+ * 3. Auto-traducción e inferencia bilingüe instantánea (ES <-> EN) al guardar.
+ * 4. Normalización estricta de categorías con catálogo predefinido (`categories.ts`).
+ * 5. Carga de fotografías (compresión vía Canvas antes de persistir o subir a Supabase Storage).
+ * 6. Soporte multienlace de videos de YouTube y etiquetas dietéticas interactivas.
+ * 7. Respaldo local offline-first inmediato antes de enviar a Supabase.
+ */
 export function RecipeFormModal({
   recipeToEdit,
   initialIngredients,

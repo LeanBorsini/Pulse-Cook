@@ -84,6 +84,21 @@ interface RecipeDetailModalProps {
   onToggleMenu?: (id: string) => void;
 }
 
+/**
+ * Modal de Visualización Detallada de Receta (RecipeDetailModal)
+ *
+ * Responsabilidades:
+ * 1. Presentación gourmet y de alta fidelidad de la receta (título, descripción, autor, tiempos, porciones).
+ * 2. Carrusel fotográfico con soporte multienlace y reproductor incrustado de videos de YouTube.
+ * 3. Escalado dinámico de porciones con recálculo proporcional de cantidades de ingredientes.
+ * 4. Panel de Gestión del Autor (`isOwner`):
+ *    - Identificación del autor principal (`leanBorsini` / `leoborsini12@gmail.com`) y creadores autenticados.
+ *    - Acceso directo al editor integral (`RecipeFormModal`).
+ *    - Eliminación segura con confirmación interactiva en dos pasos.
+ * 5. Conmutador de traducción bilingüe para instrucciones (ES <-> EN).
+ * 6. Integración con el Modo Cocina Guiado por voz y temporizadores sonoros.
+ * 7. Sistema de valoraciones por estrellas (1 a 5) y muro de comentarios con edición/borrado por autor.
+ */
 export function RecipeDetailModal({
   recipe,
   ingredients,
