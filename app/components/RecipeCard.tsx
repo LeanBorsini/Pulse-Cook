@@ -3,7 +3,7 @@
 import { Clock, Users, BookmarkCheck, Plus, Star, Images } from 'lucide-react';
 import { Recipe } from '../types';
 import { User } from '@supabase/supabase-js';
-import { cleanToPureSpanish, cleanToPureEnglish } from '../../lib/recipeTranslator';
+import { translateRecipeField } from '../../lib/recipeTranslator';
 import { getCategoryLabel } from '@/lib/categories';
 
 interface RecipeCardProps {
@@ -23,12 +23,8 @@ export function RecipeCard({
   onOpenDetails,
   onToggleMenu,
 }: RecipeCardProps) {
-  const rawTitle = lang === 'ES' ? (recipe.title_es || recipe.title_en || '') : (recipe.title_en || recipe.title_es || '');
-  const title = lang === 'ES' ? cleanToPureSpanish(rawTitle) : cleanToPureEnglish(rawTitle);
-
-  const rawDescription =
-    lang === 'ES' ? (recipe.description_es || recipe.description_en || '') : (recipe.description_en || recipe.description_es || '');
-  const description = lang === 'ES' ? cleanToPureSpanish(rawDescription) : cleanToPureEnglish(rawDescription);
+  const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
+  const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
   const authorName = recipe.profiles?.username || 'leanBorsini';
 
   const handleMenuClick = (e: React.MouseEvent) => {

@@ -599,6 +599,43 @@ export default function Home() {
     }
   };
 
+  // Update Comment (Only owner can edit)
+  const handleUpdateComment = async (commentId: string, newMessage: string) => {
+    const trimmed = newMessage.trim();
+    if (!trimmed) return;
+
+    setActiveComments((prev) =>
+      prev.map((c) => (c.id === commentId ? { ...c, message: trimmed } : c))
+    );
+
+    try {
+      if (!commentId.startsWith('temp-')) {
+        await supabase
+          .from('comments')
+          .update({ message: trimmed })
+          .eq('id', commentId);
+      }
+    } catch (err) {
+      console.warn('Error updating comment in Supabase:', err);
+    }
+  };
+
+  // Delete Comment (Only owner can delete)
+  const handleDeleteComment = async (commentId: string) => {
+    setActiveComments((prev) => prev.filter((c) => c.id !== commentId));
+
+    try {
+      if (!commentId.startsWith('temp-')) {
+        await supabase
+          .from('comments')
+          .delete()
+          .eq('id', commentId);
+      }
+    } catch (err) {
+      console.warn('Error deleting comment in Supabase:', err);
+    }
+  };
+
   // Delete Recipe
   const handleDeleteRecipe = async (recipeId: string) => {
     try {
@@ -924,6 +961,7 @@ export default function Home() {
           setNewMessage={setNewCommentMessage}
           lang={lang}
           user={user}
+          profileUsername={profileUsername}
           userRating={currentUserRating}
           isInMenu={activeRecipe ? selectedRecipeIds.includes(activeRecipe.id) : false}
           onToggleMenu={handleToggleMenu}
@@ -943,6 +981,8 @@ export default function Home() {
           }}
           onDelete={handleDeleteRecipe}
           onAddComment={handleAddComment}
+          onUpdateComment={handleUpdateComment}
+          onDeleteComment={handleDeleteComment}
           onOpenAuth={() => setShowAuthModal(true)}
           onRecipeUpdated={(updated) => {
             setRecipes((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));

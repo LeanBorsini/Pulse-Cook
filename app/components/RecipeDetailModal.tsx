@@ -46,10 +46,14 @@ import {
   translateCommentSmart,
   getCachedTranslation,
   setCachedTranslation,
+  invalidateCachedTranslation,
   fetchBackgroundTranslations,
   hasGenuineSpanishInstructions,
   hasGenuineEnglishInstructions,
+  hasGenuineSpanishDescription,
+  hasGenuineEnglishDescription,
   isSpanishText,
+  isEnglishText,
 } from '../../lib/recipeTranslator';
 import {
   getLocalUserRating,
@@ -68,12 +72,15 @@ interface RecipeDetailModalProps {
   setNewMessage?: (val: string) => void;
   lang: 'ES' | 'EN';
   user: User | null;
+  profileUsername?: string | null;
   userRating?: number;
   onRate?: (stars: number) => void;
   onClose: () => void;
   onEdit: (recipe: Recipe) => void;
   onDelete: (id: string) => void;
   onAddComment?: (e: React.FormEvent) => void;
+  onUpdateComment?: (commentId: string, newMessage: string) => Promise<void> | void;
+  onDeleteComment?: (commentId: string) => Promise<void> | void;
   onOpenAuth: () => void;
   isInMenu?: boolean;
   onToggleMenu?: (id: string) => void;
@@ -90,12 +97,15 @@ export function RecipeDetailModal({
   setNewMessage,
   lang,
   user,
+  profileUsername,
   userRating = 0,
   onRate,
   onClose,
   onEdit,
   onDelete,
   onAddComment,
+  onUpdateComment,
+  onDeleteComment,
   onOpenAuth,
   isInMenu = false,
   onToggleMenu,
@@ -171,6 +181,59 @@ export function RecipeDetailModal({
   const [isEditingInstructions, setIsEditingInstructions] = useState(false);
   const [instructionEditText, setInstructionEditText] = useState('');
 
+  // Estados para edición y borrado de comentarios por su autor
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [isSavingComment, setIsSavingComment] = useState(false);
+
+  // Verificación si el usuario activo es el autor del comentario
+  const checkIsCommentOwner = (c: Comment) => {
+    if (!user) return false;
+    if (c.user_id && c.user_id === user.id) return true;
+    const authorLower = (c.user_name || '').toLowerCase().trim();
+    const userEmailPrefix = (user.email?.split('@')[0] || '').toLowerCase().trim();
+    const currentUsername = (profileUsername || '').toLowerCase().trim();
+    const metaUsername = ((user.user_metadata as { username?: string })?.username || '').toLowerCase().trim();
+    if (authorLower && (authorLower === userEmailPrefix || authorLower === currentUsername || authorLower === metaUsername)) {
+      return true;
+    }
+    return false;
+  };
+
+  const handleSaveCommentEdit = async (commentId: string) => {
+    const trimmed = editingCommentText.trim();
+    if (!trimmed || !onUpdateComment) return;
+    setIsSavingComment(true);
+    try {
+      await onUpdateComment(commentId, trimmed);
+      invalidateCachedTranslation(`comment_${commentId}`);
+      setAsyncTranslations((prev) => {
+        const next = { ...prev };
+        delete next[`comment_${commentId}_ES`];
+        delete next[`comment_${commentId}_EN`];
+        return next;
+      });
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    } finally {
+      setIsSavingComment(false);
+    }
+  };
+
+  const handleConfirmDeleteComment = async (commentId: string) => {
+    if (!onDeleteComment) return;
+    await onDeleteComment(commentId);
+    invalidateCachedTranslation(`comment_${commentId}`);
+    setAsyncTranslations((prev) => {
+      const next = { ...prev };
+      delete next[`comment_${commentId}_ES`];
+      delete next[`comment_${commentId}_EN`];
+      return next;
+    });
+    setDeletingCommentId(null);
+  };
+
   const isEs = lang === 'ES';
 
   // Almacén reactivo de traducciones asíncronas para refresco instantáneo sin bloqueo
@@ -214,9 +277,23 @@ export function RecipeDetailModal({
     let isCancelled = false;
 
     const runBackgroundTranslation = async () => {
-      const instNeedsTranslation = isEs
+      const instKey = `inst_${recipe.id}_${lang}`;
+      const instCached = getCachedTranslation(instKey);
+      const instNeedsTranslation = !instCached && (isEs
         ? (!recipe.instructions_es || !hasGenuineSpanishInstructions(recipe.instructions_es, recipe.instructions_en))
-        : (!recipe.instructions_en || !hasGenuineEnglishInstructions(recipe.instructions_en, recipe.instructions_es));
+        : (!recipe.instructions_en || !hasGenuineEnglishInstructions(recipe.instructions_en, recipe.instructions_es)));
+
+      const descKey = `desc_${recipe.id}_${lang}`;
+      const descCached = getCachedTranslation(descKey);
+      const descNeedsTranslation = !descCached && (isEs
+        ? (!recipe.description_es || !hasGenuineSpanishDescription(recipe.description_es, recipe.description_en))
+        : (!recipe.description_en || !hasGenuineEnglishDescription(recipe.description_en, recipe.description_es)));
+
+      const titleKey = `title_${recipe.id}_${lang}`;
+      const titleCached = getCachedTranslation(titleKey);
+      const titleNeedsTranslation = !titleCached && (isEs
+        ? (!recipe.title_es || isEnglishText(recipe.title_es))
+        : (!recipe.title_en || isSpanishText(recipe.title_en)));
 
       const commentsToTranslate = comments.filter((c) => {
         const cacheKey = `comment_${c.id}_${lang}`;
@@ -225,11 +302,7 @@ export function RecipeDetailModal({
         return isEs ? !msgIsSpanish : msgIsSpanish;
       });
 
-      const instKey = `inst_${recipe.id}_${lang}`;
-      const instCached = getCachedTranslation(instKey);
-
-      if (!instNeedsTranslation && commentsToTranslate.length === 0) return;
-      if (instCached && commentsToTranslate.length === 0) return;
+      if (!instNeedsTranslation && !descNeedsTranslation && !titleNeedsTranslation && commentsToTranslate.length === 0) return;
 
       const sourceInst = isEs
         ? (recipe.instructions_en || recipe.instructions_es || '')
@@ -887,22 +960,126 @@ export function RecipeDetailModal({
               </p>
             ) : (
               <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                {displayedComments.map((c) => (
-                  <div key={c.id} className="bg-[#EFECE1]/60 p-3 rounded-xl border border-[#D8D3C4] text-xs">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-[#2C3523] flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-[#2C3523] text-white flex items-center justify-center text-[10px]">
-                          {c.user_name ? c.user_name.charAt(0).toUpperCase() : 'C'}
+                {displayedComments.map((c) => {
+                  const isOwner = checkIsCommentOwner(c);
+                  const isEditing = editingCommentId === c.id;
+                  const isDeleting = deletingCommentId === c.id;
+
+                  return (
+                    <div key={c.id} className="bg-[#EFECE1]/60 p-3 rounded-xl border border-[#D8D3C4] text-xs transition-all">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-[#2C3523] flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-[#2C3523] text-white flex items-center justify-center text-[10px]">
+                            {c.user_name ? c.user_name.charAt(0).toUpperCase() : 'C'}
+                          </span>
+                          @{c.user_name || 'chef'}
+                          {isOwner && (
+                            <span className="text-[9px] px-1.5 py-0.2 bg-[#2C3523]/10 text-[#2C3523] rounded font-medium">
+                              {isEs ? 'Tú' : 'You'}
+                            </span>
+                          )}
                         </span>
-                        @{c.user_name || 'chef'}
-                      </span>
-                      <span className="text-[10px] text-stone-400">
-                        {c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}
-                      </span>
+
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-stone-400">
+                            {c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}
+                          </span>
+
+                          {/* Acciones para el dueño del comentario: Editar y Borrar */}
+                          {isOwner && !isEditing && !isDeleting && (
+                            <div className="flex items-center gap-0.5 ml-1 border-l border-[#D8D3C4] pl-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCommentId(c.id);
+                                  setEditingCommentText(c.message);
+                                  setDeletingCommentId(null);
+                                }}
+                                title={isEs ? 'Editar comentario' : 'Edit comment'}
+                                className="p-1 rounded-md text-stone-500 hover:text-[#2C3523] hover:bg-[#EAE5D6] transition-colors cursor-pointer"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeletingCommentId(c.id);
+                                  setEditingCommentId(null);
+                                }}
+                                title={isEs ? 'Borrar comentario' : 'Delete comment'}
+                                className="p-1 rounded-md text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Modo edición */}
+                      {isEditing ? (
+                        <div className="pl-6.5 mt-2 space-y-2">
+                          <textarea
+                            value={editingCommentText}
+                            onChange={(e) => setEditingCommentText(e.target.value)}
+                            rows={2}
+                            className="w-full text-xs text-[#2C3523] bg-white p-2 rounded-lg border border-[#D8D3C4] focus:outline-none focus:ring-1 focus:ring-[#2C3523] resize-none"
+                            placeholder={isEs ? 'Edita tu comentario...' : 'Edit your comment...'}
+                            autoFocus
+                          />
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCommentId(null);
+                                setEditingCommentText('');
+                              }}
+                              className="px-2.5 py-1 text-[11px] rounded-lg border border-[#D8D3C4] bg-[#F7F5EC] text-stone-600 hover:bg-[#EAE5D6] font-medium transition-colors cursor-pointer"
+                            >
+                              {isEs ? 'Cancelar' : 'Cancel'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSavingComment || !editingCommentText.trim()}
+                              onClick={() => handleSaveCommentEdit(c.id)}
+                              className="px-3 py-1 text-[11px] rounded-lg bg-[#2C3523] text-white hover:bg-[#3D4932] font-semibold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {isSavingComment ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              )}
+                              <span>{isEs ? 'Guardar' : 'Save'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : isDeleting ? (
+                        /* Confirmación de borrado */
+                        <div className="pl-6.5 mt-2 p-2 bg-red-50/90 border border-red-200 rounded-lg flex items-center justify-between gap-2 text-[11px] text-red-800">
+                          <span>{isEs ? '¿Borrar tu comentario?' : 'Delete your comment?'}</span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setDeletingCommentId(null)}
+                              className="px-2.5 py-0.5 rounded bg-white border border-red-200 text-stone-700 hover:bg-stone-50 text-[10px] font-medium cursor-pointer"
+                            >
+                              {isEs ? 'Cancelar' : 'Cancel'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmDeleteComment(c.id)}
+                              className="px-2.5 py-0.5 rounded bg-red-600 text-white hover:bg-red-700 text-[10px] font-semibold cursor-pointer"
+                            >
+                              {isEs ? 'Sí, borrar' : 'Yes, delete'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[#5C6650] leading-relaxed pl-6.5">{c.translatedMessage || c.message}</p>
+                      )}
                     </div>
-                    <p className="text-[#5C6650] leading-relaxed pl-6.5">{c.translatedMessage || c.message}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

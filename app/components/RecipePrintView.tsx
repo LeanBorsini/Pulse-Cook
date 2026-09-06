@@ -4,7 +4,7 @@ import React from 'react';
 import { Recipe, Ingredient } from '../types';
 import { RemyIcon } from './RemyIcon';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
-import { cleanToPureSpanish, cleanToPureEnglish } from '../../lib/recipeTranslator';
+import { translateRecipeField } from '../../lib/recipeTranslator';
 
 interface RecipePrintViewProps {
   recipe: Recipe;
@@ -22,9 +22,9 @@ export function RecipePrintView({
   currentImage,
 }: RecipePrintViewProps) {
   const isEs = lang === 'ES';
-  const title = isEs ? cleanToPureSpanish(recipe.title_es) : cleanToPureEnglish(recipe.title_en || recipe.title_es);
-  const description = isEs ? cleanToPureSpanish(recipe.description_es) : cleanToPureEnglish(recipe.description_en || recipe.description_es);
-  const instructions = isEs ? cleanToPureSpanish(recipe.instructions_es || recipe.instructions_en) : cleanToPureEnglish(recipe.instructions_en || recipe.instructions_es);
+  const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
+  const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
+  const instructions = translateRecipeField(recipe.instructions_es, recipe.instructions_en, lang);
   const authorName = recipe.profiles?.username || 'leanBorsini';
 
   // Escalar cantidades de ingredientes según porciones si difiere

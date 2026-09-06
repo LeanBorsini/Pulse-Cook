@@ -34,12 +34,35 @@ const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
   [/\blo\s+prepar[eé]\s+hoy\b/gi, 'I cooked it today'],
   [/\ba\s+mi\s+familia\s+le\s+encant[oó]\b/gi, 'my family loved it'],
 
-  // Títulos y conexiones
+  // Títulos, descripciones y conexiones
+  [/\bamazing\s+pasta\s+con\s+una\s+delicious\s+y\s+cremosa\s+salsa\s+de\s+pistachios?,\s*con\s+toques\s+y\s+aromas\s+dulces\s+naturales\s+sin\s+az[uú]car\b/gi, 'amazing pasta with a delicious and creamy pistachio sauce, with hints of natural sweetness and aromas without sugar'],
+  [/\bcon\s+una\s+(?:delicious|deliciosa)\s+y\s+(?:cremosa|creamy)\s+salsa\s+de\s+pistachios?\b/gi, 'with a delicious and creamy pistachio sauce'],
+  [/\bcon\s+una\s+(?:cremosa|creamy)\s+salsa\s+de\s+pistachios?\b/gi, 'with a creamy pistachio sauce'],
+  [/\bcon\s+toques\s+y\s+aromas\s+dulces\s+naturales\s+sin\s+az[uú]car\b/gi, 'with hints of natural sweetness and aromas without sugar'],
+  [/\bcon\s+toques\s+y\s+aromas\s+dulces\s+naturales\b/gi, 'with hints of natural sweetness and aromas'],
+  [/\btoques\s+y\s+aromas\b/gi, 'hints and aromas'],
+  [/\bdulces\s+naturales\b/gi, 'natural sweetness'],
+  [/\bsin\s+az[uú]car\b/gi, 'without sugar'],
+  [/\bsin\s+azucar\b/gi, 'without sugar'],
+  [/\bsalsa\s+de\s+pistachios?\b/gi, 'pistachio sauce'],
   [/\bcon\s+pistachos?\s+y\s+panceta\b/gi, 'with pistachio and bacon'],
   [/\bcon\s+pistachos?\b/gi, 'with pistachios'],
   [/\bcon\s+panceta\b/gi, 'with bacon'],
   [/\bpistachos?\b/gi, 'pistachios'],
   [/\bpanceta\b/gi, 'bacon'],
+  [/\bcon\s+una\b/gi, 'with a'],
+  [/\bcon\s+un\b/gi, 'with a'],
+  [/\bcon\b/gi, 'with'],
+  [/\bcremosa\b/gi, 'creamy'],
+  [/\bcremoso\b/gi, 'creamy'],
+  [/\bdeliciosa\b/gi, 'delicious'],
+  [/\bdelicioso\b/gi, 'delicious'],
+  [/\btoques?\b/gi, 'hints'],
+  [/\baromas?\b/gi, 'aromas'],
+  [/\bdulces?\b/gi, 'sweet'],
+  [/\bnaturales?\b/gi, 'natural'],
+  [/\bsin\b/gi, 'without'],
+  [/\baz[uú]car\b/gi, 'sugar'],
 
   // Reparaciones de Spanglish frecuente y frases compuestas
   [/\ben\s+una\s+baking\s+dish\b/gi, 'in a baking dish'],
@@ -189,7 +212,28 @@ const PHRASE_DICTIONARY_EN_TO_ES: [RegExp, string][] = [
   [/\bbutter\b/gi, 'manteca'],
   [/\bsauce\b/gi, 'salsa'],
   [/\bpasta\b/gi, 'pasta'],
+  [/\bamazing\s+pasta\s+with\s+a\s+delicious\s+and\s+creamy\s+pistachio\s+sauce,?\s*with\s+hints\s+of\s+natural\s+sweetness\s+and\s+aromas\s+without\s+sugar\b/gi, 'increíble pasta con una deliciosa y cremosa salsa de pistachos, con toques y aromas dulces naturales sin azúcar'],
+  [/\bwith\s+a\s+delicious\s+and\s+creamy\s+pistachio\s+sauce\b/gi, 'con una deliciosa y cremosa salsa de pistachos'],
+  [/\bwith\s+a\s+creamy\s+pistachio\s+sauce\b/gi, 'con una cremosa salsa de pistachos'],
+  [/\bwith\s+hints\s+of\s+natural\s+sweetness\s+and\s+aromas\s+without\s+sugar\b/gi, 'con toques y aromas dulces naturales sin azúcar'],
+  [/\bwith\s+hints\s+and\s+natural\s+sweet\s+aromas\s+without\s+sugar\b/gi, 'con toques y aromas dulces naturales sin azúcar'],
+  [/\bwithout\s+sugar\b/gi, 'sin azúcar'],
+  [/\bsugar-free\b/gi, 'sin azúcar'],
+  [/\bwithout\b/gi, 'sin'],
+  [/\bsugar\b/gi, 'azúcar'],
+  [/\bpistachio\s+sauce\b/gi, 'salsa de pistacho'],
+  [/\bcreamy\b/gi, 'cremosa'],
+  [/\bdelicious\b/gi, 'deliciosa'],
+  [/\bamazing\b/gi, 'increíble'],
+  [/\bhints\s+and\s+aromas\b/gi, 'toques y aromas'],
+  [/\bhints\b/gi, 'toques'],
+  [/\baromas\b/gi, 'aromas'],
+  [/\bnatural\s+sweetness\b/gi, 'dulzura natural'],
+  [/\bnatural\s+sweet\b/gi, 'dulces naturales'],
+  [/\bsweet\b/gi, 'dulce'],
+  [/\bnatural\b/gi, 'natural'],
   [/\bnoodles\b/gi, 'fideos'],
+  [/\bwith\s+a\b/gi, 'con una'],
   [/\bwith\b/gi, 'con'],
   [/\band\b/gi, 'y'],
   [/\bper\b/gi, 'por'],
@@ -282,6 +326,29 @@ export function cleanToPureSpanish(text: string | null | undefined): string {
   for (const [regex, replacement] of PHRASE_DICTIONARY_EN_TO_ES) {
     cleaned = cleaned.replace(regex, replacement);
   }
+  // Limpieza final de conectores, adjetivos o residuos en inglés
+  cleaned = cleaned
+    .replace(/\b(amazing)\b/gi, 'increíble')
+    .replace(/\b(delicious)\b/gi, 'deliciosa')
+    .replace(/\b(creamy)\b/gi, 'cremosa')
+    .replace(/\b(tasty)\b/gi, 'sabroso')
+    .replace(/\b(with\s+a)\b/gi, 'con una')
+    .replace(/\b(with\s+an)\b/gi, 'con un')
+    .replace(/\b(with)\b/gi, 'con')
+    .replace(/\b(without\s+sugar|sugar-free)\b/gi, 'sin azúcar')
+    .replace(/\b(without)\b/gi, 'sin')
+    .replace(/\b(sugar)\b/gi, 'azúcar')
+    .replace(/\b(pistachio\s+sauce)\b/gi, 'salsa de pistacho')
+    .replace(/\b(sauce)\b/gi, 'salsa')
+    .replace(/\b(pistachios?)\b/gi, 'pistachos')
+    .replace(/\b(hints\s+and\s+aromas)\b/gi, 'toques y aromas')
+    .replace(/\b(hints?)\b/gi, 'toques')
+    .replace(/\b(aromas?)\b/gi, 'aromas')
+    .replace(/\b(natural\s+sweetness|natural\s+sweet)\b/gi, 'dulzura natural')
+    .replace(/\b(sweet)\b/gi, 'dulce')
+    .replace(/\b(natural)\b/gi, 'natural')
+    .replace(/\band\b/gi, 'y');
+
   return cleaned;
 }
 
@@ -294,8 +361,26 @@ export function cleanToPureEnglish(text: string | null | undefined): string {
   for (const [regex, replacement] of PHRASE_DICTIONARY_ES_TO_EN) {
     cleaned = cleaned.replace(regex, replacement);
   }
-  // Limpieza final de conectores o artículos españoles residuales
+  // Limpieza final de conectores, adjetivos o artículos españoles residuales
   cleaned = cleaned
+    .replace(/\b(con\s+una)\b/gi, 'with a')
+    .replace(/\b(con\s+un)\b/gi, 'with a')
+    .replace(/\b(con)\b/gi, 'with')
+    .replace(/\b(sin\s+az[uú]car|sin\s+azucar)\b/gi, 'without sugar')
+    .replace(/\b(sin)\b/gi, 'without')
+    .replace(/\b(az[uú]car|azucar)\b/gi, 'sugar')
+    .replace(/\b(cremos[ao]s?)\b/gi, 'creamy')
+    .replace(/\b(delicios[ao]s?)\b/gi, 'delicious')
+    .replace(/\b(incre[íi]bles?)\b/gi, 'amazing')
+    .replace(/\b(toques?\s+y\s+aromas?)\b/gi, 'hints and aromas')
+    .replace(/\b(toques?)\b/gi, 'hints')
+    .replace(/\b(aromas?)\b/gi, 'aromas')
+    .replace(/\b(dulces?\s+naturales?)\b/gi, 'natural sweetness')
+    .replace(/\b(dulces?)\b/gi, 'sweet')
+    .replace(/\b(naturales?)\b/gi, 'natural')
+    .replace(/\b(salsa\s+de\s+pistachios?|salsa\s+de\s+pistachos?)\b/gi, 'pistachio sauce')
+    .replace(/\b(salsa)\b/gi, 'sauce')
+    .replace(/\b(pistachos)\b/gi, 'pistachios')
     .replace(/\b(en\s+un\s+procesador\s+de\s+alimentos)\b/gi, 'in a food processor')
     .replace(/\b(la|el|los|las)\s+(chicken breast|butternut squash|oat flour|onion|olive oil)/gi, 'the $2')
     .replace(/\buna\s+(baking dish)/gi, 'a $1')
@@ -304,7 +389,15 @@ export function cleanToPureEnglish(text: string | null | undefined): string {
     .replace(/\b(hasta\s+que\s+est[eé]\s+dorado)\b/gi, 'until golden brown')
     .replace(/\b(cebollas?)\b/gi, 'onion')
     .replace(/\b(sal)\b/gi, 'salt')
-    .replace(/\b(pimienta)\b/gi, 'pepper');
+    .replace(/\b(pimienta)\b/gi, 'pepper')
+    .replace(/\by\b/gi, 'and')
+    .replace(/\bde\b/gi, 'of')
+    .replace(/\bpara\b/gi, 'for')
+    .replace(/\ben\b/gi, 'in')
+    .replace(/\b(la|el)\b/gi, 'the')
+    .replace(/\b(los|las)\b/gi, 'the')
+    .replace(/\b(un|una)\b/gi, 'a')
+    .replace(/\b(unos|unas)\b/gi, 'some');
 
   return cleaned;
 }
@@ -465,6 +558,37 @@ export function isEnglishText(text?: string | null): boolean {
 }
 
 /**
+ * Determina si una descripción en inglés es genuina o si contiene palabras o conectores en español
+ */
+export function hasGenuineEnglishDescription(descEn?: string | null, descEs?: string | null): boolean {
+  if (!descEn || !descEn.trim()) return false;
+  const trimmed = descEn.trim();
+  if (descEs && trimmed.toLowerCase() === descEs.trim().toLowerCase()) {
+    return false;
+  }
+  if (/[áéíóúñ¿¡]/.test(trimmed)) return false;
+  // Conectores y palabras en español que indican que no es inglés puro
+  const spanishMarkers = /\b(con\s+una|con\s+un|con|una|un|unos|unas|el|la|los|las|del|de|y|para|por|en|sin\s+az[uú]car|sin|salsa|cremosa|cremoso|deliciosa|delicioso|toques|toque|aromas|aroma|dulces|dulce|naturales|az[uú]car|azucar|pistachos|receta|plato|sabroso|rico|rica)\b/i;
+  if (spanishMarkers.test(trimmed)) return false;
+  return true;
+}
+
+/**
+ * Determina si una descripción en español es genuina o si contiene palabras en inglés
+ */
+export function hasGenuineSpanishDescription(descEs?: string | null, descEn?: string | null): boolean {
+  if (!descEs || !descEs.trim()) return false;
+  const trimmed = descEs.trim();
+  if (descEn && trimmed.toLowerCase() === descEn.trim().toLowerCase()) {
+    return false;
+  }
+  // Conectores y palabras en inglés que indican que no es español puro
+  const englishMarkers = /\b(amazing|delicious|creamy|tasty|with\s+a|with\s+an|with|without\s+sugar|without|sugar|hints\s+and\s+aromas|hints?|aromas?|natural\s+sweetness|sweet|sweetness|sauce|pistachios?|recipe|dish|very|great)\b/i;
+  if (englishMarkers.test(trimmed)) return false;
+  return true;
+}
+
+/**
  * Resuelve el texto correspondiente para un campo bilingüe (título, descripción o instrucciones)
  * según el idioma seleccionado de forma 100% automática y limpia.
  * Si no existe una versión genuina en el idioma solicitado, aplica la traducción pura sin dejar Spanglish.
@@ -479,22 +603,22 @@ export function translateRecipeField(
 
   if (targetLang === 'ES') {
     // 1. Si existe versión en español y es español genuino
-    if (es && !hasSpanglishResidue(es) && !isEnglishCulinaryText(es)) {
+    if (es && hasGenuineSpanishDescription(es, en) && !hasSpanglishResidue(es) && !isEnglishCulinaryText(es)) {
       return cleanToPureSpanish(es);
     }
     // 2. Si solo tenemos inglés o un texto con residuos, traducimos a español puro
-    const candidate = en || es;
+    const candidate = es || en;
     if (!candidate) return '';
     return cleanToPureSpanish(translateTextSmart(candidate, 'EN', 'ES'));
   }
 
   // targetLang === 'EN'
   // 1. Si existe versión en inglés genuina
-  if (en && !hasSpanglishResidue(en) && !isSpanishCulinaryText(en)) {
+  if (en && hasGenuineEnglishDescription(en, es) && !hasSpanglishResidue(en) && !isSpanishCulinaryText(en)) {
     return cleanToPureEnglish(en);
   }
   // 2. Si solo tenemos español o un texto con residuos, traducimos a inglés puro
-  const candidate = es || en;
+  const candidate = en || es;
   if (!candidate) return '';
   return cleanToPureEnglish(translateTextSmart(candidate, 'ES', 'EN'));
 }
@@ -531,6 +655,14 @@ export function getCachedTranslation(key: string): string | undefined {
 
 export function setCachedTranslation(key: string, value: string): void {
   translationMemoryCache.set(key, value);
+}
+
+export function invalidateCachedTranslation(keyOrPrefix: string): void {
+  for (const key of Array.from(translationMemoryCache.keys())) {
+    if (key === keyOrPrefix || key.startsWith(keyOrPrefix)) {
+      translationMemoryCache.delete(key);
+    }
+  }
 }
 
 /**

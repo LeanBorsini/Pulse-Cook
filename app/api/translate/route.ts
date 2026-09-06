@@ -93,9 +93,10 @@ export async function POST(req: NextRequest) {
       // Si no hay API key, intentamos el motor externo MyMemory
       const extInst = await translateWithExternalFallback(instructions, sourceLang, targetLang);
       const extTitle = await translateWithExternalFallback(title, sourceLang, targetLang);
+      const extDesc = await translateWithExternalFallback(description, sourceLang, targetLang);
       return NextResponse.json({
         translatedTitle: cleanPure(extTitle || fallbackTitle || title),
-        translatedDescription: cleanPure(fallbackDesc || description),
+        translatedDescription: cleanPure(extDesc || fallbackDesc || description),
         translatedInstructions: cleanPure(extInst || fallbackInst || instructions),
         translatedComments: fallbackComments,
         suggestedTags: isTargetEn ? ['Quick (<20m)', 'Healthy'] : ['Rápido (<20m)', 'Saludable'],
@@ -239,11 +240,12 @@ ${instructions}${commentsSection}`;
     console.error('Translation API error, utilizing culinary engine fallback:', error);
     const extInst = await translateWithExternalFallback(instructions, sourceLang, targetLang);
     const extTitle = await translateWithExternalFallback(title, sourceLang, targetLang);
+    const extDesc = await translateWithExternalFallback(description, sourceLang, targetLang);
     const cleanPure = (val: string) => (targetLang === 'EN' ? cleanToPureEnglish(val) : cleanToPureSpanish(val));
 
     return NextResponse.json({
       translatedTitle: cleanPure(extTitle || fallbackTitle || title),
-      translatedDescription: cleanPure(fallbackDesc || description),
+      translatedDescription: cleanPure(extDesc || fallbackDesc || description),
       translatedInstructions: cleanPure(extInst || fallbackInst || instructions),
       translatedComments: fallbackComments,
       suggestedTags: ['Saludable'],
