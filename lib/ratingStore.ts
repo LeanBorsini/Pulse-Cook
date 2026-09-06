@@ -169,7 +169,7 @@ export function getConsolidatedRating(
 }
 
 /**
- * Sincroniza la calificación del usuario en Supabase.
+ * Sincroniza la calificación del usuario en Supabase (priorizando la tabla limpia 'ratings').
  */
 export async function syncRatingToSupabase(
   recipeId: string,
@@ -177,6 +177,31 @@ export async function syncRatingToSupabase(
   authUserId?: string | null
 ): Promise<void> {
   const effectiveUserId = getPersistentClientId(authUserId);
+
+  // 1. Intentar registrar en la tabla oficial 'ratings'
+  try {
+    const { error: ratingError } = await supabase
+      .from('ratings')
+      .upsert(
+        {
+          recipe_id: recipeId,
+          user_id: authUserId || effectiveUserId,
+          stars: stars,
+          created_at: new Date().toISOString(),
+        },
+        { onConflict: 'recipe_id,user_id' }
+      );
+
+    if (!ratingError) {
+      // Guardado con éxito en la tabla 'ratings' oficial
+      return;
+    }
+  } catch (ratingsTableErr) {
+    // Si la tabla 'ratings' aún no se ha creado en Supabase, registrar advertencia
+    console.warn('Tabla ratings no disponible aún, usando compatibilidad:', ratingsTableErr);
+  }
+
+  // 2. Respaldo de compatibilidad temporal si la tabla 'ratings' no está creada
   const ratingTag = `__rating__:${effectiveUserId}`;
   const ratingMsg = `[RATING:${stars}]`;
 
@@ -212,12 +237,38 @@ export async function syncRatingToSupabase(
 
 /**
  * Obtiene todas las valoraciones registradas en Supabase por la comunidad.
+ * Prioriza la tabla dedicada 'ratings' y admite compatibilidad transitoria con registros antiguos.
  */
 export async function fetchCommunityRatings(): Promise<
   Map<string, { userId: string; stars: number }[]>
 > {
   const ratingsMap = new Map<string, { userId: string; stars: number }[]>();
 
+  // 1. Intentar leer desde la tabla oficial 'ratings'
+  try {
+    const { data: ratingsData, error: ratingsError } = await supabase
+      .from('ratings')
+      .select('recipe_id, user_id, stars');
+
+    if (!ratingsError && ratingsData && ratingsData.length > 0) {
+      ratingsData.forEach((row) => {
+        if (!row.recipe_id || !row.user_id || !row.stars) return;
+        const list = ratingsMap.get(row.recipe_id) || [];
+        const existingIdx = list.findIndex((x) => x.userId === row.user_id);
+        if (existingIdx >= 0) {
+          list[existingIdx].stars = row.stars;
+        } else {
+          list.push({ userId: row.user_id, stars: row.stars });
+        }
+        ratingsMap.set(row.recipe_id, list);
+      });
+      return ratingsMap;
+    }
+  } catch {
+    // Si la tabla ratings aún no existe, continúa al respaldo
+  }
+
+  // 2. Respaldo para instalaciones anteriores donde se usó 'comments'
   try {
     const { data, error } = await supabase
       .from('comments')

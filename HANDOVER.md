@@ -129,7 +129,26 @@ create policy "Users can update their own rating." on public.ratings for update 
 create policy "Users can delete their own rating." on public.ratings for delete using (auth.uid() = user_id);
 ```
 
-### 4. Tabla `comments`
+### 4. Tabla `ingredients`
+```sql
+create table if not exists public.ingredients (
+  id uuid default gen_random_uuid() primary key,
+  recipe_id uuid references public.recipes on delete cascade not null,
+  name_es text not null,
+  name_en text,
+  amount numeric not null default 1,
+  unit text default '',
+  aisle text default 'General'
+);
+
+alter table public.ingredients enable row level security;
+create policy "Ingredients are viewable by everyone." on public.ingredients for select using (true);
+create policy "Authenticated users can insert ingredients." on public.ingredients for insert with check (auth.role() = 'authenticated');
+create policy "Authenticated users can update ingredients." on public.ingredients for update using (auth.role() = 'authenticated');
+create policy "Authenticated users can delete ingredients." on public.ingredients for delete using (auth.role() = 'authenticated');
+```
+
+### 5. Tabla `comments`
 ```sql
 create table if not exists public.comments (
   id uuid default gen_random_uuid() primary key,
@@ -148,7 +167,7 @@ create policy "Users can delete their own comments." on public.comments for dele
 
 ---
 
-### 5. Supabase Storage: Bucket `recipe-images`
+### 6. Supabase Storage: Bucket `recipe-images`
 Para permitir la subida directa de fotos (máximo 3 imágenes por receta con compresión automática en cliente):
 
 1. Ve a **Storage** en tu panel de Supabase.
@@ -364,5 +383,37 @@ create policy "Users can update or delete their own recipe images."
     7. Fichas Imprimibles gourmet y exportación a PDF.
     8. Instalación como PWA móvil y compartir rápido por Código QR o WhatsApp.
   - Accesible en cualquier momento desde el botón *"Guía"* en la cabecera principal.
+
+---
+
+### ✅ Fase 15: Saneamiento Integral de Supabase & Alineación Bilingüe (COMPLETADA)
+- [x] **Diagnóstico y Auditoría de Datos en Supabase**:
+  - Identificación de recetas iniciales con `user_id = NULL` que impedían su edición/borrado al autor principal (`leanBorsini`).
+  - Detección de duplicidad de nombres en español dentro del campo `name_en` de la tabla `ingredients`.
+  - Detección de calificaciones antiguas camufladas en la tabla `comments` (`__rating__:<uuid>` y `[RATING:5]`).
+  - Detección de columnas faltantes en `recipes` (`instructions_en`, `images`, `video_links`).
+- [x] **Ajustes en Código de Aplicación**:
+  - `RecipeFormModal.tsx` & `page.tsx`: Garantía de traducción automática al inglés para cada ingrediente nuevo antes de persistir en Supabase.
+  - `lib/ratingStore.ts`: Conexión directa a la tabla oficial `public.ratings` con fallback retrocompatible y erradicación de inyecciones en `comments`.
+- [x] **Script de Migración y Limpieza**:
+  - Entrega del script SQL integral para actualizar recetas huérfanas al UUID `1afb8de4-9294-4f57-af9f-dc50b3e6e768`, crear la tabla `ratings`, limpiar `comments`, traducir ingredientes existentes y enriquecer descripciones bilingües.
+
+---
+
+## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
+
+> **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.
+
+### Procedimiento Operativo Estándar:
+1. **Detección de Impacto**: Al crear o modificar entidades (campos nuevos en `Recipe`, `Ingredient`, `Rating`, `Comment`, o nuevas tablas/relaciones), evaluar de inmediato si la tabla en Supabase ya cuenta con esas columnas o tipos.
+2. **Generación Inmediata de Script SQL**:
+   - Proveer sentencias `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`, índices, restricciones y políticas RLS pertinentes.
+   - Si se migran o sanean datos, incluir las consultas `UPDATE` o `INSERT INTO ... SELECT` correspondientes.
+3. **Instrucciones Claras para el Usuario**:
+   - Indicar siempre la ruta: **Supabase Dashboard > SQL Editor > Nuevo Query > Pegar y Ejecutar (Run)**.
+4. **Idempotencia y Seguridad**:
+   - Todos los scripts deben ser seguros de re-ejecutar (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING / UPDATE`).
+   - Respetar los datos existentes (imágenes en Supabase Storage, IDs de recetas y perfiles de usuario).
+
 
 

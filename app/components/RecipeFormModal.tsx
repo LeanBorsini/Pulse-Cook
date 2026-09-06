@@ -39,9 +39,8 @@ import { uploadRecipeImage } from '@/lib/storage';
 import { saveLocalRecipe, getLocalIngredients } from '@/lib/recipeStore';
 import {
   translateTextSmart,
-  cleanToPureSpanish,
-  cleanToPureEnglish,
 } from '@/lib/recipeTranslator';
+import { translateIngredientName } from '@/lib/culinaryDictionary';
 import { RECIPE_CATEGORIES, getCategoryKey, getCategoryLabel } from '@/lib/categories';
 
 interface RecipeFormModalProps {
@@ -400,17 +399,31 @@ export function RecipeFormModal({
       }
     }
 
-    // Filtrar ingredientes válidos (con nombre)
+    // Filtrar ingredientes válidos y garantizar nombres bilingües auténticos en la base de datos
     const validIngredients: Ingredient[] = ingredients
       .filter((ing) => (ing.name_es && ing.name_es.trim() !== '') || (ing.name_en && ing.name_en.trim() !== ''))
-      .map((ing) => ({
-        recipe_id: recipeToEdit?.id || '',
-        name_es: isEs ? (ing.name_es?.trim() || ing.name_en?.trim() || '') : cleanToPureSpanish(ing.name_es?.trim() || ing.name_en?.trim() || ''),
-        name_en: !isEs ? (ing.name_en?.trim() || ing.name_es?.trim() || '') : cleanToPureEnglish(ing.name_en?.trim() || ing.name_es?.trim() || ''),
-        amount: Number(ing.amount) || 1,
-        unit: ing.unit?.trim() || '',
-        aisle: ing.aisle || 'General',
-      }));
+      .map((ing) => {
+        const rawEs = (ing.name_es || '').trim();
+        const rawEn = (ing.name_en || '').trim();
+
+        let finalEs = rawEs;
+        let finalEn = rawEn;
+
+        if (finalEs && (!finalEn || finalEn.toLowerCase() === finalEs.toLowerCase())) {
+          finalEn = translateIngredientName(finalEs, undefined, 'EN') || finalEs;
+        } else if (finalEn && (!finalEs || finalEs.toLowerCase() === finalEn.toLowerCase())) {
+          finalEs = translateIngredientName('', finalEn, 'ES') || finalEn;
+        }
+
+        return {
+          recipe_id: recipeToEdit?.id || '',
+          name_es: finalEs || finalEn,
+          name_en: finalEn || finalEs,
+          amount: Number(ing.amount) || 1,
+          unit: ing.unit?.trim() || '',
+          aisle: ing.aisle || 'General',
+        };
+      });
 
     const recipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const standardizedCategory = getCategoryLabel(category, 'ES');

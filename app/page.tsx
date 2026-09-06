@@ -43,6 +43,7 @@ import { ShareAppModal } from './components/ShareAppModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 import { getCategoryKey, getCategoryLabel } from '@/lib/categories';
+import { translateIngredientName } from '@/lib/culinaryDictionary';
 
 interface SupabaseRatingRow {
   recipe_id?: string;
@@ -703,13 +704,21 @@ export default function Home() {
           .single();
 
         if (supaRec && newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
-          const ingPayload = newRecipe.generatedIngredients.map((ing) => ({
-            recipe_id: supaRec.id,
-            name_es: ing.name_es,
-            name_en: ing.name_en || ing.name_es,
-            amount: ing.amount || 1,
-            unit: ing.unit || '',
-          }));
+          const ingPayload = newRecipe.generatedIngredients.map((ing) => {
+            const rawEs = (ing.name_es || '').trim();
+            let rawEn = (ing.name_en || '').trim();
+            if (!rawEn || rawEn.toLowerCase() === rawEs.toLowerCase()) {
+              rawEn = translateIngredientName(rawEs, undefined, 'EN') || rawEs;
+            }
+            return {
+              recipe_id: supaRec.id,
+              name_es: rawEs,
+              name_en: rawEn,
+              amount: ing.amount || 1,
+              unit: ing.unit || '',
+              aisle: 'General',
+            };
+          });
           await supabase.from('ingredients').insert(ingPayload);
         }
       }
