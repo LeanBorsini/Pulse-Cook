@@ -419,6 +419,22 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
+### ✅ Fase 17: Corrección de Aislamiento de Autoría y Eliminación de Botones Duplicados (COMPLETADA)
+- [x] **Diagnóstico del problema de Atún vs. Tagliatelle para usuarios ajenos (`@daniCooker`)**:
+  - La receta de atún tenía `user_id = null` en Supabase, lo que activaba una cláusula permisiva `!recipe.user_id` en `isOwner` otorgando permisos de autor a cualquier usuario en sesión.
+  - La receta de tagliatelle sí tenía `user_id = '1afb8de4-9294-4f57-af9f-dc50b3e6e768'`, por lo que `@daniCooker` no tenía permisos en ella.
+- [x] **Aislamiento estricto de permisos en `RecipeDetailModal.tsx`**:
+  - Se eliminó la cláusula `!recipe.user_id`. Ahora las recetas remotas de Supabase solo pueden ser editadas por su autor legítimo (`recipe.user_id === user.id`) o por el administrador principal (`leanBorsini`).
+  - Las recetas locales en modo borrador solo son editables si su ID tiene prefijo `user_` o `local_`.
+- [x] **Asignación por defecto al Autor Principal en `app/page.tsx`**:
+  - Toda receta en Supabase con `user_id` nulo se atribuye automáticamente al UUID de `leanBorsini` (`1afb8de4-9294-4f57-af9f-dc50b3e6e768`).
+- [x] **Eliminación de botones duplicados/antiguos**:
+  - Se eliminaron los botones pequeños residuales de editar y eliminar ubicados junto al botón PDF.
+  - Se removió el botón redundante de edición ubicado en la cabecera de instrucciones.
+  - El único punto de control del autor es el **Panel de Gestión del Autor** superior con confirmación interactiva.
+
+---
+
 ## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.

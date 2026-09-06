@@ -287,12 +287,16 @@ export default function Home() {
             if (userRat) myRating = userRat.stars;
           }
 
-          // Resolver autor
-          const authorProfile = item.user_id ? profileMap.get(item.user_id) : null;
+          // Resolver autor (si la receta en Supabase carece de user_id, pertenece al autor principal)
+          const MAIN_ADMIN_UUID = '1afb8de4-9294-4f57-af9f-dc50b3e6e768';
+          const effectiveUserId = item.user_id || MAIN_ADMIN_UUID;
+          const authorProfile = profileMap.get(effectiveUserId) || (item.user_id ? profileMap.get(item.user_id) : null);
           const resolvedProfiles =
             authorProfile ||
             item.profiles ||
-            (item.author_name ? { id: item.user_id || 'author', username: item.author_name } : null);
+            (item.author_name
+              ? { id: effectiveUserId, username: item.author_name }
+              : { id: MAIN_ADMIN_UUID, username: 'leanBorsini' });
 
           // Normalizar imágenes
           let imagesList: string[] = [];
@@ -316,7 +320,7 @@ export default function Home() {
 
           return {
             id: String(item.id),
-            user_id: item.user_id,
+            user_id: effectiveUserId,
             profiles: resolvedProfiles,
             title_es: item.title_es || item.title_en || item.title || '',
             title_en: item.title_en || item.title_es || item.title || '',

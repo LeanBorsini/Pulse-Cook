@@ -424,8 +424,9 @@ export function RecipeDetailModal({
     if (user && recipe.user_id && recipe.user_id === user.id) return true;
     if (user && recipe.profiles?.id && recipe.profiles.id === user.id) return true;
 
-    // Receta local sin usuario remoto asignado o creada en el navegador
-    if (recipe.user_id === 'local_user' || !recipe.user_id || recipe.id.startsWith('user_')) {
+    // Receta local offline creada en este dispositivo que aún no se sincronizó a Supabase
+    const isLocalDraft = recipe.id.startsWith('user_') || recipe.id.startsWith('local_');
+    if (isLocalDraft && (!user || recipe.user_id === user?.id || recipe.user_id === 'local_user')) {
       return true;
     }
 
@@ -715,28 +716,6 @@ export function RecipeDetailModal({
               <Printer className="w-4 h-4 text-[#425035]" />
               <span>PDF</span>
             </button>
-
-            {/* Acciones de Edición/Eliminación */}
-            {isOwner && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                <button
-                  onClick={() => onEdit(recipe, ingredients)}
-                  title={lang === 'ES' ? 'Editar Receta Completa' : 'Edit Full Recipe'}
-                  className="p-2 px-2.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
-                >
-                  <Edit className="w-3.5 h-3.5 text-[#425035]" />
-                  <span className="hidden sm:inline">{lang === 'ES' ? 'Editar' : 'Edit'}</span>
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  title={lang === 'ES' ? 'Eliminar Receta' : 'Delete Recipe'}
-                  className="p-2 px-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Metadatos y Sistema de Valoración por Estrellas */}
@@ -909,19 +888,6 @@ export function RecipeDetailModal({
               <h3 className="font-serif font-bold text-[#2C3523] text-xs uppercase tracking-wider">
                 {isEs ? 'Instrucciones' : 'Instructions'}
               </h3>
-              
-              {/* Botón para editar receta completa desde la sección de instrucciones */}
-              {isOwner && (
-                <button
-                  type="button"
-                  onClick={() => onEdit(recipe, ingredients)}
-                  className="text-[11px] text-[#2C3523] hover:text-black font-semibold flex items-center gap-1 cursor-pointer bg-[#EFECE1] hover:bg-[#E2DEC2] border border-[#D8D3C4] px-2.5 py-1 rounded-lg transition-colors"
-                  title={isEs ? 'Editar toda la receta (ingredientes, descripción, porciones, instrucciones)' : 'Edit full recipe (ingredients, description, servings, instructions)'}
-                >
-                  <Edit className="w-3 h-3 text-[#425035]" />
-                  <span>{isEs ? 'Editar receta completa' : 'Edit full recipe'}</span>
-                </button>
-              )}
             </div>
 
             {displayedInstructions ? (
