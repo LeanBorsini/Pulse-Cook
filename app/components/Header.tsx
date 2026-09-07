@@ -1,9 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { LogOut, Plus, ShoppingCart, Globe, UserCheck, HelpCircle, QrCode } from 'lucide-react';
-import { RemyIcon } from './RemyIcon';
-import { PWAInstallButton } from './PWAInstallButton';
+import { Menu, ShoppingCart } from 'lucide-react';
+import { NavMenuDrawer } from './NavMenuDrawer';
 
 interface HeaderProps {
   lang: 'ES' | 'EN';
@@ -34,118 +34,89 @@ export function Header({
   onOpenWelcome,
   onOpenShareApp,
 }: HeaderProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const displayAlias = profileUsername || (user?.email ? user.email.split('@')[0] : 'chef');
+  const isEs = lang === 'ES';
 
   return (
-    <header className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 pb-6 border-b border-[#D8D3C4]/60">
-      <div className="w-full md:w-auto flex flex-col items-center justify-center text-center">
-        <h1
-          id="brand-heading"
-          className="text-4xl sm:text-5xl font-handwritten font-bold text-[#2C3523] tracking-tight text-center"
-        >
-          Pulse&Cook
-        </h1>
-        <h2
-          id="brand-subheading"
-          className="text-[#5C6650] text-xs sm:text-sm italic mt-0.5 text-center font-normal"
-        >
-          {lang === 'ES' ? 'Recetario familiar & Planificador inteligente' : 'Family Recipe Book & Smart Meal Planner'}
-        </h2>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-        {/* Botón Compartir App con QR & WhatsApp */}
-        {onOpenShareApp && (
-          <button
-            onClick={onOpenShareApp}
-            className="flex items-center gap-1.5 px-3 py-2 border border-[#D8D3C4] rounded-xl text-xs font-bold text-[#2C3523] bg-[#EFECE1] hover:bg-[#E2DEC2] transition-all cursor-pointer active:scale-95 shadow-2xs"
-            title={lang === 'ES' ? 'Compartir app con Código QR o WhatsApp' : 'Share app via QR Code or WhatsApp'}
-            id="header-share-app-btn"
+    <>
+      <header className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-[#D8D3C4]/60">
+        <div className="flex flex-col items-start justify-center text-left">
+          <h1
+            id="brand-heading"
+            className="text-3xl sm:text-4xl lg:text-5xl font-handwritten font-bold text-[#2C3523] tracking-tight leading-tight"
           >
-            <QrCode className="w-3.5 h-3.5 text-[#2C3523]" />
-            <span>{lang === 'ES' ? 'Compartir App' : 'Share App'}</span>
-          </button>
-        )}
-
-        {/* Botón Instalar PWA */}
-        <PWAInstallButton lang={lang} />
-
-        {/* Botón de Ayuda / Info de la App */}
-        {onOpenWelcome && (
-          <button
-            onClick={onOpenWelcome}
-            className="flex items-center gap-1 px-2.5 py-2 border border-[#D8D3C4] rounded-xl text-xs font-semibold text-[#5C6650] bg-[#EFECE1] hover:bg-[#E2DEC2] transition-colors"
-            title={lang === 'ES' ? '¿Cómo funciona Pulse & Cook?' : 'How Pulse & Cook works'}
+            Pulse&Cook
+          </h1>
+          <h2
+            id="brand-subheading"
+            className="text-[#5C6650] text-xs sm:text-sm italic mt-0.5 font-normal"
           >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{lang === 'ES' ? 'Guía' : 'Guide'}</span>
-          </button>
-        )}
+            {isEs
+              ? 'Recetario familiar & Planificador inteligente'
+              : 'Family Recipe Book & Smart Meal Planner'}
+          </h2>
+        </div>
 
-        {/* Selector de Idioma */}
-        <button
-          onClick={() => setLang(lang === 'ES' ? 'EN' : 'ES')}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#D8D3C4] rounded-xl text-xs font-bold text-[#2C3523] bg-[#EFECE1] hover:bg-[#E2DEC2] transition-colors"
-          title={lang === 'ES' ? 'Cambiar idioma' : 'Change language'}
-        >
-          <Globe className="w-3.5 h-3.5 text-[#5C6650]" />
-          <span>{lang === 'ES' ? 'ES' : 'EN'}</span>
-        </button>
-
-        {/* Botón Chef Remy IA */}
-        <button
-          onClick={onOpenChefAI}
-          className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-[#2C3523] to-[#425035] text-amber-200 border border-[#2C3523] rounded-xl text-xs font-bold hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all"
-          title={lang === 'ES' ? '¿Qué cocino hoy? Asistente Chef Remy' : 'What to cook? Chef Remy AI Assistant'}
-        >
-          <RemyIcon className="w-5 h-5 -mt-0.5" />
-          <span>Remy</span>
-        </button>
-
-        {/* Menú de Compras */}
-        {selectedCount > 0 && (
-          <button
-            onClick={onOpenShoppingList}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#2C3523]/10 text-[#2C3523] border border-[#2C3523]/30 rounded-xl text-xs font-bold hover:bg-[#2C3523]/20 transition-colors animate-pulse"
-          >
-            <ShoppingCart className="w-4 h-4" />
-            <span>{lang === 'ES' ? 'Menú' : 'Menu'} ({selectedCount})</span>
-          </button>
-        )}
-
-        {/* Botón Crear Receta */}
-        <button
-          onClick={onOpenNewRecipe}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#2C3523] text-[#F7F5EC] rounded-xl text-xs sm:text-sm font-semibold hover:bg-[#3D4932] transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{lang === 'ES' ? 'Añadir Receta' : 'Add Recipe'}</span>
-        </button>
-
-        {/* Estado de Autenticación */}
-        {user ? (
-          <div className="flex items-center gap-2 bg-[#EFECE1] px-3 py-1.5 rounded-xl border border-[#D8D3C4]">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#2C3523]">
-              <UserCheck className="w-3.5 h-3.5 text-[#5C6650]" />
-              <span>@{displayAlias}</span>
-            </div>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* Acceso rápido a Menú Semanal si hay recetas seleccionadas */}
+          {selectedCount > 0 && (
             <button
-              onClick={onSignOut}
-              className="p-1 text-[#5C6650] hover:text-red-700 hover:bg-red-100 rounded-md transition-colors ml-1"
-              title={lang === 'ES' ? 'Cerrar sesión' : 'Sign out'}
+              onClick={onOpenShoppingList}
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#2C3523] text-[#FAF8F2] hover:bg-[#3D4932] rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 animate-pulse"
+              title={isEs ? 'Ver Menú Semanal y Compras' : 'View Weekly Menu & Shopping'}
+              id="header-quick-menu-btn"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <ShoppingCart className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isEs ? 'Menú' : 'Menu'}</span>
+              <span className="bg-[#FAF8F2] text-[#2C3523] text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                {selectedCount}
+              </span>
             </button>
-          </div>
-        ) : (
+          )}
+
+          {/* Botón Principal de Menú Desplegable */}
           <button
-            onClick={onOpenAuth}
-            className="px-4 py-2 bg-[#EFECE1] text-[#2C3523] border border-[#D8D3C4] rounded-xl text-xs sm:text-sm font-semibold hover:bg-[#E2DEC2] transition-colors"
+            onClick={() => setIsMenuOpen(true)}
+            className="flex items-center gap-2 px-3 sm:px-3.5 py-2 bg-[#EFECE1] hover:bg-[#E2DEC2] border border-[#D8D3C4] rounded-2xl text-xs sm:text-sm font-semibold text-[#2C3523] transition-all cursor-pointer active:scale-95 shadow-2xs group"
+            aria-label={isEs ? 'Abrir menú principal' : 'Open main menu'}
+            aria-expanded={isMenuOpen}
+            id="header-menu-toggle-btn"
           >
-            {lang === 'ES' ? 'Ingresar' : 'Sign In'}
+            {user ? (
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-[#2C3523] text-white flex items-center justify-center text-[10px] font-bold">
+                  {displayAlias.charAt(0).toUpperCase()}
+                </div>
+                <span className="max-w-[100px] sm:max-w-[140px] truncate font-bold">
+                  @{displayAlias}
+                </span>
+              </div>
+            ) : null}
+            <Menu className="w-4 h-4 text-[#2C3523] group-hover:scale-110 transition-transform" />
+            {!user && <span className="font-bold">{isEs ? 'Menú' : 'Menu'}</span>}
           </button>
-        )}
-      </div>
-    </header>
+        </div>
+      </header>
+
+      {/* Menú Desplegable Lateral / Drawer */}
+      <NavMenuDrawer
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        lang={lang}
+        setLang={setLang}
+        user={user}
+        profileUsername={profileUsername}
+        onOpenAuth={onOpenAuth}
+        onSignOut={onSignOut}
+        onOpenNewRecipe={onOpenNewRecipe}
+        selectedCount={selectedCount}
+        onOpenShoppingList={onOpenShoppingList}
+        onOpenChefAI={onOpenChefAI}
+        onOpenWelcome={onOpenWelcome}
+        onOpenShareApp={onOpenShareApp}
+      />
+    </>
   );
 }
+

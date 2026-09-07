@@ -441,6 +441,13 @@ create policy "Users can update or delete their own recipe images."
   - **Optimización de Renderizado e Imágenes**: Inclusión de `loading="lazy"` y `decoding="async"` en componentes con fotos dinámicas y base64, configurando `remotePatterns` en `next.config.ts`.
   - **Resolución de Dependencias React Hook**: Ajuste estricto en el hook de carga de ingredientes en `RecipeFormModal.tsx`.
   - **Verificación 100% Limpia**: `lint_applet` pasó con 0 errores y 0 advertencias, y `compile_applet` compiló exitosamente para producción.
+- [x] **Reorganización de Cabecera y Menú Desplegable (`NavMenuDrawer.tsx`)**:
+  - **Experiencia Limpia de Llegada**: Se eliminó la acumulación de 6 botones en la cabecera móvil y desktop. Ahora la pantalla de inicio presenta únicamente el título, subtítulo, barra de búsqueda con filtros y las recetas de inmediato.
+  - **Panel Desplegable Organizado por Secciones**:
+    - *Cuenta & Sesión*: Estado del usuario `@leanBorsini`, correo y botón para salir (o iniciar sesión si es invitado).
+    - *Acciones Culinarias*: Acceso a `＋ Añadir Receta`, `👨‍🍳 Chef Remy (IA)` y `🛒 Menú Semanal & Compras` (con contador reactivo).
+    - *Configuración & Utilidades*: Selector directo bilingüe `[ ES | EN ]`, `📲 Compartir App`, instalación PWA y guía de uso.
+  - **Cierre Intuitivo y Accesibilidad**: Soporte para cierre por clic fuera (*backdrop blur*), botón dedicado `✕`, selección de cualquier acción o tecla `Escape`, bloqueando el scroll de fondo mientras permanece abierto.
 
 ---
 
