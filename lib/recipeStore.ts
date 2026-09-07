@@ -165,3 +165,20 @@ export function saveLocalIngredients(recipeId: string, ingredients: Ingredient[]
     console.warn('Error saving local ingredients:', err);
   }
 }
+
+/**
+ * Guarda múltiples recetas e ingredientes en un solo acceso a localStorage (alto rendimiento)
+ */
+export function batchSaveLocalIngredients(map: Record<string, Ingredient[]>) {
+  if (typeof window === 'undefined' || !map || Object.keys(map).length === 0) return;
+
+  try {
+    const allIngredientsMap: Record<string, Ingredient[]> = JSON.parse(
+      localStorage.getItem(INGREDIENTS_STORAGE_KEY) || '{}'
+    );
+    Object.assign(allIngredientsMap, map);
+    localStorage.setItem(INGREDIENTS_STORAGE_KEY, JSON.stringify(allIngredientsMap));
+  } catch (err) {
+    console.warn('Error batch saving local ingredients:', err);
+  }
+}

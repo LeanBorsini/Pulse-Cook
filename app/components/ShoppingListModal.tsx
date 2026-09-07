@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle, Trash2, Users, Minus, Plus } from 'lucide-react';
 import { Ingredient, Recipe } from '../types';
 import { supabase } from '../../lib/supabase';
-import { getLocalIngredients } from '../../lib/recipeStore';
+import { getLocalIngredients, batchSaveLocalIngredients } from '../../lib/recipeStore';
 import { translateIngredientName } from '../../lib/culinaryDictionary';
 import { consolidateIngredients, CATEGORY_NAMES } from '../../lib/groceryConsolidator';
 import { ShoppingListPrintView } from './ShoppingListPrintView';
@@ -146,6 +146,15 @@ export function ShoppingListModal({
 
           if (!error && data && data.length > 0) {
             consolidated.push(...data);
+            // Guardar en caché local para acceso inmediato futuro
+            const mapByRecipe: Record<string, Ingredient[]> = {};
+            data.forEach((ing) => {
+              if (ing.recipe_id) {
+                if (!mapByRecipe[ing.recipe_id]) mapByRecipe[ing.recipe_id] = [];
+                mapByRecipe[ing.recipe_id].push(ing);
+              }
+            });
+            batchSaveLocalIngredients(mapByRecipe);
           }
         } catch {
           // ignore

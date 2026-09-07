@@ -21,6 +21,8 @@ import {
   saveLocalRecipe,
   deleteLocalRecipe,
   getLocalIngredients,
+  saveLocalIngredients,
+  batchSaveLocalIngredients,
 } from '@/lib/recipeStore';
 import {
   getLocalUserRating,
@@ -417,6 +419,26 @@ export default function Home() {
         });
 
         setRecipes(finalizedRecipes);
+
+        // 5. Precargar y sincronizar en caché local todos los ingredientes de Supabase en segundo plano
+        try {
+          const { data: allRemoteIngs, error: ingsErr } = await supabase
+            .from('ingredients')
+            .select('*');
+
+          if (!ingsErr && allRemoteIngs && allRemoteIngs.length > 0) {
+            const mapByRecipe: Record<string, Ingredient[]> = {};
+            allRemoteIngs.forEach((ing) => {
+              if (ing.recipe_id) {
+                if (!mapByRecipe[ing.recipe_id]) mapByRecipe[ing.recipe_id] = [];
+                mapByRecipe[ing.recipe_id].push(ing);
+              }
+            });
+            batchSaveLocalIngredients(mapByRecipe);
+          }
+        } catch (ingsPrefetchErr) {
+          console.warn('Background ingredients prefetch note:', ingsPrefetchErr);
+        }
       }
     } catch (err) {
       console.warn('Error fetching Supabase recipes:', err);
@@ -500,55 +522,76 @@ export default function Home() {
     };
   }, [loadUserProfile, fetchRecipes]);
 
-  // Load ingredients & comments when activeRecipe changes
+  // Load ingredients & comments when activeRecipeId changes
+  const activeRecipeId = activeRecipe?.id;
   useEffect(() => {
-    if (!activeRecipe) return;
+    if (!activeRecipeId) return;
 
     let isMounted = true;
 
     const loadRecipeDetails = async () => {
-      setLoadingIngredients(true);
-      setLoadingComments(true);
-
       // User rating check (local y remoto)
-      const localVote = getLocalUserRating(activeRecipe.id, user?.id);
-      setCurrentUserRating(activeRecipe.user_rating || localVote || 0);
+      const localVote = getLocalUserRating(activeRecipeId, user?.id);
+      setCurrentUserRating(activeRecipe?.user_rating || localVote || 0);
 
-      // Load Ingredients (check local persistent store first, then Supabase)
-      const localIngs = getLocalIngredients(activeRecipe.id);
+      // 1. Cargar ingredientes de caché local inmediatamente (0 ms de espera, sin pantallas en blanco)
+      const localIngs = getLocalIngredients(activeRecipeId);
       if (localIngs && localIngs.length > 0) {
         if (isMounted) {
           setActiveIngredients(localIngs);
           setLoadingIngredients(false);
         }
       } else {
-        try {
-          const { data, error } = await supabase
-            .from('ingredients')
-            .select('*')
-            .eq('recipe_id', activeRecipe.id);
-
-          if (!isMounted) return;
-
-          if (!error && data && data.length > 0) {
-            setActiveIngredients(data);
-          } else {
-            setActiveIngredients([]);
-          }
-        } catch {
-          if (!isMounted) return;
-          setActiveIngredients([]);
-        } finally {
-          if (isMounted) setLoadingIngredients(false);
+        if (isMounted) {
+          setLoadingIngredients(true);
         }
       }
 
-      // Load Comments (filtrando registros técnicos de ratings)
+      setLoadingComments(true);
+
+      // 2. Cargar/Sincronizar ingredientes desde Supabase con tolerancia a cold start
+      try {
+        let fetchedData: Ingredient[] | null = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const { data, error } = await supabase
+              .from('ingredients')
+              .select('*')
+              .eq('recipe_id', activeRecipeId);
+
+            if (!error && data && data.length > 0) {
+              fetchedData = data;
+              break;
+            }
+          } catch (netErr) {
+            console.warn(`Supabase ingredients fetch attempt ${attempt + 1} warning:`, netErr);
+            if (attempt === 0) await new Promise((res) => setTimeout(res, 400));
+          }
+        }
+
+        if (!isMounted) return;
+
+        if (fetchedData && fetchedData.length > 0) {
+          setActiveIngredients(fetchedData);
+          saveLocalIngredients(activeRecipeId, fetchedData);
+        } else if (!localIngs || localIngs.length === 0) {
+          setActiveIngredients([]);
+        }
+      } catch {
+        if (!isMounted) return;
+        if (!localIngs || localIngs.length === 0) {
+          setActiveIngredients([]);
+        }
+      } finally {
+        if (isMounted) setLoadingIngredients(false);
+      }
+
+      // 3. Cargar comentarios
       try {
         const { data, error } = await supabase
           .from('comments')
           .select('*')
-          .eq('recipe_id', activeRecipe.id)
+          .eq('recipe_id', activeRecipeId)
           .order('created_at', { ascending: true });
 
         if (!isMounted) return;
@@ -573,7 +616,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, [activeRecipe, user?.id]);
+  }, [activeRecipeId, activeRecipe?.user_rating, user?.id]);
 
   // Toggle Recipe into Shopping Menu (with optional customServings)
   const handleToggleMenu = (recipeId: string, customServings?: number) => {
