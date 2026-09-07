@@ -428,10 +428,13 @@ create policy "Users can update or delete their own recipe images."
   - Las recetas locales en modo borrador solo son editables si su ID tiene prefijo `user_` o `local_`.
 - [x] **Asignación por defecto al Autor Principal en `app/page.tsx`**:
   - Toda receta en Supabase con `user_id` nulo se atribuye automáticamente al UUID de `leanBorsini` (`1afb8de4-9294-4f57-af9f-dc50b3e6e768`).
-- [x] **Eliminación de botones duplicados/antiguos**:
-  - Se eliminaron los botones pequeños residuales de editar y eliminar ubicados junto al botón PDF.
-  - Se removió el botón redundante de edición ubicado en la cabecera de instrucciones.
-  - El único punto de control del autor es el **Panel de Gestión del Autor** superior con confirmación interactiva.
+- [x] **Unificación de Interfaz del Autor (Botones compactos y elegantes)**:
+  - Se eliminó el panel grande que ocupaba espacio vertical excesivo (`Your Recipe (Author)`).
+  - En su lugar, junto al autor `by @author` se muestra un indicador visual sutil y pulcro (`🟢 Tu receta`).
+  - Las acciones de **Editar** y **Eliminar** se unificaron en la barra de acciones gastronómicas principal como botones pequeños y armónicos:
+    - Botón Editar: `[ ✏️ ]` (en desktop con etiqueta `Editar`).
+    - Botón Eliminar: `[ 🗑️ ]` (en desktop con etiqueta `Eliminar`).
+    - Al presionar eliminar, se despliega una confirmación compacta en el mismo lugar (`¿Borrar? [Sí] [✕]`) sin alterar el flujo visual ni duplicar controles.
 
 ---
 

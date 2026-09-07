@@ -593,70 +593,16 @@ export function RecipeDetailModal({
             </h2>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs text-stone-500 font-medium">by @{authorName}</span>
+              {isOwner && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                  {lang === 'ES' ? 'Tu receta' : 'Your recipe'}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Panel de Gestión del Autor (Editar Receta Completa y Eliminar con Confirmación) */}
-          {isOwner && (
-            <div className="bg-[#EAE5D6]/90 border border-[#D8D3C4] rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 flex-wrap shadow-xs">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse" />
-                <span className="text-xs font-bold text-[#2C3523] tracking-wide">
-                  {lang === 'ES' ? 'Tu Receta (Autor)' : 'Your Recipe (Author)'}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Botón Editar Receta Completa */}
-                <button
-                  type="button"
-                  onClick={() => onEdit(recipe, ingredients)}
-                  className="px-3.5 py-2 rounded-xl bg-[#2C3523] text-[#F7F5EC] hover:bg-[#3D4932] transition-colors flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer active:scale-95"
-                  title={lang === 'ES' ? 'Editar toda la receta (ingredientes, descripción, porciones, fotos, etc.)' : 'Edit full recipe (ingredients, description, servings, photos, etc.)'}
-                >
-                  <Edit className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{lang === 'ES' ? 'Editar Receta' : 'Edit Recipe'}</span>
-                </button>
-
-                {/* Botón Eliminar con confirmación interactiva visual */}
-                {showDeleteConfirm ? (
-                  <div className="flex items-center gap-1.5 bg-red-100/90 border border-red-300 px-2.5 py-1.5 rounded-xl">
-                    <span className="text-[11px] font-bold text-red-900">
-                      {lang === 'ES' ? '¿Eliminar receta?' : 'Delete recipe?'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onDelete(recipe.id);
-                        setShowDeleteConfirm(false);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors text-xs font-bold cursor-pointer shadow-xs active:scale-95"
-                    >
-                      {lang === 'ES' ? 'Sí, eliminar' : 'Yes, delete'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="px-2 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors text-xs font-medium cursor-pointer"
-                    >
-                      {lang === 'ES' ? 'Cancelar' : 'Cancel'}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="px-3 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95"
-                    title={lang === 'ES' ? 'Eliminar esta receta' : 'Delete this recipe'}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Barra de Acciones Gastronómicas (Diseñada para envolver limpiamente en móvil sin desbordar) */}
+          {/* Barra de Acciones Gastronómicas */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Botón Cocinar Paso a Paso */}
             <button
@@ -716,6 +662,59 @@ export function RecipeDetailModal({
               <Printer className="w-4 h-4 text-[#425035]" />
               <span>PDF</span>
             </button>
+
+            {/* Acciones de Autor Unificadas: Editar y Eliminar pequeños */}
+            {isOwner && (
+              <div className="flex items-center gap-1.5 ml-auto">
+                {/* Botón Editar Receta */}
+                <button
+                  type="button"
+                  onClick={() => onEdit(recipe, ingredients)}
+                  title={lang === 'ES' ? 'Editar Receta' : 'Edit Recipe'}
+                  className="p-2 px-2.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
+                >
+                  <Edit className="w-3.5 h-3.5 text-[#425035]" />
+                  <span className="hidden sm:inline">{lang === 'ES' ? 'Editar' : 'Edit'}</span>
+                </button>
+
+                {/* Botón Eliminar con confirmación compacta */}
+                {showDeleteConfirm ? (
+                  <div className="flex items-center gap-1 bg-red-100/90 border border-red-300 p-1 px-2 rounded-xl">
+                    <span className="text-[11px] font-bold text-red-900 hidden sm:inline">
+                      {lang === 'ES' ? '¿Borrar?' : 'Delete?'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDelete(recipe.id);
+                        setShowDeleteConfirm(false);
+                      }}
+                      className="px-2 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors text-xs font-bold cursor-pointer shadow-xs active:scale-95"
+                    >
+                      {lang === 'ES' ? 'Sí' : 'Yes'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="px-1.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors text-xs font-medium cursor-pointer"
+                      title={lang === 'ES' ? 'Cancelar' : 'Cancel'}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    title={lang === 'ES' ? 'Eliminar Receta' : 'Delete Recipe'}
+                    className="p-2 px-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Metadatos y Sistema de Valoración por Estrellas */}
