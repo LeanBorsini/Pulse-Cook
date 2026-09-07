@@ -10,17 +10,19 @@ interface ShoppingListPrintViewProps {
   selectedRecipes: Recipe[];
   items: Ingredient[];
   lang: 'ES' | 'EN';
+  servingsMap?: Record<string, number>;
 }
 
 export function ShoppingListPrintView({
   selectedRecipes,
   items,
   lang,
+  servingsMap = {},
 }: ShoppingListPrintViewProps) {
   const isEs = lang === 'ES';
 
-  // Consolidar usando el motor inteligente
-  const consolidated = consolidateIngredients(items, selectedRecipes, lang);
+  // Consolidar usando el motor inteligente escalado por porciones
+  const consolidated = consolidateIngredients(items, selectedRecipes, lang, servingsMap);
   
   // Aplanar las categorías para la vista de cuadrícula en impresión, pero manteniendo un orden lógico
   const ingredientsList = [
@@ -67,14 +69,17 @@ export function ShoppingListPrintView({
             {isEs ? 'Recetas Seleccionadas en el Menú:' : 'Selected Menu Recipes:'}
           </h3>
           <div className="flex flex-wrap gap-1.5">
-            {selectedRecipes.map((r) => (
-              <span
-                key={r.id}
-                className="px-2 py-0.5 bg-white border border-[#D8D3C4] rounded-md text-[11px] font-semibold text-[#2C3523]"
-              >
-                🍽️ {isEs ? r.title_es : r.title_en || r.title_es}
-              </span>
-            ))}
+            {selectedRecipes.map((r) => {
+              const portions = servingsMap[r.id] || r.servings || 2;
+              return (
+                <span
+                  key={r.id}
+                  className="px-2 py-0.5 bg-white border border-[#D8D3C4] rounded-md text-[11px] font-semibold text-[#2C3523]"
+                >
+                  🍽️ {isEs ? r.title_es : r.title_en || r.title_es} ({portions} {isEs ? (portions === 1 ? 'porción' : 'porciones') : (portions === 1 ? 'serving' : 'servings')})
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

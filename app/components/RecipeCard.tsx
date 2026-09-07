@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, Users, BookmarkCheck, Plus, Star, Images } from 'lucide-react';
+import { Clock, Users, Plus, Minus, Star, Images, X } from 'lucide-react';
 import { Recipe } from '../types';
 import { User } from '@supabase/supabase-js';
 import { translateRecipeField } from '../../lib/recipeTranslator';
@@ -11,9 +11,11 @@ interface RecipeCardProps {
   recipe: Recipe;
   lang: 'ES' | 'EN';
   isSelected: boolean;
+  servingsCount?: number;
   user?: User | null;
   onOpenDetails: (recipe: Recipe) => void;
-  onToggleMenu: (recipeId: string) => void;
+  onToggleMenu: (recipeId: string, customServings?: number) => void;
+  onUpdateServings?: (recipeId: string, newServings: number) => void;
   onOpenAuth?: () => void;
 }
 
@@ -21,12 +23,15 @@ export function RecipeCard({
   recipe,
   lang,
   isSelected,
+  servingsCount,
   onOpenDetails,
   onToggleMenu,
+  onUpdateServings,
 }: RecipeCardProps) {
   const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
   const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
   const authorName = recipe.profiles?.username || MAIN_AUTHOR_CONFIG.USERNAME;
+  const currentServings = servingsCount ?? (recipe.servings || 2);
 
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -134,27 +139,68 @@ export function RecipeCard({
         >
           {lang === 'ES' ? 'Ver Receta' : 'View Recipe'}
         </button>
-        <button
-          onClick={handleMenuClick}
-          className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-            isSelected
-              ? 'bg-[#2C3523] text-[#F7F5EC] border border-[#2C3523]'
-              : 'bg-[#EFECE1] text-[#2C3523] hover:bg-[#E2DEC2] border border-[#D8D3C4]'
-          }`}
-          title={lang === 'ES' ? 'Añadir al menú semanal' : 'Add to weekly menu'}
-        >
-          {isSelected ? (
-            <>
-              <BookmarkCheck className="w-3.5 h-3.5" />
-              <span>{lang === 'ES' ? 'En Menú' : 'In Menu'}</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-3.5 h-3.5" />
-              <span>{lang === 'ES' ? 'Menú' : 'Menu'}</span>
-            </>
-          )}
-        </button>
+        {isSelected ? (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center bg-[#2C3523] text-[#F7F5EC] rounded-xl px-2 py-1 text-xs font-semibold shadow-xs border border-[#2C3523]"
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (currentServings > 1 && onUpdateServings) {
+                  onUpdateServings(recipe.id, currentServings - 1);
+                }
+              }}
+              disabled={currentServings <= 1}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              title={lang === 'ES' ? 'Menos comensales' : 'Fewer servings'}
+              aria-label={lang === 'ES' ? 'Menos comensales' : 'Fewer servings'}
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <span
+              className="px-1.5 text-center flex items-center gap-1 font-bold text-[11px]"
+              title={lang === 'ES' ? `${currentServings} porciones en menú` : `${currentServings} servings in menu`}
+            >
+              <Users className="w-3 h-3 text-amber-200" />
+              <span>{currentServings}p</span>
+            </span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (currentServings < 99 && onUpdateServings) {
+                  onUpdateServings(recipe.id, currentServings + 1);
+                }
+              }}
+              disabled={currentServings >= 99}
+              className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+              title={lang === 'ES' ? 'Más comensales' : 'More servings'}
+              aria-label={lang === 'ES' ? 'Más comensales' : 'More servings'}
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={handleMenuClick}
+              className="ml-1 pl-1 border-l border-white/25 text-stone-300 hover:text-rose-300 active:scale-90 transition-colors cursor-pointer"
+              title={lang === 'ES' ? 'Quitar del menú' : 'Remove from menu'}
+              aria-label={lang === 'ES' ? 'Quitar del menú' : 'Remove from menu'}
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleMenuClick}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors bg-[#EFECE1] text-[#2C3523] hover:bg-[#E2DEC2] border border-[#D8D3C4] cursor-pointer"
+            title={lang === 'ES' ? 'Añadir al menú semanal' : 'Add to weekly menu'}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>{lang === 'ES' ? 'Menú' : 'Menu'}</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -31,6 +31,8 @@ import {
   Check,
   ChefHat,
   ShoppingCart,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
@@ -82,7 +84,9 @@ interface RecipeDetailModalProps {
   onDeleteComment?: (commentId: string) => Promise<void> | void;
   onOpenAuth: () => void;
   isInMenu?: boolean;
-  onToggleMenu?: (id: string) => void;
+  servingsCount?: number;
+  onToggleMenu?: (id: string, customServings?: number) => void;
+  onUpdateServings?: (id: string, newServings: number) => void;
 }
 
 /**
@@ -121,8 +125,29 @@ export function RecipeDetailModal({
   onDeleteComment,
   onOpenAuth,
   isInMenu = false,
+  servingsCount,
   onToggleMenu,
+  onUpdateServings,
 }: RecipeDetailModalProps) {
+  const baseServings = Math.max(1, Number(recipe.servings) || 1);
+  const [userServingsOverride, setUserServingsOverride] = useState<number | null>(null);
+  const [prevServingsCountProp, setPrevServingsCountProp] = useState<number | undefined>(servingsCount);
+
+  if (servingsCount !== prevServingsCountProp) {
+    setPrevServingsCountProp(servingsCount);
+    setUserServingsOverride(null);
+  }
+
+  const detailServings = userServingsOverride ?? servingsCount ?? baseServings;
+
+  const handleStepServings = (delta: number) => {
+    const nextVal = Math.max(1, Math.min(99, detailServings + delta));
+    setUserServingsOverride(nextVal);
+    if (isInMenu && onUpdateServings) {
+      onUpdateServings(recipe.id, nextVal);
+    }
+  };
+
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
@@ -600,20 +625,57 @@ export function RecipeDetailModal({
               <span>{lang === 'ES' ? 'Cocinar Paso a Paso' : 'Cook Step-by-Step'}</span>
             </button>
 
-            {/* Botón Añadir al Menú */}
+            {/* Botón Añadir / Gestionar en Menú */}
             {onToggleMenu && (
-              <button
-                onClick={() => onToggleMenu(recipe.id)}
-                title={isInMenu ? (lang === 'ES' ? 'Quitar del Menú' : 'Remove from Menu') : (lang === 'ES' ? 'Añadir al Menú' : 'Add to Menu')}
-                className={`p-2 px-3 rounded-xl border transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer ${
-                  isInMenu
-                    ? 'bg-[#EAE5D6] text-[#2C3523] border-[#2C3523] font-bold'
-                    : 'bg-[#EFECE1] border-[#D8D3C4] text-[#5C6650] hover:bg-[#E2DEC2]'
-                }`}
-              >
-                <ShoppingCart className="w-4 h-4" />
-                <span>{isInMenu ? (lang === 'ES' ? 'En Menú ✓' : 'In Menu ✓') : (lang === 'ES' ? '+ Menú' : '+ Menu')}</span>
-              </button>
+              isInMenu ? (
+                <div className="flex items-center bg-[#2C3523] text-[#F7F5EC] rounded-xl px-2 py-1 border border-[#2C3523] text-xs font-semibold shadow-xs">
+                  <span className="flex items-center gap-1 mr-1.5 text-[11px]">
+                    <ShoppingCart className="w-3.5 h-3.5 text-amber-200" />
+                    <span>{lang === 'ES' ? 'En Menú' : 'In Menu'}</span>
+                  </span>
+                  <div className="flex items-center bg-black/25 rounded-lg p-0.5 mr-1">
+                    <button
+                      type="button"
+                      onClick={() => handleStepServings(-1)}
+                      disabled={detailServings <= 1}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                      title={lang === 'ES' ? 'Menos comensales' : 'Fewer servings'}
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="px-1.5 text-center flex items-center gap-1 font-bold text-[11px]">
+                      <Users className="w-3 h-3 text-amber-200" />
+                      <span>{detailServings}p</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleStepServings(1)}
+                      disabled={detailServings >= 99}
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                      title={lang === 'ES' ? 'Más comensales' : 'More servings'}
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onToggleMenu(recipe.id)}
+                    className="p-1 hover:text-rose-300 transition-colors cursor-pointer"
+                    title={lang === 'ES' ? 'Quitar del Menú' : 'Remove from Menu'}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => onToggleMenu(recipe.id, detailServings)}
+                  title={lang === 'ES' ? 'Añadir al Menú Semanal' : 'Add to Weekly Menu'}
+                  className="p-2 px-3 rounded-xl border transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer bg-[#EFECE1] border-[#D8D3C4] text-[#5C6650] hover:bg-[#E2DEC2]"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>{lang === 'ES' ? `+ Menú (${detailServings}p)` : `+ Menu (${detailServings}s)`}</span>
+                </button>
+              )
             )}
 
             {/* Botón Compartir */}
@@ -849,18 +911,61 @@ export function RecipeDetailModal({
 
           {/* Ingredientes */}
           <div>
-            <h3 className="font-serif font-bold text-[#2C3523] mb-2 text-xs uppercase tracking-wider">
-              {isEs ? 'Ingredientes' : 'Ingredients'}
-            </h3>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="font-serif font-bold text-[#2C3523] text-xs uppercase tracking-wider">
+                {isEs ? 'Ingredientes' : 'Ingredients'}
+              </h3>
+
+              {/* Ajuste Interactivo de Porciones para la Receta */}
+              <div className="flex items-center bg-[#EFECE1] border border-[#D8D3C4] rounded-lg p-0.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => handleStepServings(-1)}
+                  disabled={detailServings <= 1}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-[#E2DEC2] active:scale-90 disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer text-[#2C3523]"
+                  title={isEs ? 'Reducir comensales' : 'Decrease servings'}
+                  aria-label={isEs ? 'Reducir comensales' : 'Decrease servings'}
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <span className="px-2 font-bold text-[11px] text-[#2C3523] flex items-center gap-1">
+                  <Users className="w-3 h-3 text-[#5C6650]" />
+                  <span>{detailServings}</span>
+                  <span className="text-[9px] font-normal text-[#5C6650]">
+                    {isEs ? (detailServings === 1 ? 'porción' : 'porciones') : (detailServings === 1 ? 'serving' : 'servings')}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleStepServings(1)}
+                  disabled={detailServings >= 99}
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-[#E2DEC2] active:scale-90 disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer text-[#2C3523]"
+                  title={isEs ? 'Aumentar comensales' : 'Increase servings'}
+                  aria-label={isEs ? 'Aumentar comensales' : 'Increase servings'}
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
             {loadingIngredients ? (
               <p className="text-xs text-stone-500">{isEs ? 'Cargando ingredientes...' : 'Loading ingredients...'}</p>
             ) : ingredients && ingredients.length > 0 ? (
               <ul className="list-disc list-inside space-y-1.5 text-xs text-[#2C3523] bg-[#EFECE1]/50 p-3 rounded-xl border border-[#D8D3C4]">
-                {ingredients.map((ing, i) => (
-                  <li key={i}>
-                    <span className="font-semibold">{ing.amount} {ing.unit}</span> - {translateIngredientName(ing.name_es, ing.name_en, lang)}
-                  </li>
-                ))}
+                {ingredients.map((ing, i) => {
+                  const scaleFactor = detailServings / baseServings;
+                  const rawAmount = Number(ing.amount);
+                  let displayAmount: string | number = ing.amount;
+                  if (!isNaN(rawAmount) && rawAmount > 0) {
+                    const scaled = rawAmount * scaleFactor;
+                    displayAmount = Math.round((scaled + Number.EPSILON) * 100) / 100;
+                  }
+                  return (
+                    <li key={i}>
+                      <span className="font-semibold">{displayAmount} {ing.unit}</span> - {translateIngredientName(ing.name_es, ing.name_en, lang)}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="text-xs text-stone-400 italic">{isEs ? 'Sin ingredientes registrados.' : 'No ingredients.'}</p>

@@ -269,21 +269,31 @@ export function normalizeIngredientKey(name: string): {
  * @param {Ingredient[]} items - Lista de ingredientes brutos extraídos de las recetas del menú.
  * @param {Recipe[]} recipes - Lista de recetas para recuperar sus títulos y asociarlas a los ítems.
  * @param {'ES' | 'EN'} [lang='ES'] - Idioma para mostrar los títulos de las recetas de origen.
+ * @param {Record<string, number>} [servingsMap] - Mapa de porciones deseadas por id de receta (ej. { id: 6 }). Si no se indica, toma las porciones originales.
  * @returns {Record<'produce' | 'meat' | 'dairy' | 'pantry' | 'other', ConsolidatedItem[]>} Mapa agrupado por pasillo.
  */
 export function consolidateIngredients(
   items: Ingredient[],
   recipes: Recipe[],
-  lang: 'ES' | 'EN' = 'ES'
+  lang: 'ES' | 'EN' = 'ES',
+  servingsMap?: Record<string, number>
 ): Record<'produce' | 'meat' | 'dairy' | 'pantry' | 'other', ConsolidatedItem[]> {
   const map: Record<string, ConsolidatedItem> = {};
   const recipeMap = new Map(recipes.map(r => [r.id, r]));
 
   items.forEach((ing: Ingredient) => {
     const recipe = ing.recipe_id ? recipeMap.get(ing.recipe_id) : undefined;
-    const recipeTitle = recipe 
+    const baseServings = Math.max(1, Number(recipe?.servings) || 1);
+    const targetServings = (servingsMap && ing.recipe_id && servingsMap[ing.recipe_id] !== undefined)
+      ? Math.max(1, Number(servingsMap[ing.recipe_id]))
+      : baseServings;
+
+    const scaleFactor = targetServings / baseServings;
+
+    const recipeTitleBase = recipe 
       ? (lang === 'ES' ? recipe.title_es : recipe.title_en || recipe.title_es)
       : 'General';
+    const recipeTitle = `${recipeTitleBase} (${targetServings} ${lang === 'ES' ? (targetServings === 1 ? 'porc.' : 'porcs.') : (targetServings === 1 ? 'serv.' : 'servs.')})`;
 
     const nameEs = ing.name_es || '';
     const nameEn = ing.name_en || '';
@@ -292,7 +302,9 @@ export function consolidateIngredients(
 
     const norm = normalizeIngredientKey(rawName);
     const normUnit = normalizeUnit(ing.unit);
-    const parsedAmount = Number(ing.amount) || 0;
+    const rawAmount = Number(ing.amount) || 0;
+    // Escalar la cantidad según el ratio: (porciones deseadas / porciones base)
+    const parsedAmount = rawAmount * scaleFactor;
 
     // Agrupar por clave canónica + unidad normalizada (para sumar de forma segura)
     const compositeKey = `${norm.key}_${normUnit}`;

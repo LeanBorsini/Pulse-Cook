@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle, Trash2 } from 'lucide-react';
+import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle, Trash2, Users, Minus, Plus } from 'lucide-react';
 import { Ingredient, Recipe } from '../types';
 import { supabase } from '../../lib/supabase';
 import { getLocalIngredients } from '../../lib/recipeStore';
@@ -26,6 +26,8 @@ interface ShoppingListModalProps {
   shoppingList?: Ingredient[];
   selectedRecipeIds?: string[];
   recipes?: Recipe[];
+  servingsMap?: Record<string, number>;
+  onUpdateServings?: (recipeId: string, newServings: number) => void;
   onClose: () => void;
   onClearMenu?: () => void;
   onRemoveRecipe?: (recipeId: string) => void;
@@ -36,12 +38,25 @@ export function ShoppingListModal({
   shoppingList: initialShoppingList,
   selectedRecipeIds = [],
   recipes = [],
+  servingsMap,
+  onUpdateServings,
   onClose,
   onClearMenu,
   onRemoveRecipe,
 }: ShoppingListModalProps) {
   const [fetchedItems, setFetchedItems] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [internalServingsMap, setInternalServingsMap] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('pulse_menu_servings');
+        if (saved) return JSON.parse(saved);
+      } catch {
+        // ignore
+      }
+    }
+    return {};
+  });
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -53,6 +68,28 @@ export function ShoppingListModal({
     }
     return {};
   });
+
+  const effectiveServingsMap = servingsMap || internalServingsMap;
+
+  const handleStepServings = (recipeId: string, delta: number) => {
+    const current = effectiveServingsMap[recipeId] ?? (recipes.find((r) => r.id === recipeId)?.servings || 2);
+    const nextVal = Math.max(1, Math.min(99, current + delta));
+
+    if (onUpdateServings) {
+      onUpdateServings(recipeId, nextVal);
+    }
+    setInternalServingsMap((prev) => {
+      const updated = { ...prev, [recipeId]: nextVal };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('pulse_menu_servings', JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+      }
+      return updated;
+    });
+  };
 
   const items = initialShoppingList || (selectedRecipeIds.length > 0 ? fetchedItems : []);
 
@@ -68,9 +105,11 @@ export function ShoppingListModal({
 
   const handleClear = () => {
     setCheckedMap({});
+    setInternalServingsMap({});
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('pulse_shopping_list_checks');
+        localStorage.removeItem('pulse_menu_servings');
       } catch {
         // ignore
       }
@@ -129,8 +168,8 @@ export function ShoppingListModal({
     setCheckedMap((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Group ingredients by aisle using the intelligent consolidator
-  const consolidated = consolidateIngredients(items, recipes, lang);
+  // Group ingredients by aisle using the intelligent consolidator with scaled servings
+  const consolidated = consolidateIngredients(items, recipes, lang, effectiveServingsMap);
   
   // Transform the new consolidated structure into the expected format for rendering
   const groupedByAisle: Record<string, { amount: number; unit: string; name_es: string; name_en: string; aisle: string; recipes?: string[] }[]> = {};
@@ -150,9 +189,6 @@ export function ShoppingListModal({
   });
 
   const selectedRecipes = recipes.filter((r) => selectedRecipeIds.includes(r.id));
-  const selectedRecipesNames = selectedRecipes.map((r) =>
-    lang === 'ES' ? r.title_es : r.title_en || r.title_es
-  );
 
   const handlePrint = () => {
     window.print();
@@ -164,10 +200,12 @@ export function ShoppingListModal({
       ? `🛒 *LISTA DE COMPRAS - Pulse & Cook*\n\n`
       : `🛒 *GROCERY SHOPPING LIST - Pulse & Cook*\n\n`;
 
-    if (selectedRecipesNames.length > 0) {
-      message += isEs ? `📋 *Recetas Seleccionadas:*\n` : `📋 *Selected Recipes:*\n`;
-      selectedRecipesNames.forEach((name) => {
-        message += `• ${name}\n`;
+    if (selectedRecipes.length > 0) {
+      message += isEs ? `📋 *Recetas en el Menú:*\n` : `📋 *Recipes in Menu:*\n`;
+      selectedRecipes.forEach((r) => {
+        const name = isEs ? r.title_es : r.title_en || r.title_es;
+        const portions = effectiveServingsMap[r.id] ?? (r.servings || 2);
+        message += `• ${name} (${portions} ${isEs ? (portions === 1 ? 'persona' : 'personas') : (portions === 1 ? 'person' : 'people')})\n`;
       });
       message += `\n`;
     }
@@ -201,6 +239,7 @@ export function ShoppingListModal({
         selectedRecipes={selectedRecipes}
         items={items}
         lang={lang}
+        servingsMap={effectiveServingsMap}
       />
 
       <div className="bg-[#F7F5EC] border border-[#D8D3C4]/80 rounded-2xl max-w-lg w-full shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative max-h-[92vh] flex flex-col text-[#2C3523] overflow-hidden print:hidden">
@@ -227,8 +266,8 @@ export function ShoppingListModal({
         <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           <p className="text-xs text-[#5C6650] mb-4">
             {lang === 'ES'
-              ? 'Ingredientes consolidados para tus recetas seleccionadas'
-              : 'Consolidated ingredients for your selected recipes'}
+              ? 'Ingredientes consolidados y calculados según las porciones deseadas para cada receta'
+              : 'Consolidated ingredients calculated based on desired servings for each recipe'}
           </p>
 
         {/* Botones de acción rápida: WhatsApp y PDF */}
@@ -254,41 +293,95 @@ export function ShoppingListModal({
         )}
 
         {selectedRecipes.length > 0 && (
-          <div className="mb-4 p-3 bg-[#EFECE1] rounded-xl border border-[#D8D3C4] text-xs text-[#5C6650]">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold text-[#2C3523]">
-                {lang === 'ES' ? 'Recetas en el menú semanal:' : 'Recipes in weekly menu:'}
+          <div className="mb-4 p-3.5 bg-[#EFECE1] rounded-xl border border-[#D8D3C4] text-xs text-[#5C6650]">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="font-bold text-[#2C3523] flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-[#2C3523]" />
+                {lang === 'ES' ? 'Platos y comensales planificados:' : 'Planned dishes & guests:'}
               </span>
-              <span className="text-[11px] text-[#5C6650] font-medium bg-[#E2DEC2] px-2 py-0.5 rounded-full">
+              <span className="text-[11px] text-[#5C6650] font-semibold bg-[#E2DEC2] px-2 py-0.5 rounded-full border border-[#D8D3C4]">
                 {selectedRecipes.length} {lang === 'ES' ? (selectedRecipes.length === 1 ? 'receta' : 'recetas') : (selectedRecipes.length === 1 ? 'recipe' : 'recipes')}
               </span>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+
+            <div className="space-y-2">
               {selectedRecipes.map((r) => {
                 const title = lang === 'ES' ? r.title_es : r.title_en || r.title_es;
+                const baseServings = Math.max(1, Number(r.servings) || 1);
+                const currentServings = effectiveServingsMap[r.id] ?? baseServings;
+
                 return (
-                  <span
+                  <div
                     key={r.id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#FDFBF7] text-[#2C3523] rounded-lg border border-[#D8D3C4] font-medium text-xs shadow-2xs"
+                    className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-2.5 bg-[#FDFBF7] rounded-xl border border-[#D8D3C4] shadow-2xs"
                   >
-                    <span>{title}</span>
-                    {onRemoveRecipe && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveRecipe(r.id);
-                        }}
-                        className="text-[#5C6650] hover:text-rose-600 transition-colors p-0.5 rounded cursor-pointer"
-                        title={lang === 'ES' ? `Quitar "${title}" del menú` : `Remove "${title}" from menu`}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </span>
+                    <div className="min-w-0 flex-1 pr-2">
+                      <p className="font-serif font-bold text-xs text-[#2C3523] truncate">
+                        {title}
+                      </p>
+                      <p className="text-[10px] text-[#7C886E]">
+                        {lang === 'ES' ? `Receta original: ${baseServings} porc.` : `Original recipe: ${baseServings} serv.`}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Control Interactivo de Porciones / Comensales */}
+                      <div className="flex items-center bg-[#F4F0E8] border border-[#D8D3C4] rounded-lg p-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => handleStepServings(r.id, -1)}
+                          disabled={currentServings <= 1}
+                          className="w-6 h-6 flex items-center justify-center rounded text-xs font-bold text-[#2C3523] hover:bg-[#E2DEC2] active:scale-90 disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer"
+                          title={lang === 'ES' ? 'Menos comensales' : 'Fewer servings'}
+                          aria-label={lang === 'ES' ? 'Menos comensales' : 'Fewer servings'}
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-xs font-bold text-[#2C3523] px-2 min-w-[3.6rem] text-center flex items-center justify-center gap-1">
+                          <Users className="w-3 h-3 text-[#5C6650]" />
+                          <span>{currentServings}</span>
+                          <span className="text-[10px] font-normal text-[#5C6650]">
+                            {lang === 'ES' ? (currentServings === 1 ? 'p.' : 'p.') : (currentServings === 1 ? 's.' : 's.')}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleStepServings(r.id, 1)}
+                          disabled={currentServings >= 99}
+                          className="w-6 h-6 flex items-center justify-center rounded text-xs font-bold text-[#2C3523] hover:bg-[#E2DEC2] active:scale-90 disabled:opacity-25 disabled:pointer-events-none transition-all cursor-pointer"
+                          title={lang === 'ES' ? 'Más comensales' : 'More servings'}
+                          aria-label={lang === 'ES' ? 'Más comensales' : 'More servings'}
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Botón Quitar Receta del Menú */}
+                      {onRemoveRecipe && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveRecipe(r.id)}
+                          className="w-7 h-7 flex items-center justify-center text-[#5C6650] hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-all rounded-lg cursor-pointer"
+                          title={lang === 'ES' ? `Quitar "${title}" del menú` : `Remove "${title}" from menu`}
+                          aria-label={lang === 'ES' ? `Quitar "${title}" del menú` : `Remove "${title}" from menu`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
+
+            <p className="text-[11px] text-[#7C886E] italic mt-2.5 pt-2 border-t border-[#D8D3C4]/60 flex items-center gap-1.5">
+              <span>💡</span>
+              <span>
+                {lang === 'ES'
+                  ? 'Cada plato se calcula a medida: 2 personas para una cita o 10 para una cena. Los ingredientes se escalan y agrupan automáticamente.'
+                  : 'Each dish is scaled independently: 2 for a date or 10 for a dinner. Ingredients scale and consolidate automatically.'}
+              </span>
+            </p>
           </div>
         )}
 

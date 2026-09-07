@@ -143,6 +143,22 @@ export default function Home() {
     return [];
   });
 
+  // Custom Servings per Recipe in Menu (Persists across reloads & sessions)
+  const [menuServings, setMenuServings] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('pulse_menu_servings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') return parsed;
+        }
+      } catch (err) {
+        console.warn('Error loading saved menu servings:', err);
+      }
+    }
+    return {};
+  });
+
   // Persist selected menu recipe IDs whenever changed
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -154,12 +170,34 @@ export default function Home() {
     }
   }, [selectedRecipeIds]);
 
+  // Persist menu servings whenever changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('pulse_menu_servings', JSON.stringify(menuServings));
+      } catch (err) {
+        console.warn('Error saving menu servings:', err);
+      }
+    }
+  }, [menuServings]);
+
+  // Update servings for a recipe in menu
+  const handleUpdateMenuServings = (recipeId: string, newServings: number) => {
+    const sanitized = Math.max(1, Math.min(99, Math.round(newServings)));
+    setMenuServings((prev) => ({
+      ...prev,
+      [recipeId]: sanitized,
+    }));
+  };
+
   // Clear entire menu and stored checks
   const handleClearMenu = () => {
     setSelectedRecipeIds([]);
+    setMenuServings({});
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('pulse_menu_recipe_ids');
+        localStorage.removeItem('pulse_menu_servings');
         localStorage.removeItem('pulse_shopping_list_checks');
       } catch (err) {
         console.warn('Error clearing menu storage:', err);
@@ -537,11 +575,22 @@ export default function Home() {
     };
   }, [activeRecipe, user?.id]);
 
-  // Toggle Recipe into Shopping Menu
-  const handleToggleMenu = (recipeId: string) => {
-    setSelectedRecipeIds((prev) =>
-      prev.includes(recipeId) ? prev.filter((id) => id !== recipeId) : [...prev, recipeId]
-    );
+  // Toggle Recipe into Shopping Menu (with optional customServings)
+  const handleToggleMenu = (recipeId: string, customServings?: number) => {
+    setSelectedRecipeIds((prev) => {
+      const isSelected = prev.includes(recipeId);
+      if (isSelected) {
+        return prev.filter((id) => id !== recipeId);
+      } else {
+        const rec = recipes.find((r) => r.id === recipeId);
+        const initialServings = customServings || rec?.servings || 2;
+        setMenuServings((prevMap) => ({
+          ...prevMap,
+          [recipeId]: prevMap[recipeId] || initialServings,
+        }));
+        return [...prev, recipeId];
+      }
+    });
   };
 
   // Calificar una receta (soporta re-calificar y actualizar votos, recalculando promedio y votos)
@@ -971,9 +1020,11 @@ export default function Home() {
               recipe={recipe}
               lang={lang}
               isSelected={selectedRecipeIds.includes(recipe.id)}
+              servingsCount={menuServings[recipe.id] || recipe.servings || 2}
               user={user}
               onOpenDetails={(r) => setActiveRecipe(r)}
               onToggleMenu={handleToggleMenu}
+              onUpdateServings={handleUpdateMenuServings}
               onOpenAuth={() => setShowAuthModal(true)}
             />
           ))}
@@ -995,7 +1046,9 @@ export default function Home() {
           profileUsername={profileUsername}
           userRating={currentUserRating}
           isInMenu={activeRecipe ? selectedRecipeIds.includes(activeRecipe.id) : false}
+          servingsCount={activeRecipe ? (menuServings[activeRecipe.id] || activeRecipe.servings || 2) : undefined}
           onToggleMenu={handleToggleMenu}
+          onUpdateServings={handleUpdateMenuServings}
           onRate={handleRateRecipe}
           onClose={() => {
             setActiveRecipe(null);
@@ -1046,6 +1099,8 @@ export default function Home() {
           lang={lang}
           selectedRecipeIds={selectedRecipeIds}
           recipes={recipes}
+          servingsMap={menuServings}
+          onUpdateServings={handleUpdateMenuServings}
           onClose={() => setShowShoppingList(false)}
           onClearMenu={handleClearMenu}
           onRemoveRecipe={handleToggleMenu}
