@@ -5,6 +5,7 @@ import { Recipe } from '../types';
 import { User } from '@supabase/supabase-js';
 import { translateRecipeField } from '../../lib/recipeTranslator';
 import { getCategoryLabel } from '@/lib/categories';
+import { MAIN_AUTHOR_CONFIG } from '@/lib/constants';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -25,7 +26,7 @@ export function RecipeCard({
 }: RecipeCardProps) {
   const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
   const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
-  const authorName = recipe.profiles?.username || 'leanBorsini';
+  const authorName = recipe.profiles?.username || MAIN_AUTHOR_CONFIG.USERNAME;
 
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -43,9 +44,12 @@ export function RecipeCard({
       <div>
         {recipe.image_url && (
           <div className="w-full h-48 rounded-xl overflow-hidden mb-4 border border-[#D8D3C4]/60 bg-black/5 relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={recipe.image_url}
               alt={title}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               onError={(e) => {
                 (e.target as HTMLElement).parentElement!.style.display = 'none';

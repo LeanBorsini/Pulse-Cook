@@ -42,6 +42,7 @@ import {
 } from '@/lib/recipeTranslator';
 import { translateIngredientName } from '@/lib/culinaryDictionary';
 import { RECIPE_CATEGORIES, getCategoryKey, getCategoryLabel } from '@/lib/categories';
+import { MAIN_AUTHOR_CONFIG } from '@/lib/constants';
 
 interface RecipeFormModalProps {
   recipeToEdit?: Recipe | null;
@@ -126,8 +127,10 @@ export function RecipeFormModal({
   });
 
   // Carga complementaria de ingredientes desde Supabase si la receta editada no los tenía en memoria local
+  const recipeIdToLoad = recipeToEdit?.id;
   useEffect(() => {
-    if (!recipeToEdit?.id) return;
+    if (!recipeIdToLoad) return;
+    const targetRecipeId = recipeIdToLoad;
 
     let isMounted = true;
     async function loadRemoteIngredients() {
@@ -135,14 +138,14 @@ export function RecipeFormModal({
         const { data, error } = await supabase
           .from('ingredients')
           .select('*')
-          .eq('recipe_id', recipeToEdit!.id);
+          .eq('recipe_id', targetRecipeId);
 
         if (!error && data && data.length > 0 && isMounted) {
           setIngredients((current) => {
             if (current.some((ing) => ing.name_es?.trim() || ing.name_en?.trim())) {
               return current;
             }
-            saveLocalIngredients(recipeToEdit!.id, data);
+            saveLocalIngredients(targetRecipeId, data);
             return data;
           });
         }
@@ -155,7 +158,7 @@ export function RecipeFormModal({
     return () => {
       isMounted = false;
     };
-  }, [recipeToEdit?.id]);
+  }, [recipeIdToLoad]);
 
   // Campos complementarios (Categoría normalizada mediante catálogo fijo)
   const [category, setCategory] = useState(() => {
@@ -496,7 +499,7 @@ export function RecipeFormModal({
       user_id: user?.id || recipeToEdit?.user_id || 'local_user',
       profiles: recipeToEdit?.profiles || {
         id: user?.id || 'local_user',
-        username: (user?.user_metadata as { username?: string })?.username || (user?.email ? user.email.split('@')[0] : 'leanBorsini'),
+        username: (user?.user_metadata as { username?: string })?.username || (user?.email ? user.email.split('@')[0] : MAIN_AUTHOR_CONFIG.USERNAME),
         avatar_url: '',
       },
       dietary_tags: selectedTags,
@@ -898,9 +901,12 @@ export function RecipeFormModal({
                     key={idx}
                     className="relative group rounded-lg overflow-hidden border border-[#D8D3C4] aspect-video bg-[#EAE5D6]"
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={img}
                       alt={`Foto ${idx + 1}`}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                     />
                     {idx === 0 && (

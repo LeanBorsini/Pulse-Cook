@@ -145,6 +145,7 @@ export function ShareAppModal({ isOpen, onClose, lang }: ShareAppModalProps) {
               <div className="flex flex-col items-center justify-center text-center">
                 <div className="p-3 bg-white rounded-2xl border-2 border-[#2C3523]/20 shadow-md mb-3 relative group">
                   {qrDataUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={qrDataUrl}
                       alt="QR Code Pulse & Cook"

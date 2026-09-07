@@ -44,6 +44,7 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 import { getCategoryKey, getCategoryLabel } from '@/lib/categories';
 import { translateIngredientName } from '@/lib/culinaryDictionary';
+import { MAIN_AUTHOR_CONFIG } from '@/lib/constants';
 
 interface SupabaseRatingRow {
   recipe_id?: string;
@@ -288,15 +289,14 @@ export default function Home() {
           }
 
           // Resolver autor (si la receta en Supabase carece de user_id, pertenece al autor principal)
-          const MAIN_ADMIN_UUID = '1afb8de4-9294-4f57-af9f-dc50b3e6e768';
-          const effectiveUserId = item.user_id || MAIN_ADMIN_UUID;
+          const effectiveUserId = item.user_id || MAIN_AUTHOR_CONFIG.UUID;
           const authorProfile = profileMap.get(effectiveUserId) || (item.user_id ? profileMap.get(item.user_id) : null);
           const resolvedProfiles =
             authorProfile ||
             item.profiles ||
             (item.author_name
               ? { id: effectiveUserId, username: item.author_name }
-              : { id: MAIN_ADMIN_UUID, username: 'leanBorsini' });
+              : { id: MAIN_AUTHOR_CONFIG.UUID, username: MAIN_AUTHOR_CONFIG.USERNAME });
 
           // Normalizar imágenes
           let imagesList: string[] = [];

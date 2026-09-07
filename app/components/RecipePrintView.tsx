@@ -114,7 +114,14 @@ export function RecipePrintView({
       {/* Imagen Principal (si existe) */}
       {currentImage && (
         <div className="mb-4 rounded-xl overflow-hidden border border-[#D8D3C4] max-h-48 flex items-center justify-center bg-[#F4F0E8]">
-          <img src={currentImage} alt={title} className="w-full h-48 object-cover" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={currentImage}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-48 object-cover"
+          />
         </div>
       )}
 

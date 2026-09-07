@@ -435,6 +435,12 @@ create policy "Users can update or delete their own recipe images."
     - Botón Editar: `[ ✏️ ]` (en desktop con etiqueta `Editar`).
     - Botón Eliminar: `[ 🗑️ ]` (en desktop con etiqueta `Eliminar`).
     - Al presionar eliminar, se despliega una confirmación compacta en el mismo lugar (`¿Borrar? [Sí] [✕]`) sin alterar el flujo visual ni duplicar controles.
+- [x] **Auditoría y Refactorización de Ingeniería de Alto Nivel**:
+  - **Constantes Centralizadas (`lib/constants.ts`)**: Se creó un módulo de constantes de autor y administración (`MAIN_AUTHOR_CONFIG`, `isMainAdminUser`, `isRecipeAuthor`) para eliminar strings mágicos y lógica duplicada.
+  - **Limpieza de artefactos**: Eliminación de `lib/culinaryDictionary.js` redundante.
+  - **Optimización de Renderizado e Imágenes**: Inclusión de `loading="lazy"` y `decoding="async"` en componentes con fotos dinámicas y base64, configurando `remotePatterns` en `next.config.ts`.
+  - **Resolución de Dependencias React Hook**: Ajuste estricto en el hook de carga de ingredientes en `RecipeFormModal.tsx`.
+  - **Verificación 100% Limpia**: `lint_applet` pasó con 0 errores y 0 advertencias, y `compile_applet` compiló exitosamente para producción.
 
 ---
 

@@ -38,6 +38,7 @@ import { RecipePrintView } from './RecipePrintView';
 import { CookingModeModal } from './CookingModeModal';
 import { translateTag, translateIngredientName } from '../../lib/culinaryDictionary';
 import { getCategoryLabel } from '@/lib/categories';
+import { MAIN_AUTHOR_CONFIG, isRecipeAuthor } from '@/lib/constants';
 import {
   translateRecipeField,
   translateCommentSmart,
@@ -404,33 +405,12 @@ export function RecipeDetailModal({
     recipe.profiles?.username ||
     (recipe as unknown as { author_name?: string }).author_name ||
     (recipe.user_id === user?.id
-      ? (user?.user_metadata?.username || user?.email?.split('@')[0] || 'leanBorsini')
-      : 'leanBorsini');
+      ? (user?.user_metadata?.username || user?.email?.split('@')[0] || MAIN_AUTHOR_CONFIG.USERNAME)
+      : MAIN_AUTHOR_CONFIG.USERNAME);
 
-  // Solo el autor original puede editar o eliminar su receta
+  // Solo el autor original o el administrador principal puede editar o eliminar su receta
   const isOwner = useMemo(() => {
-    // Si el usuario es el autor principal del proyecto (leoborsini12@gmail.com o leanBorsini)
-    const isMainAdminAuthor =
-      user &&
-      (user.email?.toLowerCase() === 'leoborsini12@gmail.com' ||
-        user.user_metadata?.username?.toLowerCase() === 'leanborsini' ||
-        profileUsername?.toLowerCase() === 'leanborsini');
-
-    if (isMainAdminAuthor) {
-      return true;
-    }
-
-    // Coincidencia estándar por ID de usuario autenticado
-    if (user && recipe.user_id && recipe.user_id === user.id) return true;
-    if (user && recipe.profiles?.id && recipe.profiles.id === user.id) return true;
-
-    // Receta local offline creada en este dispositivo que aún no se sincronizó a Supabase
-    const isLocalDraft = recipe.id.startsWith('user_') || recipe.id.startsWith('local_');
-    if (isLocalDraft && (!user || recipe.user_id === user?.id || recipe.user_id === 'local_user')) {
-      return true;
-    }
-
-    return false;
+    return isRecipeAuthor(recipe, user, profileUsername);
   }, [user, recipe, profileUsername]);
 
   const handlePrint = () => {
@@ -545,9 +525,12 @@ export function RecipeDetailModal({
           {recipeImages.length > 0 && currentImage && (
             <div className="space-y-2">
               <div className="w-full h-56 sm:h-64 rounded-xl overflow-hidden border border-[#D8D3C4] bg-black/5 relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={currentImage}
                   alt={`${displayedTitle} - ${activeImageIndex + 1}`}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover transition-all duration-300"
                   onError={(e) => {
                     (e.target as HTMLElement).parentElement!.style.display = 'none';
@@ -574,9 +557,12 @@ export function RecipeDetailModal({
                           : 'border-[#D8D3C4] opacity-60 hover:opacity-100'
                       }`}
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={imgSrc}
                         alt={`Miniatura ${idx + 1}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                       />
                     </button>
