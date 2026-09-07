@@ -448,6 +448,7 @@ create policy "Users can update or delete their own recipe images."
     - *Acciones Culinarias*: Acceso a `＋ Añadir Receta`, `👨‍🍳 Chef Remy (IA)` y `🛒 Menú Semanal & Compras` (con contador reactivo).
     - *Configuración & Utilidades*: Selector directo bilingüe `[ ES | EN ]`, `📲 Compartir App`, instalación PWA y guía de uso.
   - **Cierre Intuitivo y Accesibilidad**: Soporte para cierre por clic fuera (*backdrop blur*), botón dedicado `✕`, selección de cualquier acción o tecla `Escape`, bloqueando el scroll de fondo mientras permanece abierto.
+  - **Alineación Central Simétrica**: Se alineó el `h1` ("Pulse&Cook") al centro geométrico del `h2` subtítulo ("Recetario familiar & Planificador inteligente"), manteniendo una composición visual equilibrada y armónica.
 
 ---
 

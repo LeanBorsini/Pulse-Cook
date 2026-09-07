@@ -41,16 +41,16 @@ export function Header({
   return (
     <>
       <header className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-[#D8D3C4]/60">
-        <div className="flex flex-col items-start justify-center text-left">
+        <div className="flex flex-col items-center justify-center text-center">
           <h1
             id="brand-heading"
-            className="text-3xl sm:text-4xl lg:text-5xl font-handwritten font-bold text-[#2C3523] tracking-tight leading-tight"
+            className="text-3xl sm:text-4xl lg:text-5xl font-handwritten font-bold text-[#2C3523] tracking-tight leading-tight text-center"
           >
             Pulse&Cook
           </h1>
           <h2
             id="brand-subheading"
-            className="text-[#5C6650] text-xs sm:text-sm italic mt-0.5 font-normal"
+            className="text-[#5C6650] text-xs sm:text-sm italic mt-0.5 font-normal text-center"
           >
             {isEs
               ? 'Recetario familiar & Planificador inteligente'
