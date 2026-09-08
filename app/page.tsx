@@ -23,6 +23,8 @@ import {
   getLocalIngredients,
   saveLocalIngredients,
   batchSaveLocalIngredients,
+  reconcileLocalRecipesWithRemote,
+  normalizeRecipeTitle,
 } from '@/lib/recipeStore';
 import {
   getLocalUserRating,
@@ -396,21 +398,28 @@ export default function Home() {
           };
         });
 
-        // Combinar recetas locales con las de Supabase sin duplicados
-        // Las ediciones y creaciones locales del usuario tienen prioridad sobre registros remotos no actualizados
-        const combined = [...localList];
-        formatted.forEach((remoteRecipe) => {
-          const existsIndex = combined.findIndex((r) => r.id === remoteRecipe.id);
-          if (existsIndex === -1) {
-            combined.push(remoteRecipe);
-          } else {
-            // Preservar las modificaciones locales del usuario sobre la versión remota
-            combined[existsIndex] = {
-              ...remoteRecipe,
-              ...combined[existsIndex],
-              avg_rating: remoteRecipe.avg_rating || combined[existsIndex].avg_rating,
-              ratings_count: remoteRecipe.ratings_count || combined[existsIndex].ratings_count,
-              user_rating: remoteRecipe.user_rating || combined[existsIndex].user_rating,
+        // Reconciliar y purgar cualquier duplicado local temporal que ya exista en Supabase
+        const reconciledLocal = reconcileLocalRecipesWithRemote(formatted);
+
+        // Combinar recetas: base canónica remota de Supabase + locales no sincronizadas
+        const combined = [...formatted];
+        reconciledLocal.forEach((localRecipe) => {
+          const existsById = combined.some((r) => r.id === localRecipe.id);
+          const normLocalTitle = normalizeRecipeTitle(localRecipe.title_es);
+          const existsByTitle = combined.some(
+            (r) => normalizeRecipeTitle(r.title_es) === normLocalTitle
+          );
+
+          if (!existsById && !existsByTitle) {
+            combined.push(localRecipe);
+          } else if (existsById) {
+            const idx = combined.findIndex((r) => r.id === localRecipe.id);
+            combined[idx] = {
+              ...combined[idx],
+              ...localRecipe,
+              avg_rating: combined[idx].avg_rating || localRecipe.avg_rating,
+              ratings_count: combined[idx].ratings_count || localRecipe.ratings_count,
+              user_rating: combined[idx].user_rating || localRecipe.user_rating,
             };
           }
         });
@@ -774,33 +783,34 @@ export default function Home() {
 
   // Delete Recipe
   const handleDeleteRecipe = async (recipeId: string) => {
-    try {
-      await supabase.from('recipes').delete().eq('id', recipeId);
-    } catch (err) {
-      console.warn('Delete recipe remote error:', err);
-    }
-    const updated = deleteLocalRecipe(recipeId);
-    setRecipes(updated);
+    deleteLocalRecipe(recipeId);
+    setRecipes((prev) => prev.filter((r) => r.id !== recipeId));
     setSelectedRecipeIds((prev) => prev.filter((id) => id !== recipeId));
     setActiveRecipe(null);
     setActiveIngredients([]);
     setActiveComments([]);
     setCurrentUserRating(0);
+
+    try {
+      await supabase.from('recipes').delete().eq('id', recipeId);
+    } catch (err) {
+      console.warn('Delete recipe remote error:', err);
+    }
   };
 
   // Save generated recipe from Chef AI Assistant
   const handleSaveChefRecipe = async (
     newRecipe: Partial<Recipe> & { generatedIngredients?: Ingredient[] }
   ) => {
-    const localNewRecipe: Recipe = {
-      id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      user_id: user?.id || 'local_user',
-      profiles: profileUsername
-        ? { id: user?.id || 'local_user', username: profileUsername }
-        : { id: 'local_user', username: user?.email?.split('@')[0] || 'Mi Cocina' },
+    setShowChefAI(false);
+
+    const standardizedCategory = getCategoryLabel(newRecipe.category, 'ES');
+    let finalRecipeId: string | null = null;
+
+    const supabasePayload = {
       title_es: newRecipe.title_es || 'Nueva Receta',
       title_en: newRecipe.title_en || '',
-      category: getCategoryLabel(newRecipe.category, 'ES'),
+      category: standardizedCategory,
       prep_time: newRecipe.prep_time || 20,
       servings: newRecipe.servings || 2,
       description_es: newRecipe.description_es || '',
@@ -810,44 +820,19 @@ export default function Home() {
       image_url: newRecipe.image_url || '',
       images: newRecipe.images || (newRecipe.image_url ? [newRecipe.image_url] : []),
       dietary_tags: newRecipe.dietary_tags || [],
-      created_at: new Date().toISOString(),
+      user_id: user?.id || null,
     };
 
-    saveLocalRecipe(localNewRecipe, newRecipe.generatedIngredients || []);
-    setRecipes(getLocalRecipes());
-    setShowChefAI(false);
-
-    try {
-      if (user) {
-        const { data: supaRec } = await supabase
+    if (user) {
+      try {
+        const { data: supaRec, error: supaErr } = await supabase
           .from('recipes')
-          .insert([
-            {
-              user_id: user.id,
-              title_es: localNewRecipe.title_es,
-              title_en: localNewRecipe.title_en,
-              category: localNewRecipe.category,
-              prep_time: localNewRecipe.prep_time,
-              servings: localNewRecipe.servings,
-              description_es: localNewRecipe.description_es,
-              description_en: localNewRecipe.description_en,
-              instructions_es: localNewRecipe.instructions_es,
-              instructions_en: localNewRecipe.instructions_en,
-              image_url: localNewRecipe.image_url,
-              images: localNewRecipe.images,
-              dietary_tags: localNewRecipe.dietary_tags,
-            },
-          ])
+          .insert([supabasePayload])
           .select()
           .single();
 
-        if (supaRec) {
-          localNewRecipe.id = supaRec.id;
-          saveLocalRecipe(localNewRecipe, newRecipe.generatedIngredients || []);
-          if (newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
-            saveLocalIngredients(supaRec.id, newRecipe.generatedIngredients);
-          }
-          setRecipes(getLocalRecipes());
+        if (!supaErr && supaRec) {
+          finalRecipeId = supaRec.id;
 
           if (newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
             const ingPayload = newRecipe.generatedIngredients.map((ing) => {
@@ -869,10 +854,38 @@ export default function Home() {
             if (chefIngErr) console.error('Chef recipe ingredients insert error:', chefIngErr);
           }
         }
+      } catch (err) {
+        console.warn('Chef recipe remote sync error, saving locally:', err);
       }
-    } catch (err) {
-      console.warn('Chef recipe remote sync skipped:', err);
     }
+
+    if (!finalRecipeId) {
+      finalRecipeId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    }
+
+    const localNewRecipe: Recipe = {
+      id: finalRecipeId,
+      user_id: user?.id || 'local_user',
+      profiles: profileUsername
+        ? { id: user?.id || 'local_user', username: profileUsername }
+        : { id: 'local_user', username: user?.email?.split('@')[0] || 'Mi Cocina' },
+      title_es: supabasePayload.title_es,
+      title_en: supabasePayload.title_en,
+      category: supabasePayload.category,
+      prep_time: supabasePayload.prep_time,
+      servings: supabasePayload.servings,
+      description_es: supabasePayload.description_es,
+      description_en: supabasePayload.description_en,
+      instructions_es: supabasePayload.instructions_es,
+      instructions_en: supabasePayload.instructions_en,
+      image_url: supabasePayload.image_url,
+      images: supabasePayload.images,
+      dietary_tags: supabasePayload.dietary_tags,
+      created_at: new Date().toISOString(),
+    };
+
+    saveLocalRecipe(localNewRecipe, newRecipe.generatedIngredients || []);
+    await fetchRecipes();
   };
 
   // Filtered and Sorted Recipes

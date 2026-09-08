@@ -50,15 +50,118 @@ export function getLocalRecipes(): Recipe[] {
     // Filtrar estrictamente cualquier receta de prueba
     const validRecipes = customRecipes.filter((r) => !DEMO_IDS.has(r.id));
     
-    if (validRecipes.length !== customRecipes.length) {
-      localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(validRecipes));
+    // Deduplicar automáticamente recetas con el mismo título normalizado, prefiriendo siempre UUID de Supabase
+    const seenTitles = new Map<string, Recipe>();
+    const deduplicated: Recipe[] = [];
+
+    validRecipes.forEach((r) => {
+      const normTitle = normalizeRecipeTitle(r.title_es) || r.id;
+      const existing = seenTitles.get(normTitle);
+      if (!existing) {
+        seenTitles.set(normTitle, r);
+        deduplicated.push(r);
+      } else {
+        const isCurrentUuid = r.id.length === 36 && r.id.includes('-');
+        const isExistingUuid = existing.id.length === 36 && existing.id.includes('-');
+        if (isCurrentUuid && !isExistingUuid) {
+          const idx = deduplicated.findIndex((item) => item.id === existing.id);
+          if (idx >= 0) {
+            deleteLocalIngredients(existing.id);
+            deduplicated[idx] = r;
+            seenTitles.set(normTitle, r);
+          }
+        }
+      }
+    });
+
+    if (deduplicated.length !== customRecipes.length) {
+      localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(deduplicated));
     }
 
-    return validRecipes;
+    return deduplicated;
   } catch (err) {
     console.warn('Error reading local recipes:', err);
     return [];
   }
+}
+
+/**
+ * Normaliza un título para comparaciones seguras de deduplicación
+ */
+export function normalizeRecipeTitle(title?: string): string {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Reconcilia recetas locales con recetas remotas de Supabase.
+ * Detecta si una receta local temporal (con ID que comienza por 'user_', 'rec_', 'local_', o no-UUID)
+ * ya existe en Supabase (mismo título normalizado).
+ * Si existe: purga la versión local huérfana de localStorage y migra ingredientes si aplica.
+ */
+export function reconcileLocalRecipesWithRemote(remoteRecipes: Recipe[]): Recipe[] {
+  if (typeof window === 'undefined') return [];
+  const localRecipes = getLocalRecipes();
+  if (localRecipes.length === 0 || remoteRecipes.length === 0) return localRecipes;
+
+  const remoteTitlesMap = new Map<string, Recipe>();
+  remoteRecipes.forEach((r) => {
+    const normEs = normalizeRecipeTitle(r.title_es);
+    const normEn = normalizeRecipeTitle(r.title_en);
+    if (normEs) remoteTitlesMap.set(normEs, r);
+    if (normEn) remoteTitlesMap.set(normEn, r);
+  });
+
+  const remainingLocal: Recipe[] = [];
+  let purgedAny = false;
+
+  localRecipes.forEach((local) => {
+    // Si la receta local ya tiene exactamente el mismo ID que una remota, se preserva
+    if (remoteRecipes.some((r) => r.id === local.id)) {
+      remainingLocal.push(local);
+      return;
+    }
+
+    // Identificar si tiene un ID temporal generado en el cliente
+    const isTempId =
+      local.id.startsWith('user_') ||
+      local.id.startsWith('local_') ||
+      local.id.startsWith('rec_') ||
+      !local.id.includes('-');
+
+    const normEs = normalizeRecipeTitle(local.title_es);
+    const normEn = normalizeRecipeTitle(local.title_en);
+    const matchingRemote =
+      (normEs ? remoteTitlesMap.get(normEs) : null) ||
+      (normEn ? remoteTitlesMap.get(normEn) : null);
+
+    if (isTempId && matchingRemote) {
+      // Es un duplicado temporal que ya se subió a Supabase con éxito.
+      // Migrar ingredientes locales al ID remoto si el remoto aún no los tiene en caché local
+      const localIngs = getLocalIngredients(local.id);
+      if (localIngs.length > 0) {
+        const remoteIngs = getLocalIngredients(matchingRemote.id);
+        if (remoteIngs.length === 0) {
+          saveLocalIngredients(matchingRemote.id, localIngs);
+        }
+      }
+      deleteLocalRecipe(local.id);
+      purgedAny = true;
+    } else {
+      remainingLocal.push(local);
+    }
+  });
+
+  if (purgedAny) {
+    localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(remainingLocal));
+  }
+
+  return remainingLocal;
 }
 
 /**
@@ -69,10 +172,24 @@ export function saveLocalRecipe(recipe: Recipe, ingredients?: Ingredient[]): Rec
 
   try {
     const customRecipes: Recipe[] = getLocalRecipes();
-    const existingIndex = customRecipes.findIndex((r) => r.id === recipe.id);
+    // 1. Buscar coincidencia exacta por ID
+    let existingIndex = customRecipes.findIndex((r) => r.id === recipe.id);
+
+    // 2. Si no coincide por ID pero es el mismo título normalizado del mismo autor/receta, actualizarla
+    if (existingIndex === -1 && recipe.title_es) {
+      const normTitle = normalizeRecipeTitle(recipe.title_es);
+      existingIndex = customRecipes.findIndex(
+        (r) => normalizeRecipeTitle(r.title_es) === normTitle
+      );
+    }
 
     let updated: Recipe[];
     if (existingIndex >= 0) {
+      const oldId = customRecipes[existingIndex].id;
+      // Si el ID cambió (ej. de temp user_ a UUID de Supabase), limpiar el viejo
+      if (oldId !== recipe.id) {
+        deleteLocalIngredients(oldId);
+      }
       updated = [...customRecipes];
       updated[existingIndex] = recipe;
     } else {

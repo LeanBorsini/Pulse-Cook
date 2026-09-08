@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
-import { saveLocalRecipe, getLocalIngredients, saveLocalIngredients } from '@/lib/recipeStore';
+import { saveLocalRecipe, getLocalIngredients, saveLocalIngredients, deleteLocalRecipe } from '@/lib/recipeStore';
 import {
   translateTextSmart,
 } from '@/lib/recipeTranslator';
@@ -478,11 +478,105 @@ export function RecipeFormModal({
         };
       });
 
-    const recipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const standardizedCategory = getCategoryLabel(category, 'ES');
+    const isExistingRemote = Boolean(recipeToEdit?.id && !recipeToEdit.id.startsWith('user_') && !recipeToEdit.id.startsWith('rec_'));
+    const oldTempId = recipeToEdit?.id && (recipeToEdit.id.startsWith('user_') || recipeToEdit.id.startsWith('rec_')) ? recipeToEdit.id : null;
+
+    let finalRecipeId = isExistingRemote ? recipeToEdit!.id : null;
+
+    const supabasePayload = {
+      title_es: finalTitleEs,
+      title_en: finalTitleEn,
+      category: standardizedCategory,
+      prep_time: Number(prepTime) || 20,
+      servings: Number(servings) || 4,
+      description_es: finalDescEs,
+      description_en: finalDescEn,
+      instructions_es: finalInstEs,
+      instructions_en: finalInstEn,
+      image_url: images[0] || '',
+      images: images,
+      youtube_url: validVideos[0]?.url || '',
+      video_links: validVideos,
+      user_id: user?.id || recipeToEdit?.user_id || null,
+      dietary_tags: selectedTags,
+    };
+
+    // 1. Sincronizar prioritariamente con Supabase si el usuario está autenticado
+    if (user) {
+      try {
+        if (isExistingRemote && recipeToEdit?.id) {
+          // Actualizar receta existente en Supabase
+          await supabase
+            .from('recipes')
+            .update(supabasePayload)
+            .eq('id', recipeToEdit.id);
+          finalRecipeId = recipeToEdit.id;
+
+          // Actualizar ingredientes en Supabase
+          try {
+            await supabase.from('ingredients').delete().eq('recipe_id', recipeToEdit.id);
+            if (validIngredients.length > 0) {
+              const ingPayload = validIngredients.map((ing) => ({
+                recipe_id: recipeToEdit.id,
+                name_es: ing.name_es,
+                name_en: ing.name_en,
+                amount: ing.amount,
+                unit: ing.unit,
+                aisle: ing.aisle || 'General',
+              }));
+              const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
+              if (ingErr) {
+                console.error('Error inserting ingredients into Supabase on update:', ingErr);
+              }
+            }
+          } catch (ingErr) {
+            console.warn('Ingredients sync note:', ingErr);
+          }
+        } else {
+          // Crear nueva receta en Supabase (obtiene el UUID oficial de inmediato)
+          const { data: supaRecipe, error: supaErr } = await supabase
+            .from('recipes')
+            .insert([supabasePayload])
+            .select()
+            .single();
+
+          if (!supaErr && supaRecipe) {
+            finalRecipeId = supaRecipe.id;
+
+            // Si se editaba una receta que antes era temporal local, purgarla
+            if (oldTempId) {
+              deleteLocalRecipe(oldTempId);
+            }
+
+            if (validIngredients.length > 0) {
+              const ingPayload = validIngredients.map((ing) => ({
+                recipe_id: supaRecipe.id,
+                name_es: ing.name_es,
+                name_en: ing.name_en,
+                amount: ing.amount,
+                unit: ing.unit,
+                aisle: ing.aisle || 'General',
+              }));
+              const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
+              if (ingErr) {
+                console.error('Error inserting ingredients into Supabase on create:', ingErr);
+              }
+            }
+          }
+        }
+      } catch (supaErr) {
+        console.warn('Supabase sync skipped/offline, saving locally:', supaErr);
+      }
+    }
+
+    // 2. Si no hay conexión o no hay usuario autenticado, usar ID temporal
+    if (!finalRecipeId) {
+      finalRecipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    }
 
     const recipeData: Recipe = {
-      id: recipeId,
+      id: finalRecipeId,
       title_es: finalTitleEs,
       title_en: finalTitleEn,
       category: standardizedCategory,
@@ -509,88 +603,8 @@ export function RecipeFormModal({
       created_at: recipeToEdit?.created_at || new Date().toISOString(),
     };
 
-    // 1. Guardar de forma 100% persistente en el almacenamiento local
+    // 3. Guardar de forma 100% consistente en el almacenamiento local bajo el ID canónico
     saveLocalRecipe(recipeData, validIngredients);
-
-    // 2. Intentar guardar en Supabase en segundo plano si está disponible
-    try {
-      const supabasePayload = {
-        title_es: finalTitleEs,
-        title_en: finalTitleEn,
-        category: standardizedCategory,
-        prep_time: Number(prepTime) || 20,
-        servings: Number(servings) || 4,
-        description_es: finalDescEs,
-        description_en: finalDescEn,
-        instructions_es: finalInstEs,
-        instructions_en: finalInstEn,
-        image_url: images[0] || '',
-        images: images,
-        youtube_url: validVideos[0]?.url || '',
-        video_links: validVideos,
-        user_id: user?.id || recipeToEdit?.user_id || null,
-        dietary_tags: selectedTags,
-      };
-
-      if (recipeToEdit?.id && !recipeToEdit.id.startsWith('user_') && !recipeToEdit.id.startsWith('rec_')) {
-        // Actualizar receta existente en Supabase
-        await supabase
-          .from('recipes')
-          .update(supabasePayload)
-          .eq('id', recipeToEdit.id);
-
-        // Actualizar ingredientes en Supabase
-        try {
-          await supabase.from('ingredients').delete().eq('recipe_id', recipeToEdit.id);
-          if (validIngredients.length > 0) {
-            const ingPayload = validIngredients.map((ing) => ({
-              recipe_id: recipeToEdit.id,
-              name_es: ing.name_es,
-              name_en: ing.name_en,
-              amount: ing.amount,
-              unit: ing.unit,
-              aisle: ing.aisle || 'General',
-            }));
-            const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
-            if (ingErr) {
-              console.error('Error inserting ingredients into Supabase on update:', ingErr);
-            }
-          }
-        } catch (ingErr) {
-          console.warn('Ingredients sync note:', ingErr);
-        }
-      } else if (user) {
-        // Crear nueva receta en Supabase (o subir receta local previamente no sincronizada)
-        const { data: supaRecipe, error: supaErr } = await supabase
-          .from('recipes')
-          .insert([supabasePayload])
-          .select()
-          .single();
-
-        if (!supaErr && supaRecipe) {
-          // Asignar el ID real de Supabase a la receta guardada localmente para mantener concordancia
-          recipeData.id = supaRecipe.id;
-          saveLocalRecipe(recipeData, validIngredients);
-
-          if (validIngredients.length > 0) {
-            const ingPayload = validIngredients.map((ing) => ({
-              recipe_id: supaRecipe.id,
-              name_es: ing.name_es,
-              name_en: ing.name_en,
-              amount: ing.amount,
-              unit: ing.unit,
-              aisle: ing.aisle || 'General',
-            }));
-            const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
-            if (ingErr) {
-              console.error('Error inserting ingredients into Supabase on create:', ingErr);
-            }
-          }
-        }
-      }
-    } catch (supaErr) {
-      console.warn('Supabase sync skipped/offline, saved locally:', supaErr);
-    }
 
     setSaving(false);
     setStatusMessage(null);
