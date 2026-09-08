@@ -183,8 +183,12 @@ export default function Home() {
     }
   }, [menuServings]);
 
-  // Update servings for a recipe in menu
+  // Update servings for a recipe in menu (sólo usuarios autenticados)
   const handleUpdateMenuServings = (recipeId: string, newServings: number) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     const sanitized = Math.max(1, Math.min(99, Math.round(newServings)));
     setMenuServings((prev) => ({
       ...prev,
@@ -194,6 +198,10 @@ export default function Home() {
 
   // Clear entire menu and stored checks
   const handleClearMenu = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setSelectedRecipeIds([]);
     setMenuServings({});
     if (typeof window !== 'undefined') {
@@ -508,6 +516,18 @@ export default function Home() {
         await loadUserProfile(currentUser.id);
       } else {
         setProfileUsername(null);
+        setSelectedRecipeIds([]);
+        setMenuServings({});
+        setShowShoppingList(false);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('pulse_menu_recipe_ids');
+            localStorage.removeItem('pulse_menu_servings');
+            localStorage.removeItem('pulse_shopping_list_checks');
+          } catch (e) {
+            console.warn('Error clearing menu storage on signout:', e);
+          }
+        }
       }
 
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
@@ -618,8 +638,12 @@ export default function Home() {
     };
   }, [activeRecipeId, activeRecipe?.user_rating, user?.id]);
 
-  // Toggle Recipe into Shopping Menu (with optional customServings)
+  // Toggle Recipe into Shopping Menu (with optional customServings, sólo usuarios autenticados)
   const handleToggleMenu = (recipeId: string, customServings?: number) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setSelectedRecipeIds((prev) => {
       const isSelected = prev.includes(recipeId);
       if (isSelected) {
@@ -923,10 +947,28 @@ export default function Home() {
           await supabase.auth.signOut();
           setUser(null);
           setProfileUsername(null);
+          setSelectedRecipeIds([]);
+          setMenuServings({});
+          setShowShoppingList(false);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('pulse_menu_recipe_ids');
+              localStorage.removeItem('pulse_menu_servings');
+              localStorage.removeItem('pulse_shopping_list_checks');
+            } catch (err) {
+              console.warn('Error clearing menu storage on sign out:', err);
+            }
+          }
         }}
         onOpenNewRecipe={() => setIsCreatingRecipe(true)}
-        selectedCount={selectedRecipeIds.length}
-        onOpenShoppingList={() => setShowShoppingList(true)}
+        selectedCount={user ? selectedRecipeIds.length : 0}
+        onOpenShoppingList={() => {
+          if (!user) {
+            setShowAuthModal(true);
+          } else {
+            setShowShoppingList(true);
+          }
+        }}
         onOpenChefAI={() => setShowChefAI(true)}
         onOpenWelcome={() => setShowWelcomeModal(true)}
         onOpenShareApp={() => setShowShareApp(true)}
@@ -1062,7 +1104,7 @@ export default function Home() {
               key={recipe.id}
               recipe={recipe}
               lang={lang}
-              isSelected={selectedRecipeIds.includes(recipe.id)}
+              isSelected={Boolean(user && selectedRecipeIds.includes(recipe.id))}
               servingsCount={menuServings[recipe.id] || recipe.servings || 2}
               user={user}
               onOpenDetails={(r) => setActiveRecipe(r)}
@@ -1088,7 +1130,7 @@ export default function Home() {
           user={user}
           profileUsername={profileUsername}
           userRating={currentUserRating}
-          isInMenu={activeRecipe ? selectedRecipeIds.includes(activeRecipe.id) : false}
+          isInMenu={Boolean(user && activeRecipe && selectedRecipeIds.includes(activeRecipe.id))}
           servingsCount={activeRecipe ? (menuServings[activeRecipe.id] || activeRecipe.servings || 2) : undefined}
           onToggleMenu={handleToggleMenu}
           onUpdateServings={handleUpdateMenuServings}
@@ -1140,11 +1182,13 @@ export default function Home() {
       {showShoppingList && (
         <ShoppingListModal
           lang={lang}
-          selectedRecipeIds={selectedRecipeIds}
+          user={user}
+          selectedRecipeIds={user ? selectedRecipeIds : []}
           recipes={recipes}
           servingsMap={menuServings}
           onUpdateServings={handleUpdateMenuServings}
           onClose={() => setShowShoppingList(false)}
+          onOpenAuth={() => setShowAuthModal(true)}
           onClearMenu={handleClearMenu}
           onRemoveRecipe={handleToggleMenu}
         />

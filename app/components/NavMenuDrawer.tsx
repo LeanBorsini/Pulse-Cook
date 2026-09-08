@@ -14,6 +14,7 @@ import {
   UserCheck,
   ChevronRight,
   Smartphone,
+  Lock,
 } from 'lucide-react';
 import { RemyIcon } from './RemyIcon';
 import { usePWAInstall } from './usePWAInstall';
@@ -238,6 +239,10 @@ export function NavMenuDrawer({
             <button
               onClick={() => {
                 onClose();
+                if (!user) {
+                  onOpenAuth();
+                  return;
+                }
                 onOpenShoppingList();
               }}
               className="w-full flex items-center justify-between p-3.5 bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl hover:bg-[#EFECE1] transition-all cursor-pointer active:scale-98 group text-left"
@@ -252,20 +257,29 @@ export function NavMenuDrawer({
                     <h4 className="text-xs sm:text-sm font-bold text-[#2C3523] leading-tight">
                       {isEs ? 'Menú Semanal & Compras' : 'Weekly Menu & Shopping'}
                     </h4>
-                    {selectedCount > 0 && (
+                    {user && selectedCount > 0 ? (
                       <span className="text-[10px] font-extrabold px-1.5 py-0.2 bg-[#2C3523] text-white rounded-full">
                         {selectedCount}
                       </span>
-                    )}
+                    ) : !user ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#EFECE1] text-[#5C6650] border border-[#D8D3C4] rounded-md flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-[#5C6650]" />
+                        <span>{isEs ? 'Requiere cuenta' : 'Login required'}</span>
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-[11px] text-[#5C6650] mt-0.5">
-                    {selectedCount > 0
+                    {user && selectedCount > 0
                       ? isEs
                         ? `${selectedCount} recetas planificadas`
                         : `${selectedCount} recipes selected`
+                      : user
+                      ? isEs
+                        ? 'Organiza tus platos de la semana'
+                        : 'Organize your weekly meal plan'
                       : isEs
-                      ? 'Organiza tus platos de la semana'
-                      : 'Organize your weekly meal plan'}
+                      ? 'Inicia sesión para planificar y comprar'
+                      : 'Sign in to plan meals and grocery list'}
                   </p>
                 </div>
               </div>

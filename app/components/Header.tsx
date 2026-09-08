@@ -59,8 +59,8 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Acceso rápido a Menú Semanal si hay recetas seleccionadas */}
-          {selectedCount > 0 && (
+          {/* Acceso rápido a Menú Semanal sólo si el usuario está autenticado y tiene recetas seleccionadas */}
+          {Boolean(user && selectedCount > 0) && (
             <button
               onClick={onOpenShoppingList}
               className="flex items-center gap-1.5 px-3 py-2 bg-[#2C3523] text-[#FAF8F2] hover:bg-[#3D4932] rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 animate-pulse"

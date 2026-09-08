@@ -13,8 +13,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle, Trash2, Users, Minus, Plus } from 'lucide-react';
+import { X, Check, ShoppingCart, Loader2, Printer, MessageCircle, Trash2, Users, Minus, Plus, Lock } from 'lucide-react';
 import { Ingredient, Recipe } from '../types';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabase';
 import { getLocalIngredients, batchSaveLocalIngredients } from '../../lib/recipeStore';
 import { translateIngredientName } from '../../lib/culinaryDictionary';
@@ -23,24 +24,28 @@ import { ShoppingListPrintView } from './ShoppingListPrintView';
 
 interface ShoppingListModalProps {
   lang: 'ES' | 'EN';
+  user?: User | null;
   shoppingList?: Ingredient[];
   selectedRecipeIds?: string[];
   recipes?: Recipe[];
   servingsMap?: Record<string, number>;
   onUpdateServings?: (recipeId: string, newServings: number) => void;
   onClose: () => void;
+  onOpenAuth?: () => void;
   onClearMenu?: () => void;
   onRemoveRecipe?: (recipeId: string) => void;
 }
 
 export function ShoppingListModal({
   lang,
+  user,
   shoppingList: initialShoppingList,
   selectedRecipeIds = [],
   recipes = [],
   servingsMap,
   onUpdateServings,
   onClose,
+  onOpenAuth,
   onClearMenu,
   onRemoveRecipe,
 }: ShoppingListModalProps) {
@@ -235,6 +240,55 @@ export function ShoppingListModal({
     const encodedMessage = encodeURIComponent(message);
     window.open(`https://api.whatsapp.com/send?text=${encodedMessage}`, '_blank');
   };
+
+  if (!user) {
+    return (
+      <div
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+      >
+        <div className="bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl max-w-md w-full p-6 shadow-xl text-center text-[#2C3523] relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-[#EFECE1] text-[#5C6650] transition-colors cursor-pointer"
+            aria-label={lang === 'ES' ? 'Cerrar' : 'Close'}
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <div className="w-14 h-14 rounded-2xl bg-[#EFECE1] border border-[#D8D3C4] flex items-center justify-center mx-auto mb-4 text-[#2C3523]">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h3 className="text-lg font-serif font-bold mb-2">
+            {lang === 'ES' ? 'Menú Semanal y Compras' : 'Weekly Menu & Shopping'}
+          </h3>
+          <p className="text-xs sm:text-sm text-[#5C6650] leading-relaxed mb-6">
+            {lang === 'ES'
+              ? 'Debes iniciar sesión con tu cuenta para agregar recetas al menú, planificar tus comidas y generar tu lista de compras inteligente.'
+              : 'Please sign in to add recipes to your menu, plan meals, and generate your smart grocery shopping list.'}
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                onClose();
+                onOpenAuth?.();
+              }}
+              className="w-full py-2.5 bg-[#2C3523] text-[#FAF8F2] hover:bg-[#3D4932] rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer"
+            >
+              {lang === 'ES' ? 'Iniciar Sesión / Registrarme' : 'Sign In / Register'}
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full py-2 bg-transparent hover:bg-[#EFECE1] text-[#5C6650] rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              {lang === 'ES' ? 'Volver al catálogo' : 'Back to recipes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

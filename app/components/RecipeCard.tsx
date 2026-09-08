@@ -24,17 +24,24 @@ export function RecipeCard({
   lang,
   isSelected,
   servingsCount,
+  user,
   onOpenDetails,
   onToggleMenu,
   onUpdateServings,
+  onOpenAuth,
 }: RecipeCardProps) {
   const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
   const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
   const authorName = recipe.profiles?.username || MAIN_AUTHOR_CONFIG.USERNAME;
   const currentServings = servingsCount ?? (recipe.servings || 2);
+  const isEffectiveSelected = Boolean(user && isSelected);
 
   const handleMenuClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!user) {
+      onOpenAuth?.();
+      return;
+    }
     onToggleMenu(recipe.id);
   };
 
@@ -139,7 +146,7 @@ export function RecipeCard({
         >
           {lang === 'ES' ? 'Ver Receta' : 'View Recipe'}
         </button>
-        {isSelected ? (
+        {isEffectiveSelected ? (
           <div
             onClick={(e) => e.stopPropagation()}
             className="flex items-center bg-[#2C3523] text-[#F7F5EC] rounded-xl px-2 py-1 text-xs font-semibold shadow-xs border border-[#2C3523]"

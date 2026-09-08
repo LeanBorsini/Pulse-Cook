@@ -627,7 +627,7 @@ export function RecipeDetailModal({
 
             {/* Botón Añadir / Gestionar en Menú */}
             {onToggleMenu && (
-              isInMenu ? (
+              isInMenu && user ? (
                 <div className="flex items-center bg-[#2C3523] text-[#F7F5EC] rounded-xl px-2 py-1 border border-[#2C3523] text-xs font-semibold shadow-xs">
                   <span className="flex items-center gap-1 mr-1.5 text-[11px]">
                     <ShoppingCart className="w-3.5 h-3.5 text-amber-200" />
@@ -668,8 +668,14 @@ export function RecipeDetailModal({
                 </div>
               ) : (
                 <button
-                  onClick={() => onToggleMenu(recipe.id, detailServings)}
-                  title={lang === 'ES' ? 'Añadir al Menú Semanal' : 'Add to Weekly Menu'}
+                  onClick={() => {
+                    if (!user) {
+                      onOpenAuth();
+                      return;
+                    }
+                    onToggleMenu(recipe.id, detailServings);
+                  }}
+                  title={lang === 'ES' ? (user ? 'Añadir al Menú Semanal' : 'Inicia sesión para añadir al Menú') : (user ? 'Add to Weekly Menu' : 'Sign in to add to Menu')}
                   className="p-2 px-3 rounded-xl border transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer bg-[#EFECE1] border-[#D8D3C4] text-[#5C6650] hover:bg-[#E2DEC2]"
                 >
                   <ShoppingCart className="w-4 h-4" />
