@@ -549,8 +549,12 @@ export function RecipeFormModal({
               name_en: ing.name_en,
               amount: ing.amount,
               unit: ing.unit,
+              aisle: ing.aisle || 'General',
             }));
-            await supabase.from('ingredients').insert(ingPayload);
+            const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
+            if (ingErr) {
+              console.error('Error inserting ingredients into Supabase on update:', ingErr);
+            }
           }
         } catch (ingErr) {
           console.warn('Ingredients sync note:', ingErr);
@@ -575,8 +579,12 @@ export function RecipeFormModal({
               name_en: ing.name_en,
               amount: ing.amount,
               unit: ing.unit,
+              aisle: ing.aisle || 'General',
             }));
-            await supabase.from('ingredients').insert(ingPayload);
+            const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
+            if (ingErr) {
+              console.error('Error inserting ingredients into Supabase on create:', ingErr);
+            }
           }
         }
       }

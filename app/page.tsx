@@ -841,23 +841,33 @@ export default function Home() {
           .select()
           .single();
 
-        if (supaRec && newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
-          const ingPayload = newRecipe.generatedIngredients.map((ing) => {
-            const rawEs = (ing.name_es || '').trim();
-            let rawEn = (ing.name_en || '').trim();
-            if (!rawEn || rawEn.toLowerCase() === rawEs.toLowerCase()) {
-              rawEn = translateIngredientName(rawEs, undefined, 'EN') || rawEs;
-            }
-            return {
-              recipe_id: supaRec.id,
-              name_es: rawEs,
-              name_en: rawEn,
-              amount: ing.amount || 1,
-              unit: ing.unit || '',
-              aisle: 'General',
-            };
-          });
-          await supabase.from('ingredients').insert(ingPayload);
+        if (supaRec) {
+          localNewRecipe.id = supaRec.id;
+          saveLocalRecipe(localNewRecipe, newRecipe.generatedIngredients || []);
+          if (newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
+            saveLocalIngredients(supaRec.id, newRecipe.generatedIngredients);
+          }
+          setRecipes(getLocalRecipes());
+
+          if (newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
+            const ingPayload = newRecipe.generatedIngredients.map((ing) => {
+              const rawEs = (ing.name_es || '').trim();
+              let rawEn = (ing.name_en || '').trim();
+              if (!rawEn || rawEn.toLowerCase() === rawEs.toLowerCase()) {
+                rawEn = translateIngredientName(rawEs, undefined, 'EN') || rawEs;
+              }
+              return {
+                recipe_id: supaRec.id,
+                name_es: rawEs,
+                name_en: rawEn,
+                amount: ing.amount || 1,
+                unit: ing.unit || '',
+                aisle: 'General',
+              };
+            });
+            const { error: chefIngErr } = await supabase.from('ingredients').insert(ingPayload);
+            if (chefIngErr) console.error('Chef recipe ingredients insert error:', chefIngErr);
+          }
         }
       }
     } catch (err) {
