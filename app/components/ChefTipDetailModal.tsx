@@ -296,7 +296,8 @@ export function ChefTipDetailModal({
               </span>
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((starVal) => {
-                  const isFilled = starVal <= (currentTip.user_rating || Math.round(currentTip.avg_rating || 5));
+                  const hasRatingData = Boolean(currentTip.user_rating || (currentTip.ratings_count && currentTip.ratings_count > 0));
+                  const isFilled = hasRatingData && starVal <= (currentTip.user_rating || Math.round(currentTip.avg_rating || 0));
                   return (
                     <button
                       key={starVal}
@@ -314,10 +315,12 @@ export function ChefTipDetailModal({
                 })}
               </div>
               <span className="text-xs font-black text-[#2C3523] ml-1">
-                {currentTip.avg_rating?.toFixed(1) || '5.0'}
+                {currentTip.ratings_count && currentTip.ratings_count > 0 && currentTip.avg_rating
+                  ? currentTip.avg_rating.toFixed(1)
+                  : '0.0'}
               </span>
               <span className="text-[11px] text-[#5C6650]">
-                ({currentTip.ratings_count || 1})
+                ({currentTip.ratings_count || 0})
               </span>
             </div>
           </div>

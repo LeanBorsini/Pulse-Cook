@@ -3,7 +3,8 @@ import { supabase } from './supabase';
 import { INITIAL_CHEF_TIPS, AUTHOR_LEAN_BORSINI } from './chefTipsData';
 import { getPersistentClientId } from './ratingStore';
 
-const TIPS_STORAGE_KEY = 'pulse_cook_chef_tips_v1';
+const TIPS_STORAGE_KEY = 'pulse_cook_chef_tips_v2';
+const LEGACY_TIPS_KEY = 'pulse_cook_chef_tips_v1';
 const TIP_LIKES_KEY = 'pulse_cook_tip_likes_v1';
 const TIP_RATINGS_KEY = 'pulse_cook_tip_ratings_v1';
 const TIP_EXPERIENCES_KEY = 'pulse_cook_tip_experiences_v1';
@@ -26,19 +27,62 @@ export function canManageTip(
 
 /**
  * Obtiene los tips almacenados localmente en localStorage (combinando con iniciales).
+ * Garantiza que arranquen estrictamente en 0 me gusta y 0 puntuación si no han sido votados.
  */
 export function getLocalTips(): ChefTip[] {
   if (typeof window === 'undefined') return INITIAL_CHEF_TIPS;
 
   try {
+    const localLikes = getLocalTipLikes();
+    const localRatings = getLocalTipRatings();
+
+    // 1. Migración de v1 a v2 para limpiar contadores falsos de versiones anteriores
+    const legacyRaw = localStorage.getItem(LEGACY_TIPS_KEY);
+    if (legacyRaw && !localStorage.getItem(TIPS_STORAGE_KEY)) {
+      try {
+        const legacyParsed = JSON.parse(legacyRaw);
+        if (Array.isArray(legacyParsed)) {
+          // Limpiar likes y ratings falsos de tips antiguos
+          const cleaned = legacyParsed.map((tip: ChefTip) => ({
+            ...tip,
+            likes_count: localLikes[tip.id] ? 1 : 0,
+            user_liked: Boolean(localLikes[tip.id]),
+            avg_rating: localRatings[tip.id] || 0,
+            ratings_count: localRatings[tip.id] ? 1 : 0,
+            user_rating: localRatings[tip.id] || 0,
+          }));
+          localStorage.setItem(TIPS_STORAGE_KEY, JSON.stringify(cleaned));
+          localStorage.removeItem(LEGACY_TIPS_KEY);
+          return cleaned;
+        }
+      } catch {}
+      localStorage.removeItem(LEGACY_TIPS_KEY);
+    }
+
     const raw = localStorage.getItem(TIPS_STORAGE_KEY);
     if (!raw) {
       localStorage.setItem(TIPS_STORAGE_KEY, JSON.stringify(INITIAL_CHEF_TIPS));
       return INITIAL_CHEF_TIPS;
     }
+
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      // Re-asegurar que ningún tip inicial mantenga contadores artificiales
+      const sanitized = parsed.map((t: ChefTip) => {
+        const isCustom = t.id.startsWith('user_') || !INITIAL_CHEF_TIPS.some((init) => init.id === t.id);
+        const hasUserLike = Boolean(localLikes[t.id]);
+        const userRatingVal = localRatings[t.id] || 0;
+
+        return {
+          ...t,
+          likes_count: isCustom ? (t.likes_count ?? (hasUserLike ? 1 : 0)) : (hasUserLike ? 1 : 0),
+          user_liked: hasUserLike,
+          avg_rating: isCustom ? (t.avg_rating ?? userRatingVal) : userRatingVal,
+          ratings_count: isCustom ? (t.ratings_count ?? (userRatingVal > 0 ? 1 : 0)) : (userRatingVal > 0 ? 1 : 0),
+          user_rating: userRatingVal,
+        };
+      });
+      return sanitized;
     }
     return INITIAL_CHEF_TIPS;
   } catch (err) {
@@ -118,8 +162,8 @@ export async function fetchTipsWithSync(authUserId?: string | null): Promise<Che
         image_url: row.image_url,
         read_time_seconds: row.read_time_seconds || 45,
         likes_count: row.likes_count ?? 0,
-        avg_rating: row.avg_rating ?? 5.0,
-        ratings_count: row.ratings_count ?? 1,
+        avg_rating: Number(row.avg_rating ?? 0),
+        ratings_count: row.ratings_count ?? 0,
         created_at: row.created_at,
       }));
 
@@ -208,8 +252,8 @@ export async function saveChefTip(
     image_url: tipData.image_url || '',
     read_time_seconds: tipData.read_time_seconds || 45,
     likes_count: tipData.likes_count ?? 0,
-    avg_rating: tipData.avg_rating ?? 5.0,
-    ratings_count: tipData.ratings_count ?? 1,
+    avg_rating: tipData.avg_rating ?? 0,
+    ratings_count: tipData.ratings_count ?? 0,
     created_at: tipData.created_at || new Date().toISOString(),
   };
 
@@ -388,14 +432,14 @@ export async function rateChefTip(
 
   const updatedTips = localTips.map((tip) => {
     if (tip.id === tipId) {
-      const currentCount = tip.ratings_count || 1;
-      const currentAvg = tip.avg_rating || 5.0;
+      const currentCount = tip.ratings_count || 0;
+      const currentAvg = tip.avg_rating || 0;
       const hadPreviousRating = Boolean(tip.user_rating);
 
       let newCount = currentCount;
       let newAvg = currentAvg;
 
-      if (hadPreviousRating) {
+      if (hadPreviousRating && currentCount > 0) {
         // Actualizar promedio ajustando el valor previo
         const prevRating = tip.user_rating || currentAvg;
         newAvg = Number(
@@ -403,7 +447,9 @@ export async function rateChefTip(
         );
       } else {
         newCount = currentCount + 1;
-        newAvg = Number(((currentAvg * currentCount + stars) / newCount).toFixed(1));
+        newAvg = currentCount === 0
+          ? Number(stars.toFixed(1))
+          : Number(((currentAvg * currentCount + stars) / newCount).toFixed(1));
       }
 
       finalAvg = newAvg;

@@ -432,11 +432,29 @@ export function ChefTipsFeed({
                       {/* Estrellas */}
                       <div
                         onClick={(e) => handleQuickRate(e, tip, 5)}
-                        className="flex items-center gap-1 px-2 py-1 bg-[#F7F5EC] border border-[#D8D3C4] rounded-xl text-xs font-bold text-[#2C3523]"
-                        title={isEs ? 'Puntuación promedio' : 'Average rating'}
+                        className={`flex items-center gap-1 px-2 py-1 bg-[#F7F5EC] border border-[#D8D3C4] rounded-xl text-xs font-bold ${
+                          tip.ratings_count && tip.ratings_count > 0 ? 'text-[#2C3523]' : 'text-[#8C977D]'
+                        }`}
+                        title={
+                          tip.ratings_count && tip.ratings_count > 0
+                            ? `${isEs ? 'Puntuación promedio' : 'Average rating'}: ${tip.avg_rating?.toFixed(1)} (${tip.ratings_count} ${tip.ratings_count === 1 ? (isEs ? 'voto' : 'rating') : (isEs ? 'votos' : 'ratings')})`
+                            : isEs
+                            ? 'Sin valoraciones aún (haz clic para calificar)'
+                            : 'No ratings yet (click to rate)'
+                        }
                       >
-                        <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-                        <span>{tip.avg_rating?.toFixed(1) || '5.0'}</span>
+                        <Star
+                          className={`w-3.5 h-3.5 ${
+                            tip.ratings_count && tip.ratings_count > 0
+                              ? 'text-amber-500 fill-amber-400'
+                              : 'text-[#B8BEAF]'
+                          }`}
+                        />
+                        <span>
+                          {tip.ratings_count && tip.ratings_count > 0 && tip.avg_rating
+                            ? tip.avg_rating.toFixed(1)
+                            : '0'}
+                        </span>
                       </div>
 
                       {/* Experiencias / Comentarios */}
