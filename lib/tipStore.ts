@@ -105,7 +105,7 @@ export async function fetchTipsWithSync(authUserId?: string | null): Promise<Che
     if (!error && data && data.length > 0) {
       remoteTips = data.map((row) => ({
         id: row.id,
-        author_id: row.author_id,
+        author_id: row.author_id || row.user_id,
         profiles: row.profiles || null,
         author_username: row.profiles?.username || row.author_username || 'Chef',
         title_es: row.title_es,
@@ -233,25 +233,43 @@ export async function saveChefTip(
           .eq('id', payload.id);
         if (error) console.warn('Supabase tip update note:', error.message);
       } else {
-        const { data: supaTip, error } = await supabase
+        // Enviar author_id y user_id para compatibilidad total con cualquier esquema
+        const insertData: Record<string, unknown> = {
+          author_id: user.id,
+          user_id: user.id,
+          title_es: payload.title_es,
+          title_en: payload.title_en,
+          summary_es: payload.summary_es,
+          summary_en: payload.summary_en,
+          content_es: payload.content_es,
+          content_en: payload.content_en,
+          category: payload.category,
+          image_url: payload.image_url,
+          read_time_seconds: payload.read_time_seconds,
+          likes_count: 0,
+        };
+
+        let { data: supaTip, error } = await supabase
           .from('chef_tips')
-          .insert([
-            {
-              author_id: user.id,
-              title_es: payload.title_es,
-              title_en: payload.title_en,
-              summary_es: payload.summary_es,
-              summary_en: payload.summary_en,
-              content_es: payload.content_es,
-              content_en: payload.content_en,
-              category: payload.category,
-              image_url: payload.image_url,
-              read_time_seconds: payload.read_time_seconds,
-              likes_count: 0,
-            },
-          ])
+          .insert([insertData])
           .select()
           .single();
+
+        // Fallback si la tabla solo tiene author_id o solo user_id
+        if (error && error.code === '42703') {
+          if (error.message.includes('user_id')) {
+            delete insertData.user_id;
+          } else if (error.message.includes('author_id')) {
+            delete insertData.author_id;
+          }
+          const retry = await supabase
+            .from('chef_tips')
+            .insert([insertData])
+            .select()
+            .single();
+          supaTip = retry.data;
+          error = retry.error;
+        }
 
         if (!error && supaTip) {
           finalId = supaTip.id;
