@@ -230,17 +230,17 @@ export function ChefTipDetailModal({
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
           {/* Título */}
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-[#2C3523] leading-snug font-handwritten">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-handwritten font-bold text-[#2C3523] leading-tight tracking-wide">
               {displayTitle}
             </h2>
           </div>
 
           {/* Caja Resumen Relámpago */}
-          <div className="p-4 bg-[#EFECE1]/80 border-l-4 border-[#2C3523] rounded-r-2xl space-y-1 shadow-2xs">
+          <div className="p-4 sm:p-5 bg-[#EFECE1]/80 border-l-4 border-[#2C3523] rounded-r-2xl space-y-1 shadow-2xs">
             <span className="text-[10px] font-black uppercase tracking-wider text-[#5C6650]">
               {isEs ? '⚡ El Hack Relámpago' : '⚡ The Flash Hack'}
             </span>
-            <p className="text-xs sm:text-sm font-semibold text-[#2C3523] leading-relaxed">
+            <p className="font-cozy text-sm sm:text-base text-[#2C3523] leading-relaxed">
               {displaySummary}
             </p>
           </div>
@@ -251,7 +251,7 @@ export function ChefTipDetailModal({
               <h4 className="text-xs font-bold uppercase tracking-wider text-[#5C6650]">
                 {isEs ? '¿Por qué funciona?' : 'Why does this work?'}
               </h4>
-              <p className="text-xs sm:text-sm text-[#46533A] leading-relaxed whitespace-pre-line">
+              <p className="font-cozy text-sm sm:text-base text-[#38432E] leading-relaxed whitespace-pre-line">
                 {displayContent}
               </p>
             </div>
@@ -490,7 +490,7 @@ export function ChefTipDetailModal({
                       </span>
                     </div>
 
-                    <p className="text-xs text-[#46533A] leading-relaxed">{exp.comment}</p>
+                    <p className="font-cozy text-xs sm:text-sm text-[#38432E] leading-relaxed">{exp.comment}</p>
 
                     {exp.photo_url && (
                       <div className="relative w-full h-36 rounded-xl overflow-hidden mt-1.5 border border-[#D8D3C4]">

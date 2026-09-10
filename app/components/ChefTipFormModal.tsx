@@ -247,7 +247,7 @@ export function ChefTipFormModal({
                     ? 'Ej: La regla del trapo húmedo bajo la tabla'
                     : 'Ej: The damp towel rule under your board'
                 }
-                className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl text-xs sm:text-sm font-semibold text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30"
+                className="w-full px-3.5 py-2 bg-white border border-[#D8D3C4] rounded-xl text-xl sm:text-2xl font-handwritten font-bold text-[#2C3523] tracking-wide focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30"
                 required
               />
               <span className="text-[10px] text-[#5C6650] mt-0.5 block">
@@ -261,7 +261,7 @@ export function ChefTipFormModal({
                 value={titleEn}
                 onChange={(e) => setTitleEn(e.target.value)}
                 placeholder="Ex: The damp towel rule under your cutting board"
-                className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl text-xs sm:text-sm font-medium text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30"
+                className="w-full px-3.5 py-2 bg-white border border-[#D8D3C4] rounded-xl text-xl sm:text-2xl font-handwritten font-bold text-[#2C3523] tracking-wide focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30"
               />
               <span className="text-[10px] text-[#5C6650] mt-0.5 block">
                 {isEs ? 'Versión en Inglés (Opcional)' : 'English Version (Optional)'}
@@ -285,7 +285,7 @@ export function ChefTipFormModal({
                     ? 'Explica el truco en 2 o 3 frases directas y prácticas...'
                     : 'Explain the hack in 2 or 3 direct, practical sentences...'
                 }
-                className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30 resize-none"
+                className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl font-cozy text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30 resize-none"
                 required
               />
               <span className="text-[10px] text-[#5C6650] mt-0.5 block">
@@ -299,7 +299,7 @@ export function ChefTipFormModal({
                 onChange={(e) => setSummaryEn(e.target.value)}
                 rows={2}
                 placeholder="English summary..."
-                className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30 resize-none"
+                className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl font-cozy text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30 resize-none"
               />
               <span className="text-[10px] text-[#5C6650] mt-0.5 block">
                 {isEs ? 'Resumen en Inglés (Opcional)' : 'Summary in English (Optional)'}
@@ -323,7 +323,7 @@ export function ChefTipFormModal({
                   ? '¿Por qué ocurre esto? Explicación técnica o consejo adicional...'
                   : 'Why does this work? Scientific reason or extra tip...'
               }
-              className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30 resize-none"
+              className="w-full px-3.5 py-2.5 bg-white border border-[#D8D3C4] rounded-xl font-cozy text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30 resize-none"
             />
           </div>
 

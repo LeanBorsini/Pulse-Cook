@@ -157,12 +157,12 @@ export function ChefTipsFeed({
               <span>{isEs ? 'Tips de 30-60 seg' : '30-60s hacks'}</span>
             </span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold font-handwritten tracking-tight">
+          <h2 className="text-2xl sm:text-3xl font-bold font-handwritten tracking-wide text-[#FAF8F2]">
             {isEs
               ? 'Tips & Hacks de Chef: Cocina Profesional en Casa'
               : 'Chef Tips & Hacks: Professional Cooking at Home'}
           </h2>
-          <p className="text-xs sm:text-sm text-[#FAF8F2]/80 leading-relaxed">
+          <p className="font-cozy text-xs sm:text-sm text-[#FAF8F2]/90 leading-relaxed">
             {isEs
               ? 'Pequeños trucos de ciencia culinaria, ergonomía y mise en place para hacer tu cocina más amena, cómoda y deliciosa.'
               : 'Quick culinary science secrets, ergonomics, and mise en place hacks to make home cooking joyful, effortless, and professional.'}
@@ -399,11 +399,11 @@ export function ChefTipsFeed({
                       </div>
                     )}
 
-                    <h3 className="text-sm sm:text-base font-bold text-[#2C3523] leading-snug font-handwritten group-hover:text-amber-800 transition-colors">
+                    <h3 className="text-2xl sm:text-[26px] font-handwritten font-bold text-[#2C3523] leading-[1.2] group-hover:text-[#3D4932] transition-colors tracking-wide pt-0.5">
                       {displayTitle}
                     </h3>
 
-                    <p className="text-xs text-[#46533A] leading-relaxed line-clamp-3">
+                    <p className="font-cozy text-xs sm:text-[13px] text-[#38432E] leading-relaxed line-clamp-3">
                       {displaySummary}
                     </p>
                   </div>
