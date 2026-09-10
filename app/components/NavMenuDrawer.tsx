@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Smartphone,
   Lock,
+  Lightbulb,
 } from 'lucide-react';
 import { RemyIcon } from './RemyIcon';
 import { usePWAInstall } from './usePWAInstall';
@@ -34,6 +35,7 @@ interface NavMenuDrawerProps {
   onOpenChefAI: () => void;
   onOpenWelcome?: () => void;
   onOpenShareApp?: () => void;
+  onOpenChefTips: () => void;
 }
 
 export function NavMenuDrawer({
@@ -51,6 +53,7 @@ export function NavMenuDrawer({
   onOpenChefAI,
   onOpenWelcome,
   onOpenShareApp,
+  onOpenChefTips,
 }: NavMenuDrawerProps) {
   const isEs = lang === 'ES';
   const displayAlias = profileUsername || (user?.email ? user.email.split('@')[0] : 'chef');
@@ -229,6 +232,36 @@ export function NavMenuDrawer({
                   </h4>
                   <p className="text-[11px] text-[#5C6650] mt-0.5">
                     {isEs ? '¿Qué cocino hoy? Asistente interactivo' : 'What to cook? Smart kitchen assistant'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#5C6650] group-hover:translate-x-0.5 transition-transform" />
+            </button>
+
+            {/* Tips & Hacks de Chef */}
+            <button
+              onClick={() => {
+                onClose();
+                onOpenChefTips();
+              }}
+              className="w-full flex items-center justify-between p-3.5 bg-[#F7F5EC] border border-[#D8D3C4] rounded-2xl hover:bg-[#EFECE1] transition-all cursor-pointer active:scale-98 group text-left"
+              id="menu-drawer-chef-tips-btn"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                  <Lightbulb className="w-5 h-5 fill-current text-amber-500" />
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-bold text-[#2C3523] leading-tight flex items-center gap-1.5">
+                    <span>{isEs ? 'Tips & Hacks de Chef' : 'Chef Tips & Hacks'}</span>
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded">
+                      {isEs ? 'Comunidad' : 'Community'}
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-[#5C6650] mt-0.5">
+                    {isEs
+                      ? 'Secretos culinarios, técnicas y consejos relámpago'
+                      : 'Culinary secrets, techniques & quick hacks'}
                   </p>
                 </div>
               </div>

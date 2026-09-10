@@ -18,6 +18,7 @@ interface HeaderProps {
   onOpenChefAI: () => void;
   onOpenWelcome?: () => void;
   onOpenShareApp?: () => void;
+  onOpenChefTips: () => void;
 }
 
 export function Header({
@@ -33,6 +34,7 @@ export function Header({
   onOpenChefAI,
   onOpenWelcome,
   onOpenShareApp,
+  onOpenChefTips,
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const displayAlias = profileUsername || (user?.email ? user.email.split('@')[0] : 'chef');
@@ -115,6 +117,7 @@ export function Header({
         onOpenChefAI={onOpenChefAI}
         onOpenWelcome={onOpenWelcome}
         onOpenShareApp={onOpenShareApp}
+        onOpenChefTips={onOpenChefTips}
       />
     </>
   );

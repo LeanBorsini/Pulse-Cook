@@ -133,3 +133,96 @@ export interface Ingredient {
   aisle?: string;
 }
 
+/**
+ * Categorías temáticas para los Tips & Hacks de Chef.
+ */
+export type TipCategoryKey =
+  | 'knife_skills'
+  | 'organization'
+  | 'heat_control'
+  | 'flavor_seasoning'
+  | 'shortcuts_conservation'
+  | 'baking';
+
+/**
+ * Entrada de micro-contenido en la sección "Tips & Hacks de Chef".
+ * Diseñada para lectura rápida (30-60 seg) con trucos profesionales para cocinar en casa.
+ */
+export interface ChefTip {
+  /** Identificador único del tip (UUID en Supabase o ID local) */
+  id: string;
+  /** Identificador del autor en profiles / auth.users */
+  author_id?: string;
+  /** Perfil enriquecido del autor obtenido de profiles */
+  profiles?: Profile | null;
+  /** Alias legible del autor si profiles no está disponible */
+  author_username?: string;
+  /** Título directo e impactante en español */
+  title_es: string;
+  /** Título directo en inglés */
+  title_en: string;
+  /** Resumen o truco conciso (2-3 oraciones) en español */
+  summary_es: string;
+  /** Resumen o truco conciso en inglés */
+  summary_en: string;
+  /** Explicación o detalle científico ampliado en español */
+  content_es?: string;
+  /** Explicación o detalle científico ampliado en inglés */
+  content_en?: string;
+  /** Categoría temática del hack */
+  category: TipCategoryKey;
+  /** URL de imagen o ilustración demostrativa */
+  image_url?: string;
+  /** Tiempo de lectura estimado en segundos (ej. 30, 45, 60) */
+  read_time_seconds?: number;
+  /** Contador acumulado de likes / utilidad */
+  likes_count: number;
+  /** Indica si el usuario actual ha marcado este tip como útil / like */
+  user_liked?: boolean;
+  /** Calificación media de 1 a 5 estrellas */
+  avg_rating?: number;
+  /** Total de valoraciones recibidas */
+  ratings_count?: number;
+  /** Calificación individual otorgada por el usuario actual (1-5) */
+  user_rating?: number;
+  /** Contador de comentarios / experiencias de la comunidad */
+  experiences_count?: number;
+  /** Alias para contador de comentarios */
+  comments_count?: number;
+  /** Fecha ISO de publicación */
+  created_at?: string;
+}
+
+/**
+ * Comentario o experiencia compartida por un usuario sobre un tip de chef.
+ */
+export interface TipExperience {
+  /** Identificador único de la experiencia */
+  id: string;
+  /** Identificador del tip al que pertenece */
+  tip_id: string;
+  /** Identificador del usuario que comenta */
+  user_id?: string;
+  /** Nombre o alias de quien comenta */
+  author_name: string;
+  /** Avatar opcional del autor */
+  avatar_url?: string;
+  /** Mensaje de la experiencia o prueba realizada en casa */
+  comment: string;
+  /** URL de foto demostrativa opcional subida por el usuario */
+  photo_url?: string;
+  /** Marca de tiempo ISO */
+  created_at: string;
+}
+
+/**
+ * Puntuación individual por estrellas (1 a 5) dada a un tip.
+ */
+export interface TipRating {
+  id?: string;
+  tip_id: string;
+  user_id: string;
+  stars: number;
+  created_at?: string;
+}
+

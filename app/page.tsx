@@ -15,7 +15,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
-import { Recipe, Ingredient, Comment } from './types';
+import { Recipe, Ingredient, Comment, ChefTip } from './types';
 import {
   getLocalRecipes,
   saveLocalRecipe,
@@ -33,6 +33,7 @@ import {
   fetchCommunityRatings,
   getConsolidatedRating,
 } from '@/lib/ratingStore';
+import { fetchTipsWithSync, saveChefTip, deleteChefTip, getLocalTips } from '@/lib/tipStore';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { RecipeCard } from './components/RecipeCard';
@@ -45,6 +46,9 @@ import ChefAssistantModal from './components/ChefAssistantModal';
 import { WelcomeLandingModal } from './components/WelcomeLandingModal';
 import { ShareAppModal } from './components/ShareAppModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { ChefTipsModal } from './components/ChefTipsModal';
+import { ChefTipDetailModal } from './components/ChefTipDetailModal';
+import { ChefTipFormModal } from './components/ChefTipFormModal';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 import { getCategoryKey, getCategoryLabel } from '@/lib/categories';
 import { translateIngredientName } from '@/lib/culinaryDictionary';
@@ -237,6 +241,20 @@ export default function Home() {
     }
     return false;
   });
+
+  // Modal de Tips & Hacks de Chef (abierto desde el menú lateral)
+  const [showChefTipsModal, setShowChefTipsModal] = useState<boolean>(false);
+
+  // Estado de Tips & Hacks de Chef
+  const [chefTips, setChefTips] = useState<ChefTip[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getLocalTips();
+    }
+    return [];
+  });
+  const [selectedTipForDetail, setSelectedTipForDetail] = useState<ChefTip | null>(null);
+  const [tipToEdit, setTipToEdit] = useState<ChefTip | null>(null);
+  const [isCreatingTip, setIsCreatingTip] = useState<boolean>(false);
 
   // Active Recipe Details (Ingredients & Comments)
   const [activeIngredients, setActiveIngredients] = useState<Ingredient[]>([]);
@@ -550,6 +568,59 @@ export default function Home() {
       supabase.removeChannel(recipesChannel);
     };
   }, [loadUserProfile, fetchRecipes]);
+
+  // Carga inicial y reactiva de Tips & Hacks de Chef
+  useEffect(() => {
+    let isMounted = true;
+    const syncTips = async () => {
+      try {
+        const tips = await fetchTipsWithSync(user?.id);
+        if (isMounted) {
+          setChefTips(tips);
+        }
+      } catch (err) {
+        console.warn('Error syncing chef tips:', err);
+      }
+    };
+    syncTips();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  // Guardar o Actualizar Tip de Chef
+  const handleSaveChefTip = async (tipData: Partial<ChefTip>) => {
+    const saved = await saveChefTip(tipData, user, profileUsername);
+    setChefTips((prev) => {
+      const idx = prev.findIndex((t) => t.id === saved.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = saved;
+        return copy;
+      }
+      return [saved, ...prev];
+    });
+    if (selectedTipForDetail && selectedTipForDetail.id === saved.id) {
+      setSelectedTipForDetail(saved);
+    }
+  };
+
+  // Eliminar Tip de Chef
+  const handleDeleteChefTip = async (tipId: string) => {
+    await deleteChefTip(tipId, user);
+    setChefTips((prev) => prev.filter((t) => t.id !== tipId));
+    if (selectedTipForDetail && selectedTipForDetail.id === tipId) {
+      setSelectedTipForDetail(null);
+    }
+  };
+
+  // Actualización reactiva de tip tras like o votación
+  const handleChefTipUpdated = (updatedTip: ChefTip) => {
+    setChefTips((prev) => prev.map((t) => (t.id === updatedTip.id ? updatedTip : t)));
+    if (selectedTipForDetail && selectedTipForDetail.id === updatedTip.id) {
+      setSelectedTipForDetail(updatedTip);
+    }
+  };
 
   // Load ingredients & comments when activeRecipeId changes
   const activeRecipeId = activeRecipe?.id;
@@ -995,6 +1066,7 @@ export default function Home() {
         onOpenChefAI={() => setShowChefAI(true)}
         onOpenWelcome={() => setShowWelcomeModal(true)}
         onOpenShareApp={() => setShowShareApp(true)}
+        onOpenChefTips={() => setShowChefTipsModal(true)}
       />
 
       {/* Buscador & Combobox de Filtros Inteligente */}
@@ -1008,136 +1080,144 @@ export default function Home() {
         setSelectedTags={setSelectedTags}
       />
 
-      {/* Controles de Ordenamiento & Total de Recetas */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-2 border-b border-[#D8D3C4]/60">
-        <div className="flex items-center gap-3 text-xs font-semibold text-[#5C6650]">
-          <div className="flex items-center gap-1.5">
-            <UtensilsCrossed className="w-4 h-4 text-[#2C3523]" />
-            <span>
-              {filteredRecipes.length}{' '}
-              {isEs
-                ? filteredRecipes.length === 1 ? 'receta de la comunidad' : 'recetas de la comunidad'
-                : filteredRecipes.length === 1 ? 'community recipe' : 'community recipes'}
-            </span>
-          </div>
-        </div>
+          {/* Controles de Ordenamiento & Total de Recetas */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-2 border-b border-[#D8D3C4]/60">
+            <div className="flex items-center gap-3 text-xs font-semibold text-[#5C6650]">
+              <div className="flex items-center gap-1.5">
+                <UtensilsCrossed className="w-4 h-4 text-[#2C3523]" />
+                <span>
+                  {filteredRecipes.length}{' '}
+                  {isEs
+                    ? filteredRecipes.length === 1
+                      ? 'receta de la comunidad'
+                      : 'recetas de la comunidad'
+                    : filteredRecipes.length === 1
+                    ? 'community recipe'
+                    : 'community recipes'}
+                </span>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className="text-[#5C6650] flex items-center gap-1">
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            {isEs ? 'Ordenar por:' : 'Sort by:'}
-          </span>
-          <div className="flex bg-[#EFECE1] border border-[#D8D3C4] rounded-lg p-0.5">
-            <button
-              onClick={() => setSortBy('recent')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                sortBy === 'recent'
-                  ? 'bg-[#2C3523] text-[#F7F5EC] shadow-xs'
-                  : 'text-[#5C6650] hover:text-[#2C3523]'
-              }`}
-            >
-              {isEs ? 'Recientes' : 'Recent'}
-            </button>
-            <button
-              onClick={() => setSortBy('rating')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                sortBy === 'rating'
-                  ? 'bg-[#2C3523] text-[#F7F5EC] shadow-xs'
-                  : 'text-[#5C6650] hover:text-[#2C3523]'
-              }`}
-            >
-              <Star className="w-3 h-3" />
-              {isEs ? 'Mejor valoradas' : 'Top rated'}
-            </button>
-            <button
-              onClick={() => setSortBy('prepTime')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                sortBy === 'prepTime'
-                  ? 'bg-[#2C3523] text-[#F7F5EC] shadow-xs'
-                  : 'text-[#5C6650] hover:text-[#2C3523]'
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              {isEs ? 'Más rápidas' : 'Fastest'}
-            </button>
+            <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <span className="text-[#5C6650] flex items-center gap-1">
+                <ArrowUpDown className="w-3.5 h-3.5" />
+                {isEs ? 'Ordenar por:' : 'Sort by:'}
+              </span>
+              <div className="flex bg-[#EFECE1] border border-[#D8D3C4] rounded-lg p-0.5">
+                <button
+                  onClick={() => setSortBy('recent')}
+                  className={`px-2.5 py-1 rounded-md transition-all ${
+                    sortBy === 'recent'
+                      ? 'bg-[#2C3523] text-[#F7F5EC] shadow-xs'
+                      : 'text-[#5C6650] hover:text-[#2C3523]'
+                  }`}
+                >
+                  {isEs ? 'Recientes' : 'Recent'}
+                </button>
+                <button
+                  onClick={() => setSortBy('rating')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
+                    sortBy === 'rating'
+                      ? 'bg-[#2C3523] text-[#F7F5EC] shadow-xs'
+                      : 'text-[#5C6650] hover:text-[#2C3523]'
+                  }`}
+                >
+                  <Star className="w-3 h-3" />
+                  {isEs ? 'Mejor valoradas' : 'Top rated'}
+                </button>
+                <button
+                  onClick={() => setSortBy('prepTime')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
+                    sortBy === 'prepTime'
+                      ? 'bg-[#2C3523] text-[#F7F5EC] shadow-xs'
+                      : 'text-[#5C6650] hover:text-[#2C3523]'
+                  }`}
+                >
+                  <Clock className="w-3 h-3" />
+                  {isEs ? 'Más rápidas' : 'Fastest'}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Grid de Recetas */}
-      {loadingRecipes ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse py-8">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-64 bg-[#EFECE1] rounded-2xl border border-[#D8D3C4]" />
-          ))}
-        </div>
-      ) : filteredRecipes.length === 0 ? (
-        <div className="text-center py-16 bg-[#EFECE1]/50 border border-dashed border-[#D8D3C4] rounded-2xl p-8 max-w-xl mx-auto">
-          <UtensilsCrossed className="w-12 h-12 text-[#5C6650] mx-auto mb-3 opacity-60" />
-          <h3 className="text-base font-bold text-[#2C3523] mb-1.5">
-            {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0
-              ? (isEs ? 'No se encontraron recetas con estos filtros' : 'No recipes found with these filters')
-              : (isEs ? 'Aún no hay recetas publicadas' : 'No recipes published yet')}
-          </h3>
-          <p className="text-xs text-[#5C6650] max-w-md mx-auto mb-6 leading-relaxed">
-            {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0
-              ? (isEs
-                  ? 'Prueba a cambiar el término de búsqueda o seleccionar otra categoría en el menú de filtros.'
-                  : 'Try changing your search keywords or selecting another category from the filters menu.')
-              : (isEs
+          {/* Grid de Recetas */}
+          {loadingRecipes ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse py-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="h-64 bg-[#EFECE1] rounded-2xl border border-[#D8D3C4]" />
+              ))}
+            </div>
+          ) : filteredRecipes.length === 0 ? (
+            <div className="text-center py-16 bg-[#EFECE1]/50 border border-dashed border-[#D8D3C4] rounded-2xl p-8 max-w-xl mx-auto">
+              <UtensilsCrossed className="w-12 h-12 text-[#5C6650] mx-auto mb-3 opacity-60" />
+              <h3 className="text-base font-bold text-[#2C3523] mb-1.5">
+                {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0
+                  ? isEs
+                    ? 'No se encontraron recetas con estos filtros'
+                    : 'No recipes found with these filters'
+                  : isEs
+                  ? 'Aún no hay recetas publicadas'
+                  : 'No recipes published yet'}
+              </h3>
+              <p className="text-xs text-[#5C6650] max-w-md mx-auto mb-6 leading-relaxed">
+                {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0
+                  ? isEs
+                    ? 'Prueba a cambiar el término de búsqueda o seleccionar otra categoría en el menú de filtros.'
+                    : 'Try changing your search keywords or selecting another category from the filters menu.'
+                  : isEs
                   ? '¡Sé el primero en compartir una receta con la comunidad o crea una con la ayuda del Chef IA!'
-                  : 'Be the first to share a recipe with the community or generate one with the AI Chef!')}
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0 ? (
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setSelectedCategories([]);
-                  setSelectedTags([]);
-                }}
-                className="px-4 py-2 bg-[#2C3523] text-white rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-colors cursor-pointer"
-              >
-                {isEs ? 'Restablecer filtros' : 'Reset filters'}
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={() => setIsCreatingRecipe(true)}
-                  className="px-4 py-2 bg-[#2C3523] text-[#FAF8F2] rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-all flex items-center gap-1.5 shadow-sm"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{isEs ? 'Crear Receta' : 'Create Recipe'}</span>
-                </button>
-                <button
-                  onClick={() => setShowChefAI(true)}
-                  className="px-4 py-2 bg-[#EFECE1] text-[#2C3523] border border-[#D8D3C4] hover:bg-[#E5E0D0] rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  <span>{isEs ? 'Chef Asistente IA' : 'AI Chef Assistant'}</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRecipes.map((recipe) => (
-            <RecipeCard
-              key={recipe.id}
-              recipe={recipe}
-              lang={lang}
-              isSelected={Boolean(user && selectedRecipeIds.includes(recipe.id))}
-              servingsCount={menuServings[recipe.id] || recipe.servings || 2}
-              user={user}
-              onOpenDetails={(r) => setActiveRecipe(r)}
-              onToggleMenu={handleToggleMenu}
-              onUpdateServings={handleUpdateMenuServings}
-              onOpenAuth={() => setShowAuthModal(true)}
-            />
-          ))}
-        </div>
-      )}
+                  : 'Be the first to share a recipe with the community or generate one with the AI Chef!'}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                {searchTerm || selectedCategories.length > 0 || selectedTags.length > 0 ? (
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedCategories([]);
+                      setSelectedTags([]);
+                    }}
+                    className="px-4 py-2 bg-[#2C3523] text-white rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-colors cursor-pointer"
+                  >
+                    {isEs ? 'Restablecer filtros' : 'Reset filters'}
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setIsCreatingRecipe(true)}
+                      className="px-4 py-2 bg-[#2C3523] text-[#FAF8F2] rounded-xl text-xs font-semibold hover:bg-[#3D4932] transition-all flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{isEs ? 'Crear Receta' : 'Create Recipe'}</span>
+                    </button>
+                    <button
+                      onClick={() => setShowChefAI(true)}
+                      className="px-4 py-2 bg-[#EFECE1] text-[#2C3523] border border-[#D8D3C4] hover:bg-[#E5E0D0] rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{isEs ? 'Chef Asistente IA' : 'AI Chef Assistant'}</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredRecipes.map((recipe) => (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  lang={lang}
+                  isSelected={Boolean(user && selectedRecipeIds.includes(recipe.id))}
+                  servingsCount={menuServings[recipe.id] || recipe.servings || 2}
+                  user={user}
+                  onOpenDetails={(r) => setActiveRecipe(r)}
+                  onToggleMenu={handleToggleMenu}
+                  onUpdateServings={handleUpdateMenuServings}
+                  onOpenAuth={() => setShowAuthModal(true)}
+                />
+              ))}
+            </div>
+          )}
 
       {/* Modal Detalle de Receta */}
       {activeRecipe && (
@@ -1266,6 +1346,66 @@ export default function Home() {
         onClose={() => setShowShareApp(false)}
         lang={lang}
       />
+
+      {/* Modal Principal de Tips & Hacks de Chef (Accedido desde el Menú Desplegable) */}
+      <ChefTipsModal
+        isOpen={showChefTipsModal}
+        onClose={() => setShowChefTipsModal(false)}
+        tips={chefTips}
+        lang={lang}
+        user={user}
+        profileUsername={profileUsername}
+        onOpenNewTip={() => {
+          if (!user) {
+            setShowAuthModal(true);
+          } else {
+            setTipToEdit(null);
+            setIsCreatingTip(true);
+          }
+        }}
+        onOpenTipDetail={(tip) => setSelectedTipForDetail(tip)}
+        onEditTip={(tip) => {
+          setTipToEdit(tip);
+          setIsCreatingTip(true);
+        }}
+        onDeleteTip={handleDeleteChefTip}
+        onTipUpdated={handleChefTipUpdated}
+        onOpenAuth={() => setShowAuthModal(true)}
+      />
+
+      {/* Modal Detalle de Tip de Chef (Interactivo con Estrellas, Likes y Comentarios) */}
+      {selectedTipForDetail && (
+        <ChefTipDetailModal
+          isOpen={Boolean(selectedTipForDetail)}
+          tip={selectedTipForDetail}
+          lang={lang}
+          user={user}
+          profileUsername={profileUsername}
+          onClose={() => setSelectedTipForDetail(null)}
+          onEditTip={(tip: ChefTip) => {
+            setSelectedTipForDetail(null);
+            setTipToEdit(tip);
+            setIsCreatingTip(true);
+          }}
+          onDeleteTip={handleDeleteChefTip}
+          onTipUpdated={handleChefTipUpdated}
+          onOpenAuth={() => setShowAuthModal(true)}
+        />
+      )}
+
+      {/* Modal Crear / Editar Tip de Chef */}
+      {isCreatingTip && (
+        <ChefTipFormModal
+          isOpen={isCreatingTip}
+          initialTip={tipToEdit}
+          lang={lang}
+          onClose={() => {
+            setIsCreatingTip(false);
+            setTipToEdit(null);
+          }}
+          onSave={handleSaveChefTip}
+        />
+      )}
 
       {/* Indicador sutil de conectividad offline para PWA */}
       <OfflineIndicator lang={lang} />
