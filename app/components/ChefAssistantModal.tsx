@@ -33,6 +33,7 @@ import { Recipe, Ingredient } from '../types';
 import { User } from '@supabase/supabase-js';
 import { RemyIcon } from './RemyIcon';
 import { getCategoryLabel } from '@/lib/categories';
+import { translateTextSmart, cleanToPureEnglish, cleanToPureSpanish } from '@/lib/recipeTranslator';
 
 interface ChefGeneratedRecipe {
   title: string;
@@ -226,25 +227,48 @@ export default function ChefAssistantModal({
   };
 
   const handleSaveToBook = (recipeItem: ChefGeneratedRecipe, index: number) => {
-    const formattedIngredients: Ingredient[] = recipeItem.ingredientsList.map((ing) => ({
-      name_es: isEs ? ing.name : '',
-      name_en: !isEs ? ing.name : ing.name,
-      amount: ing.amount || 1,
-      unit: ing.unit || (isEs ? 'unidad' : 'unit'),
-    }));
+    const rawTitle = recipeItem.title || 'Receta de Remy';
+    const rawDesc = recipeItem.description || '';
 
     const safetyNote = recipeItem.safetyTip
       ? `\n\n🛡️ ${isEs ? 'Punto de Cocción y Seguridad para Principiantes' : 'Beginner Cooking Doneness & Safety'}:\n${recipeItem.safetyTip}`
       : '';
     const fullInstructions = recipeItem.steps.join('\n\n') + safetyNote;
 
+    const sourceLang = isEs ? 'ES' : 'EN';
+    const targetLang = isEs ? 'EN' : 'ES';
+
+    const transTitle = translateTextSmart(rawTitle, sourceLang, targetLang);
+    const transDesc = translateTextSmart(rawDesc, sourceLang, targetLang);
+    const transInst = translateTextSmart(fullInstructions, sourceLang, targetLang);
+
+    const finalTitleEs = isEs ? rawTitle : cleanToPureSpanish(transTitle);
+    const finalTitleEn = isEs ? cleanToPureEnglish(transTitle) : rawTitle;
+
+    const finalDescEs = isEs ? rawDesc : cleanToPureSpanish(transDesc);
+    const finalDescEn = isEs ? cleanToPureEnglish(transDesc) : rawDesc;
+
+    const finalInstEs = isEs ? fullInstructions : cleanToPureSpanish(transInst);
+    const finalInstEn = isEs ? cleanToPureEnglish(transInst) : fullInstructions;
+
+    const formattedIngredients: Ingredient[] = recipeItem.ingredientsList.map((ing) => {
+      const ingName = ing.name || '';
+      const transIng = translateTextSmart(ingName, sourceLang, targetLang);
+      return {
+        name_es: isEs ? ingName : cleanToPureSpanish(transIng),
+        name_en: isEs ? cleanToPureEnglish(transIng) : ingName,
+        amount: ing.amount || 1,
+        unit: ing.unit || (isEs ? 'unidad' : 'unit'),
+      };
+    });
+
     const newRecipeData: Partial<Recipe> & { generatedIngredients?: Ingredient[] } = {
-      title_es: isEs ? recipeItem.title : '',
-      title_en: !isEs ? recipeItem.title : '',
-      description_es: isEs ? recipeItem.description : '',
-      description_en: !isEs ? recipeItem.description : '',
-      instructions_es: isEs ? fullInstructions : '',
-      instructions_en: !isEs ? fullInstructions : '',
+      title_es: finalTitleEs,
+      title_en: finalTitleEn,
+      description_es: finalDescEs,
+      description_en: finalDescEn,
+      instructions_es: finalInstEs,
+      instructions_en: finalInstEn,
       category: getCategoryLabel('main_dish', 'ES'),
       prep_time: recipeItem.prepTime || 30,
       servings: servings || 2,
