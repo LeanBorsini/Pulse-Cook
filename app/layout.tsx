@@ -1,18 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, Lora } from "next/font/google";
+import { Caveat, Lora, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
 const caveat = Caveat({
   subsets: ["latin"],
-  weight: ["600", "700"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-caveat",
   display: "swap",
 });
 
 const lora = Lora({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
   variable: "--font-lora",
+  display: "swap",
+});
+
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-sans",
   display: "swap",
 });
 
@@ -51,8 +59,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className={`h-full antialiased ${caveat.variable} ${lora.variable}`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="es" className={`h-full antialiased ${caveat.variable} ${lora.variable} ${plusJakartaSans.variable}`}>
+      <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>
   );
 }

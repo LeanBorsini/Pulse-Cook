@@ -152,8 +152,8 @@ export function NutritionBadge({
             <Info className="w-3.5 h-3.5 text-[#8C987E] shrink-0 mt-0.5" />
             <p className="leading-tight">
               {isEs
-                ? 'Cálculo orientativo en segundo plano basado en los ingredientes promedio. Las cifras reales pueden variar según el corte específico, la marca o la técnica de cocción empleada.'
-                : 'Background estimation based on standard ingredient averages. Actual numbers may vary depending on brand, specific cut, or cooking technique.'}
+                ? 'Cálculo orientativo basado en los ingredientes promedio. Las cifras reales pueden variar según el corte específico, la marca o la técnica de cocción empleada.'
+                : 'Estimation based on standard ingredient averages. Actual numbers may vary depending on brand, specific cut, or cooking technique.'}
             </p>
           </div>
         </div>

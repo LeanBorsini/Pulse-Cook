@@ -52,7 +52,7 @@ export function Header({
           </h1>
           <h2
             id="brand-subheading"
-            className="text-[#5C6650] text-xs sm:text-sm italic mt-0.5 font-normal text-center"
+            className="font-cozy text-[#5C6650] text-xs sm:text-sm italic mt-0.5 font-normal text-center"
           >
             {isEs
               ? 'Recetario familiar & Planificador inteligente'
