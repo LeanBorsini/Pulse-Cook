@@ -61,7 +61,7 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
         features: [
           {
             icon: <SlidersHorizontal className="w-5 h-5 text-emerald-700" />,
-            title: 'Filtros Inteligentes en Combobox',
+            title: 'Filtros Inteligentes',
             desc: 'La pantalla se mantiene limpia por defecto. Al tocar "Filtros", puedes seleccionar múltiples categorías (Desayuno, Postre...) y múltiples dietas (Sin Gluten, Vegano...), o solo una, o ninguna. Los filtros elegidos se muestran como chips con botón de quitar.',
           },
           {
@@ -76,7 +76,7 @@ export const WelcomeLandingModal: React.FC<WelcomeLandingModalProps> = ({
           },
           {
             icon: <Utensils className="w-5 h-5 text-orange-600" />,
-            title: 'Modo Cocina Guiado con Temporizadores',
+            title: 'Modo Cocina Guiado',
             desc: 'Cocina paso a paso a pantalla completa. Incluye temporizadores con aviso acústico para hervir o hornear, tachado interactivo de ingredientes y escalador de porciones en tiempo real.',
           },
           {
