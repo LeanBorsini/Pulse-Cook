@@ -62,6 +62,10 @@ import {
   syncRatingToSupabase,
   getConsolidatedRating,
 } from '@/lib/ratingStore';
+import { NutritionInfo } from '../types';
+import { NutritionBadge } from './NutritionBadge';
+import { getOrCalculateNutrition } from '@/lib/nutritionCalculator';
+import { getCachedNutrition } from '@/lib/recipeStore';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -184,6 +188,52 @@ export function RecipeDetailModal({
   const currentUserRating = effectiveRatingState.userRating;
   const currentAvgRating = effectiveRatingState.avgRating;
   const currentRatingsCount = effectiveRatingState.ratingsCount;
+
+  // Estado y cálculo automático en segundo plano de valores nutricionales orientativos
+  const [nutrition, setNutrition] = useState<NutritionInfo | null>(() => {
+    if (recipe.nutrition_info && recipe.nutrition_info.calories > 0) {
+      return recipe.nutrition_info;
+    }
+    return getCachedNutrition(recipe.id);
+  });
+  const [loadingNutrition, setLoadingNutrition] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadNutrition() {
+      const cached = recipe.nutrition_info || getCachedNutrition(recipe.id);
+      if (cached && cached.calories > 0) {
+        if (isMounted) setNutrition(cached);
+        return;
+      }
+
+      if (!ingredients || ingredients.length === 0) return;
+
+      setLoadingNutrition(true);
+      try {
+        const est = await getOrCalculateNutrition(
+          recipe.id,
+          ingredients,
+          baseServings,
+          recipe.nutrition_info
+        );
+        if (isMounted && est) {
+          setNutrition(est);
+        }
+      } catch (err) {
+        console.warn('Error loading recipe nutrition:', err);
+      } finally {
+        if (isMounted) setLoadingNutrition(false);
+      }
+    }
+
+    loadNutrition();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [recipe.id, ingredients, baseServings, recipe.nutrition_info]);
 
   // Cerrar con tecla Escape
   useEffect(() => {
@@ -914,6 +964,14 @@ export function RecipeDetailModal({
               )}
             </div>
           )}
+
+          {/* Valores Nutricionales Orientativos por Ración */}
+          <NutritionBadge
+            nutrition={nutrition}
+            loading={loadingNutrition}
+            lang={lang}
+            servings={baseServings}
+          />
 
           {/* Ingredientes */}
           <div>

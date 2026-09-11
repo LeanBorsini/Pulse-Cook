@@ -36,7 +36,8 @@ import {
 } from 'lucide-react';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
-import { saveLocalRecipe, getLocalIngredients, saveLocalIngredients, deleteLocalRecipe } from '@/lib/recipeStore';
+import { saveLocalRecipe, getLocalIngredients, saveLocalIngredients, deleteLocalRecipe, saveCachedNutrition } from '@/lib/recipeStore';
+import { calculateLocalNutrition } from '@/lib/nutritionCalculator';
 import {
   translateTextSmart,
 } from '@/lib/recipeTranslator';
@@ -603,7 +604,14 @@ export function RecipeFormModal({
       created_at: recipeToEdit?.created_at || new Date().toISOString(),
     };
 
-    // 3. Guardar de forma 100% consistente en el almacenamiento local bajo el ID canónico
+    // 3. Calcular estimación nutricional orientativa en background y almacenar en caché
+    const estimatedNutr = calculateLocalNutrition(validIngredients, Number(servings) || 4);
+    if (finalRecipeId && estimatedNutr.calories > 0) {
+      saveCachedNutrition(finalRecipeId, estimatedNutr);
+      recipeData.nutrition_info = estimatedNutr;
+    }
+
+    // 4. Guardar de forma 100% consistente en el almacenamiento local bajo el ID canónico
     saveLocalRecipe(recipeData, validIngredients);
 
     setSaving(false);

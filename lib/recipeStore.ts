@@ -7,7 +7,7 @@
  * Incluye lógica de migración para esquemas v2 -> v3 y purga estricta de recetas demo.
  */
 
-import { Recipe, Ingredient } from '../app/types';
+import { Recipe, Ingredient, NutritionInfo } from '../app/types';
 
 /** Clave de localStorage para el arreglo principal de recetas del usuario */
 const RECIPES_STORAGE_KEY = 'pulse_cook_local_recipes_v3';
@@ -221,6 +221,7 @@ export function deleteLocalRecipe(recipeId: string): Recipe[] {
     const filtered = customRecipes.filter((r) => r.id !== recipeId);
     localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(filtered));
     deleteLocalIngredients(recipeId);
+    deleteCachedNutrition(recipeId);
     return filtered;
   } catch (err) {
     console.warn('Error deleting local recipe:', err);
@@ -299,3 +300,58 @@ export function batchSaveLocalIngredients(map: Record<string, Ingredient[]>) {
     console.warn('Error batch saving local ingredients:', err);
   }
 }
+
+/** Clave de localStorage para la caché de información nutricional { [recipeId]: NutritionInfo } */
+const NUTRITION_STORAGE_KEY = 'pulse_cook_nutrition_cache_v1';
+
+/**
+ * Obtiene la información nutricional en caché de una receta
+ */
+export function getCachedNutrition(recipeId: string): NutritionInfo | null {
+  if (typeof window === 'undefined' || !recipeId) return null;
+
+  try {
+    const raw = localStorage.getItem(NUTRITION_STORAGE_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw);
+    return map[recipeId] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Guarda la información nutricional en la caché local de una receta
+ */
+export function saveCachedNutrition(recipeId: string, nutrition: NutritionInfo): void {
+  if (typeof window === 'undefined' || !recipeId || !nutrition) return;
+
+  try {
+    const raw = localStorage.getItem(NUTRITION_STORAGE_KEY);
+    const map: Record<string, NutritionInfo> = raw ? JSON.parse(raw) : {};
+    map[recipeId] = nutrition;
+    localStorage.setItem(NUTRITION_STORAGE_KEY, JSON.stringify(map));
+  } catch (err) {
+    console.warn('Error saving cached nutrition:', err);
+  }
+}
+
+/**
+ * Elimina la información nutricional en caché de una receta
+ */
+export function deleteCachedNutrition(recipeId: string): void {
+  if (typeof window === 'undefined' || !recipeId) return;
+
+  try {
+    const raw = localStorage.getItem(NUTRITION_STORAGE_KEY);
+    if (!raw) return;
+    const map: Record<string, NutritionInfo> = JSON.parse(raw);
+    if (map[recipeId]) {
+      delete map[recipeId];
+      localStorage.setItem(NUTRITION_STORAGE_KEY, JSON.stringify(map));
+    }
+  } catch (err) {
+    console.warn('Error deleting cached nutrition:', err);
+  }
+}
+

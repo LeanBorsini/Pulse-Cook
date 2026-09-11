@@ -109,8 +109,32 @@ export interface Recipe {
   ratings_count?: number;
   /** Calificación específica otorgada por el usuario autenticado actual */
   user_rating?: number;
+  /** Información nutricional orientativa estimada por ración */
+  nutrition_info?: NutritionInfo;
   /** Marca de tiempo ISO de creación de la receta */
   created_at?: string;
+}
+
+/**
+ * Valores nutricionales orientativos calculados por ración/porción.
+ */
+export interface NutritionInfo {
+  /** Calorías aproximadas por ración (kcal) */
+  calories: number;
+  /** Proteínas estimadas en gramos (g) */
+  protein: number;
+  /** Carbohidratos estimados en gramos (g) */
+  carbs: number;
+  /** Grasas totales estimadas en gramos (g) */
+  fat: number;
+  /** Fibra dietética en gramos (g) (opcional) */
+  fiber?: number;
+  /** Resumen o comentario del perfil nutricional */
+  summary?: string;
+  /** Confirmación de que es un valor estimado */
+  is_estimated?: boolean;
+  /** Timestamp de cálculo */
+  calculated_at?: string;
 }
 
 /**
