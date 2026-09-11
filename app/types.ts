@@ -73,6 +73,8 @@ export interface Recipe {
   id: string;
   /** Identificador del autor creador de la receta */
   user_id?: string;
+  /** Nombre del autor/creador (opcional para recetas de terceros o con autor específico) */
+  author_name?: string;
   /** Perfil enriquecido del autor obtenido mediante JOIN con profiles */
   profiles?: Profile | null;
   /** Título de la receta en español */

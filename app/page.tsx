@@ -312,22 +312,22 @@ export default function Home() {
         const rawRecipes = data as unknown as SupabaseRecipeRow[];
 
         // 2. Obtener perfiles de autor si existen
+        // 2. Obtener perfiles de autores para atribución
         const profileMap = new Map<string, { id: string; username: string; avatar_url?: string }>();
+        let daniProfile: { id: string; username: string; avatar_url?: string } | null = null;
         try {
-          const userIds = Array.from(
-            new Set(rawRecipes.map((r) => r.user_id).filter((id): id is string => Boolean(id)))
-          );
-          if (userIds.length > 0) {
-            const { data: profilesData } = await supabase
-              .from('profiles')
-              .select('id, username, avatar_url')
-              .in('id', userIds);
+          // Consultar perfiles de autores disponibles
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url');
 
-            if (profilesData) {
-              profilesData.forEach((p) => {
-                profileMap.set(p.id, p);
-              });
-            }
+          if (profilesData) {
+            profilesData.forEach((p) => {
+              profileMap.set(p.id, p);
+              if (p.username && p.username.toLowerCase() === 'danicooker') {
+                daniProfile = p;
+              }
+            });
           }
         } catch (profErr) {
           console.warn('Profiles lookup optional note:', profErr);
@@ -356,15 +356,26 @@ export default function Home() {
             if (userRat) myRating = userRat.stars;
           }
 
-          // Resolver autor (si la receta en Supabase carece de user_id, pertenece al autor principal)
-          const effectiveUserId = item.user_id || MAIN_AUTHOR_CONFIG.UUID;
-          const authorProfile = profileMap.get(effectiveUserId) || (item.user_id ? profileMap.get(item.user_id) : null);
+          // Resolver autor fidedigno
+          const rawTitle = (item.title_es || item.title_en || item.title || '').toLowerCase();
+          const isBizcochoDani = rawTitle.includes('bizcocho humedo');
+
+          const effectiveUserId = isBizcochoDani
+            ? (daniProfile?.id || (item.user_id !== MAIN_AUTHOR_CONFIG.UUID && item.user_id ? item.user_id : 'daniCooker'))
+            : (item.user_id || MAIN_AUTHOR_CONFIG.UUID);
+
+          const authorProfile = isBizcochoDani
+            ? (daniProfile || { id: effectiveUserId, username: 'daniCooker' })
+            : (profileMap.get(effectiveUserId) || (item.user_id ? profileMap.get(item.user_id) : null));
+
           const resolvedProfiles =
             authorProfile ||
             item.profiles ||
             (item.author_name
               ? { id: effectiveUserId, username: item.author_name }
-              : { id: MAIN_AUTHOR_CONFIG.UUID, username: MAIN_AUTHOR_CONFIG.USERNAME });
+              : (isBizcochoDani
+                  ? { id: effectiveUserId, username: 'daniCooker' }
+                  : { id: MAIN_AUTHOR_CONFIG.UUID, username: MAIN_AUTHOR_CONFIG.USERNAME }));
 
           // Normalizar imágenes
           let imagesList: string[] = [];
@@ -389,6 +400,7 @@ export default function Home() {
           return {
             id: String(item.id),
             user_id: effectiveUserId,
+            author_name: isBizcochoDani ? 'daniCooker' : (item.author_name || resolvedProfiles?.username),
             profiles: resolvedProfiles,
             title_es: item.title_es || item.title_en || item.title || '',
             title_en: item.title_en || item.title_es || item.title || '',
@@ -435,6 +447,9 @@ export default function Home() {
             combined[idx] = {
               ...combined[idx],
               ...localRecipe,
+              profiles: combined[idx].profiles || localRecipe.profiles,
+              user_id: combined[idx].user_id || localRecipe.user_id,
+              author_name: combined[idx].author_name || localRecipe.author_name,
               avg_rating: combined[idx].avg_rating || localRecipe.avg_rating,
               ratings_count: combined[idx].ratings_count || localRecipe.ratings_count,
               user_rating: combined[idx].user_rating || localRecipe.user_rating,

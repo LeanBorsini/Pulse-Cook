@@ -452,6 +452,27 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
+### ✅ Fase 18: Inmutabilidad de Autoría Creadora & Protección de Recetas Comunitarias (COMPLETADA)
+- [x] **Diagnóstico y Corrección de Sobre-escritura de Autoría**:
+  - Al editar una receta comunitaria como administrador (`leanBorsini`), el payload de actualización a Supabase incluía `user_id = user.id`, lo que transfería indebidamente la propiedad de la receta de `@daniCooker` a `leanBorsini`.
+  - En el almacenamiento local (`recipeData`), `profiles` y `user_id` eran sobreescritos por los del usuario en sesión.
+- [x] **Aislamiento Estricto de Payload en `RecipeFormModal.tsx`**:
+  - Se separó el payload de actualización (`baseRecipePayload` sin `user_id`) del payload de creación (`insert` con `user_id = user.id`).
+  - Al actualizar cualquier receta existente en Supabase, el campo `user_id` nunca se modifica.
+  - Se preservó estrictamente la autoría original (`profiles`, `user_id` y `author_name`) de las recetas comunitarias.
+- [x] **Normalización Canónica y Caché Resiliente en `page.tsx` y `recipeStore.ts`**:
+  - Detección y mapeo fidedigno para `@daniCooker` en el listado y combinación de recetas remotas y locales.
+  - Saneamiento automático en `getLocalRecipes()` para corregir registros locales previos afectados por ediciones pasadas.
+- [x] **Diferenciación de Distintivos en `RecipeDetailModal.tsx` y `RecipeCard.tsx`**:
+  - La tarjeta ahora muestra con precisión `by @daniCooker`.
+  - El distintivo `🟢 Tu receta` solo se muestra al creador real de la receta.
+  - Para administradores que editan recetas de la comunidad, se muestra `🛡️ Modo Admin`, permitiéndoles editar y moderar sin apropiarse de la autoría.
+  - `RecipePrintView.tsx` actualizado para reflejar la autoría fidedigna en la ficha impresa.
+- [x] **Script SQL de Reasignación en Supabase**:
+  - Script SQL idempotente para reasociar la receta "Bizcocho humedo de chocolate" al UUID de `@daniCooker`.
+
+---
+
 ## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.

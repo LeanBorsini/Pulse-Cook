@@ -476,17 +476,60 @@ export function RecipeDetailModal({
   const currentImage = recipeImages[activeImageIndex] || recipeImages[0] || null;
 
   // Author & Owner check - Cada usuario puede editar sus recetas originales
-  const authorName =
-    recipe.profiles?.username ||
-    (recipe as unknown as { author_name?: string }).author_name ||
-    (recipe.user_id === user?.id
-      ? (user?.user_metadata?.username || user?.email?.split('@')[0] || MAIN_AUTHOR_CONFIG.USERNAME)
-      : MAIN_AUTHOR_CONFIG.USERNAME);
+  const authorName = useMemo(() => {
+    const normTitle = (recipe.title_es || recipe.title_en || '').toLowerCase();
+    if (normTitle.includes('bizcocho humedo')) {
+      return 'daniCooker';
+    }
+    if (recipe.profiles?.username) {
+      return recipe.profiles.username;
+    }
+    if ((recipe as unknown as { author_name?: string }).author_name) {
+      return (recipe as unknown as { author_name?: string }).author_name!;
+    }
+    if (recipe.user_id === MAIN_AUTHOR_CONFIG.UUID) {
+      return MAIN_AUTHOR_CONFIG.USERNAME;
+    }
+    if (user && recipe.user_id === user.id) {
+      return (user.user_metadata as { username?: string })?.username || user.email?.split('@')[0] || MAIN_AUTHOR_CONFIG.USERNAME;
+    }
+    return recipe.user_id ? 'Chef' : MAIN_AUTHOR_CONFIG.USERNAME;
+  }, [recipe, user]);
 
   // Solo el autor original o el administrador principal puede editar o eliminar su receta
   const isOwner = useMemo(() => {
     return isRecipeAuthor(recipe, user, profileUsername);
   }, [user, recipe, profileUsername]);
+
+  // Identificar si el usuario actual es el autor creador directo (para no rotular 'Tu receta' a un admin en recetas ajenas)
+  const isActualCreator = useMemo(() => {
+    if (!user) return false;
+    const myUsername = (
+      profileUsername ||
+      (user.user_metadata as { username?: string })?.username ||
+      user.email?.split('@')[0] ||
+      ''
+    ).toLowerCase();
+
+    // Si el autor visible de la receta no es el usuario actual, NO es el creador
+    if (authorName.toLowerCase() !== myUsername) {
+      return false;
+    }
+
+    if (recipe.user_id && recipe.user_id === user.id) {
+      return true;
+    }
+    if (recipe.profiles?.id && recipe.profiles.id === user.id) {
+      return true;
+    }
+
+    const isLocalDraft = recipe.id.startsWith('user_') || recipe.id.startsWith('local_');
+    if (isLocalDraft && (!recipe.user_id || recipe.user_id === user.id || recipe.user_id === 'local_user')) {
+      return true;
+    }
+
+    return false;
+  }, [user, recipe, profileUsername, authorName]);
 
   const handlePrint = () => {
     window.print();
@@ -654,12 +697,17 @@ export function RecipeDetailModal({
             </h2>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs text-stone-500 font-medium">by @{authorName}</span>
-              {isOwner && (
+              {isActualCreator ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-100/70 border border-emerald-200/80 px-2 py-0.5 rounded-full">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
                   {lang === 'ES' ? 'Tu receta' : 'Your recipe'}
                 </span>
-              )}
+              ) : isOwner ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-700 bg-stone-200/70 border border-stone-300/80 px-2 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-500" />
+                  {lang === 'ES' ? 'Modo Admin' : 'Admin Mode'}
+                </span>
+              ) : null}
             </div>
           </div>
 

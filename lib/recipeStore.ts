@@ -74,7 +74,19 @@ export function getLocalRecipes(): Recipe[] {
       }
     });
 
-    if (deduplicated.length !== customRecipes.length) {
+    let correctedAny = false;
+    deduplicated.forEach((r) => {
+      const normTitle = (r.title_es || r.title_en || '').toLowerCase();
+      if (normTitle.includes('bizcocho humedo')) {
+        if (r.profiles?.username !== 'daniCooker' || r.author_name !== 'daniCooker') {
+          r.profiles = { id: r.profiles?.id || 'daniCooker', username: 'daniCooker' };
+          r.author_name = 'daniCooker';
+          correctedAny = true;
+        }
+      }
+    });
+
+    if (deduplicated.length !== customRecipes.length || correctedAny) {
       localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(deduplicated));
     }
 

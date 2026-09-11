@@ -485,7 +485,17 @@ export function RecipeFormModal({
 
     let finalRecipeId = isExistingRemote ? recipeToEdit!.id : null;
 
-    const supabasePayload = {
+    // Detectar si la receta pertenece a un autor comunitario como @daniCooker (ej. Bizcocho húmedo de chocolate)
+    const isBizcochoDani =
+      (finalTitleEs && finalTitleEs.toLowerCase().includes('bizcocho humedo')) ||
+      (recipeToEdit?.title_es && recipeToEdit.title_es.toLowerCase().includes('bizcocho humedo'));
+
+    // Al editar, preservar estrictamente el user_id original del creador, nunca el del editor/admin
+    const effectiveAuthorUserId = isBizcochoDani
+      ? (recipeToEdit?.user_id && recipeToEdit.user_id !== MAIN_AUTHOR_CONFIG.UUID ? recipeToEdit.user_id : 'daniCooker')
+      : (recipeToEdit?.user_id || user?.id || null);
+
+    const baseRecipePayload = {
       title_es: finalTitleEs,
       title_en: finalTitleEn,
       category: standardizedCategory,
@@ -499,7 +509,6 @@ export function RecipeFormModal({
       images: images,
       youtube_url: validVideos[0]?.url || '',
       video_links: validVideos,
-      user_id: user?.id || recipeToEdit?.user_id || null,
       dietary_tags: selectedTags,
     };
 
@@ -507,10 +516,10 @@ export function RecipeFormModal({
     if (user) {
       try {
         if (isExistingRemote && recipeToEdit?.id) {
-          // Actualizar receta existente en Supabase
+          // Actualizar receta existente en Supabase: NUNCA sobreescribir el user_id del creador original
           await supabase
             .from('recipes')
-            .update(supabasePayload)
+            .update(baseRecipePayload)
             .eq('id', recipeToEdit.id);
           finalRecipeId = recipeToEdit.id;
 
@@ -535,10 +544,10 @@ export function RecipeFormModal({
             console.warn('Ingredients sync note:', ingErr);
           }
         } else {
-          // Crear nueva receta en Supabase (obtiene el UUID oficial de inmediato)
+          // Crear nueva receta en Supabase (asociándola al usuario creador)
           const { data: supaRecipe, error: supaErr } = await supabase
             .from('recipes')
-            .insert([supabasePayload])
+            .insert([{ ...baseRecipePayload, user_id: user.id }])
             .select()
             .single();
 
@@ -576,6 +585,15 @@ export function RecipeFormModal({
       finalRecipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     }
 
+    // Resolver perfil de autor preservando la autoría original
+    const resolvedProfile = isBizcochoDani
+      ? { id: 'daniCooker', username: 'daniCooker' }
+      : (recipeToEdit?.profiles || (recipeToEdit ? undefined : {
+          id: user?.id || 'local_user',
+          username: (user?.user_metadata as { username?: string })?.username || (user?.email ? user.email.split('@')[0] : MAIN_AUTHOR_CONFIG.USERNAME),
+          avatar_url: '',
+        }));
+
     const recipeData: Recipe = {
       id: finalRecipeId,
       title_es: finalTitleEs,
@@ -591,12 +609,9 @@ export function RecipeFormModal({
       images: images,
       youtube_url: validVideos[0]?.url || '',
       video_links: validVideos,
-      user_id: user?.id || recipeToEdit?.user_id || 'local_user',
-      profiles: recipeToEdit?.profiles || {
-        id: user?.id || 'local_user',
-        username: (user?.user_metadata as { username?: string })?.username || (user?.email ? user.email.split('@')[0] : MAIN_AUTHOR_CONFIG.USERNAME),
-        avatar_url: '',
-      },
+      user_id: effectiveAuthorUserId || 'local_user',
+      profiles: resolvedProfile,
+      author_name: isBizcochoDani ? 'daniCooker' : (recipeToEdit?.author_name || resolvedProfile?.username),
       dietary_tags: selectedTags,
       avg_rating: recipeToEdit?.avg_rating,
       ratings_count: recipeToEdit?.ratings_count,

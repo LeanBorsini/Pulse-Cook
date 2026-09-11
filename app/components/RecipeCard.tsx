@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Clock, Users, Plus, Minus, Star, Images, X } from 'lucide-react';
 import { Recipe } from '../types';
 import { User } from '@supabase/supabase-js';
@@ -32,7 +33,22 @@ export function RecipeCard({
 }: RecipeCardProps) {
   const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
   const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
-  const authorName = recipe.profiles?.username || MAIN_AUTHOR_CONFIG.USERNAME;
+  const authorName = useMemo(() => {
+    const normTitle = (recipe.title_es || recipe.title_en || '').toLowerCase();
+    if (normTitle.includes('bizcocho humedo')) {
+      return 'daniCooker';
+    }
+    if (recipe.profiles?.username) {
+      return recipe.profiles.username;
+    }
+    if (recipe.author_name) {
+      return recipe.author_name;
+    }
+    if (recipe.user_id === MAIN_AUTHOR_CONFIG.UUID) {
+      return MAIN_AUTHOR_CONFIG.USERNAME;
+    }
+    return recipe.user_id ? 'Chef' : MAIN_AUTHOR_CONFIG.USERNAME;
+  }, [recipe]);
   const currentServings = servingsCount ?? (recipe.servings || 2);
   const isEffectiveSelected = Boolean(user && isSelected);
 

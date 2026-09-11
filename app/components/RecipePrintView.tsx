@@ -25,7 +25,11 @@ export function RecipePrintView({
   const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
   const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
   const instructions = translateRecipeField(recipe.instructions_es, recipe.instructions_en, lang);
-  const authorName = recipe.profiles?.username || 'leanBorsini';
+  const authorName =
+    recipe.author_name ||
+    (recipe.title_es?.toLowerCase().includes('bizcocho humedo')
+      ? 'daniCooker'
+      : (recipe.profiles?.username || 'leanBorsini'));
 
   // Escalar cantidades de ingredientes según porciones si difiere
   const baseServings = recipe.servings || 1;
