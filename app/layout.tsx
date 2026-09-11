@@ -1,5 +1,20 @@
 import type { Metadata, Viewport } from "next";
+import { Caveat, Lora } from "next/font/google";
 import "./globals.css";
+
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  variable: "--font-caveat",
+  display: "swap",
+});
+
+const lora = Lora({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-lora",
+  display: "swap",
+});
 
 export const viewport: Viewport = {
   themeColor: "#2C3523",
@@ -36,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className="h-full antialiased">
+    <html lang="es" className={`h-full antialiased ${caveat.variable} ${lora.variable}`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
