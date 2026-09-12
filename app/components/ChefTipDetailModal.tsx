@@ -222,11 +222,11 @@ export function ChefTipDetailModal({
                 }
                 onReportTip(currentTip);
               }}
-              className="absolute top-3 right-14 z-10 h-9 px-3 rounded-full bg-black/50 hover:bg-red-900/70 text-white flex items-center gap-1.5 backdrop-blur-xs transition-colors cursor-pointer border border-white/20 text-xs font-semibold shadow-sm"
+              className="absolute top-3 right-14 z-10 w-9 h-9 rounded-full bg-black/40 hover:bg-red-900/70 text-white flex items-center justify-center backdrop-blur-xs transition-colors cursor-pointer border border-white/20 shadow-sm"
               title={isEs ? 'Denunciar este tip' : 'Report this tip'}
+              aria-label={isEs ? 'Denunciar' : 'Report'}
             >
-              <Flag className="w-3.5 h-3.5 text-red-400" />
-              <span>{isEs ? 'Denunciar' : 'Report'}</span>
+              <Flag className="w-4 h-4 text-red-400" />
             </button>
           )}
 
@@ -361,24 +361,6 @@ export function ChefTipDetailModal({
                 ({currentTip.ratings_count || 0})
               </span>
             </div>
-
-            {/* Botón Denunciar Tip - SIEMPRE VISIBLE */}
-            {onReportTip && (
-              <button
-                onClick={() => {
-                  if (!user) {
-                    onOpenAuth?.();
-                    return;
-                  }
-                  onReportTip(currentTip);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D8D3C4] hover:border-red-300 hover:bg-red-50 text-[#5C6650] hover:text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ml-auto"
-                title={isEs ? 'Denunciar este tip' : 'Report this tip'}
-              >
-                <Flag className="w-3.5 h-3.5 text-red-500" />
-                <span>{isEs ? 'Denunciar' : 'Report'}</span>
-              </button>
-            )}
           </div>
 
           {/* Feedback tras votar */}

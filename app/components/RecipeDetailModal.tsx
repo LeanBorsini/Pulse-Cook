@@ -663,7 +663,7 @@ export function RecipeDetailModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Botón Denunciar Receta en Cabecera */}
+            {/* Botón Denunciar Receta en Cabecera (Circular junto a la X) */}
             {onReportRecipe && (
               <button
                 type="button"
@@ -674,12 +674,11 @@ export function RecipeDetailModal({
                   }
                   onReportRecipe(recipe);
                 }}
-                className="h-8 px-2.5 rounded-full bg-[#EAE5D6] hover:bg-red-50 hover:text-red-700 hover:border-red-300 active:scale-90 text-[#5C6650] flex items-center gap-1.5 border border-[#D8D3C4] transition-all cursor-pointer shadow-xs text-xs font-semibold"
+                className="w-8 h-8 rounded-full bg-[#EAE5D6] hover:bg-red-50 hover:text-red-700 hover:border-red-300 active:scale-90 text-[#5C6650] flex items-center justify-center border border-[#D8D3C4] transition-all cursor-pointer shadow-xs"
                 title={isEs ? 'Denunciar esta receta' : 'Report this recipe'}
                 aria-label={isEs ? 'Denunciar' : 'Report'}
               >
                 <Flag className="w-3.5 h-3.5 text-red-500" />
-                <span className="hidden sm:inline">{isEs ? 'Denunciar' : 'Report'}</span>
               </button>
             )}
 
@@ -1031,7 +1030,7 @@ export function RecipeDetailModal({
                 </button>
               </div>
 
-              {/* Acciones de Autor (Editar / Borrar) y Denunciar (Derecha) - EN LA MISMA LÍNEA */}
+              {/* Acciones de Autor (Editar / Borrar) - EN LA MISMA LÍNEA */}
               <div className="flex items-center gap-1.5 shrink-0">
                 {isOwner && (
                   <>
@@ -1083,25 +1082,6 @@ export function RecipeDetailModal({
                       </button>
                     )}
                   </>
-                )}
-
-                {/* Botón Denunciar Receta - SIEMPRE VISIBLE */}
-                {onReportRecipe && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!user) {
-                        onOpenAuth();
-                        return;
-                      }
-                      onReportRecipe(recipe);
-                    }}
-                    title={lang === 'ES' ? 'Denunciar receta' : 'Report recipe'}
-                    className="p-2 px-2.5 rounded-xl bg-[#EFECE1] hover:bg-red-50 border border-[#D8D3C4] hover:border-red-300 text-[#5C6650] hover:text-red-700 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
-                  >
-                    <Flag className="w-3.5 h-3.5 text-red-500" />
-                    <span>{lang === 'ES' ? 'Denunciar' : 'Report'}</span>
-                  </button>
                 )}
               </div>
             </div>
