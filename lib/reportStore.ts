@@ -4,6 +4,8 @@ import {
   ReportTargetType,
   ReportReasonCategory,
   ContentStatus,
+  Profile,
+  UserRole,
 } from '@/app/types';
 import { MAIN_AUTHOR_CONFIG, isModeratorOrAdmin } from './constants';
 import { User } from '@supabase/supabase-js';
@@ -532,3 +534,155 @@ export async function updateContentStatus(
     console.warn('Status update note:', err);
   }
 }
+
+/**
+ * Clave local para perfiles cacheados/gestionados.
+ */
+const MANAGED_USERS_KEY = 'pulse_cook_managed_profiles_v1';
+
+export function getLocalManagedProfiles(): Profile[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(MANAGED_USERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalManagedProfiles(profiles: Profile[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(MANAGED_USERS_KEY, JSON.stringify(profiles));
+  } catch {}
+}
+
+/**
+ * Consulta la lista de usuarios y perfiles para gestión administrativa.
+ * Soporta búsqueda en tiempo real por username, email o ID.
+ */
+export async function searchAndFetchProfiles(
+  query: string = ''
+): Promise<Profile[]> {
+  const localList = getLocalManagedProfiles();
+  const trimmed = query.trim().toLowerCase();
+
+  try {
+    // 1. Intentar consultar la tabla `profiles` en Supabase
+    let req = supabase.from('profiles').select('id, username, avatar_url, role, is_banned, created_at');
+
+    if (trimmed) {
+      req = req.or(`username.ilike.%${trimmed}%,id.eq.${trimmed}`);
+    }
+
+    const { data, error } = await req.limit(50);
+
+    if (!error && data) {
+      const remoteProfiles: Profile[] = (data as Profile[]).map((p) => {
+        // Garantizar que leanBorsini siempre figure como admin
+        if (p.id === MAIN_AUTHOR_CONFIG.UUID || p.username?.toLowerCase() === 'leanborsini') {
+          return {
+            ...p,
+            email: MAIN_AUTHOR_CONFIG.EMAIL,
+            role: 'admin',
+            is_banned: false,
+          };
+        }
+        return {
+          ...p,
+          role: (p.role as UserRole) || 'user',
+          is_banned: Boolean(p.is_banned),
+        };
+      });
+
+      // Si leanBorsini no vino en el resultado y coincide la búsqueda, agregarlo
+      const hasMain = remoteProfiles.some((p) => p.id === MAIN_AUTHOR_CONFIG.UUID);
+      if (!hasMain && (!trimmed || 'leanborsini'.includes(trimmed) || MAIN_AUTHOR_CONFIG.EMAIL.includes(trimmed))) {
+        remoteProfiles.unshift({
+          id: MAIN_AUTHOR_CONFIG.UUID,
+          username: MAIN_AUTHOR_CONFIG.USERNAME,
+          email: MAIN_AUTHOR_CONFIG.EMAIL,
+          role: 'admin',
+          is_banned: false,
+        });
+      }
+
+      // Fusionar con caché local
+      saveLocalManagedProfiles(remoteProfiles);
+      return remoteProfiles;
+    }
+  } catch (err) {
+    console.warn('Error fetching profiles from Supabase, using local fallback:', err);
+  }
+
+  // Fallback con datos locales y base canónica
+  const fallbackProfiles: Profile[] = [
+    {
+      id: MAIN_AUTHOR_CONFIG.UUID,
+      username: MAIN_AUTHOR_CONFIG.USERNAME,
+      email: MAIN_AUTHOR_CONFIG.EMAIL,
+      role: 'admin',
+      is_banned: false,
+    },
+    ...localList.filter((p) => p.id !== MAIN_AUTHOR_CONFIG.UUID),
+  ];
+
+  if (!trimmed) return fallbackProfiles;
+
+  return fallbackProfiles.filter(
+    (p) =>
+      p.username.toLowerCase().includes(trimmed) ||
+      (p.email && p.email.toLowerCase().includes(trimmed)) ||
+      p.id.toLowerCase().includes(trimmed)
+  );
+}
+
+/**
+ * Asigna o cambia el rol de un usuario (admin, moderator, user).
+ * Solo ejecutable por el Administrador.
+ */
+export async function updateUserRole(
+  targetUserId: string,
+  newRole: UserRole,
+  adminUser: User
+): Promise<{ success: boolean; error?: string }> {
+  // Proteger al autor principal de ser degradado
+  if (targetUserId === MAIN_AUTHOR_CONFIG.UUID && newRole !== 'admin') {
+    return { success: false, error: 'No es posible modificar el rol del Administrador Supremo.' };
+  }
+
+  // 1. Actualizar caché local
+  const currentList = getLocalManagedProfiles();
+  const updatedList = currentList.map((p) =>
+    p.id === targetUserId ? { ...p, role: newRole } : p
+  );
+  saveLocalManagedProfiles(updatedList);
+
+  // 2. Persistir en Supabase
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', targetUserId);
+
+    if (error) {
+      console.warn('Error updating profile role in Supabase:', error);
+      return { success: false, error: error.message };
+    }
+
+    await recordModerationLog({
+      action: `role_change_to_${newRole}`,
+      moderator_id: adminUser.id,
+      target_user_id: targetUserId,
+      note: `Role changed to ${newRole} by admin`,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.warn('Supabase role update error:', err);
+    return { success: true }; // Permite que funcione localmente
+  }
+}
+

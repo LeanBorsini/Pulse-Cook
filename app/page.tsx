@@ -55,7 +55,7 @@ import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucid
 import { getCategoryKey, getCategoryLabel } from '@/lib/categories';
 import { translateIngredientName } from '@/lib/culinaryDictionary';
 import { MAIN_AUTHOR_CONFIG, isModeratorOrAdmin } from '@/lib/constants';
-import { getPendingReportsCount } from '@/lib/reportStore';
+import { getPendingReportsCount, isUserLocallyBanned } from '@/lib/reportStore';
 
 interface SupabaseRatingRow {
   recipe_id?: string;
@@ -343,13 +343,28 @@ export default function Home() {
         setUserRole('admin');
       }
 
+      // Comprobar baneo local
+      if (!isMain && isUserLocallyBanned(userId)) {
+        console.warn('User is locally banned. Signing out.');
+        await supabase.auth.signOut();
+        alert(lang === 'ES' ? 'Esta cuenta ha sido suspendida por moderación.' : 'This account has been suspended by moderation.');
+        return;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
-        .select('username, role')
+        .select('username, role, is_banned')
         .eq('id', userId)
         .single();
 
       if (data) {
+        if (!isMain && data.is_banned) {
+          console.warn('User account is banned in Supabase profiles. Signing out.');
+          await supabase.auth.signOut();
+          alert(lang === 'ES' ? 'Esta cuenta ha sido suspendida por el Administrador.' : 'This account has been suspended by an Administrator.');
+          return;
+        }
+
         if (data.username) {
           setProfileUsername(data.username);
         }
@@ -364,7 +379,7 @@ export default function Home() {
     } catch (err) {
       console.warn('Profile fetch error:', err);
     }
-  }, []);
+  }, [lang]);
 
   // Fetch Recipes: Prioriza la base de datos de Supabase y combina con el almacén local
   const fetchRecipes = useCallback(async (userOverride?: User | null) => {

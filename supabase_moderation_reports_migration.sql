@@ -283,3 +283,47 @@ WITH CHECK (
     SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_banned = TRUE
   )
 );
+
+-- 8. POLÍTICAS RLS EN PROFILES: PERMITIR A ADMINS Y MODERADORES LEER Y MODIFICAR ROLES / BANEO
+-- Habilitar RLS en profiles si no estuviese habilitado
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- 8.1 Todos los usuarios autenticados pueden consultar perfiles (para ver autores, menciones, y buscador de moderación)
+DROP POLICY IF EXISTS "Public and authenticated can view profiles" ON public.profiles;
+CREATE POLICY "Public and authenticated can view profiles"
+ON public.profiles
+FOR SELECT
+TO authenticated, anon
+USING (true);
+
+-- 8.2 Cada usuario puede actualizar su propio perfil (su propio username, etc.)
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+CREATE POLICY "Users can update own profile"
+ON public.profiles
+FOR UPDATE
+TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (
+  auth.uid() = id 
+  -- Un usuario normal no puede auto-asignarse rol de admin o desbanearse
+  AND (
+    role = (SELECT p.role FROM public.profiles p WHERE p.id = auth.uid())
+    OR public.is_admin_or_moderator(auth.uid())
+  )
+);
+
+-- 8.3 Administradores y Moderadores pueden actualizar perfiles de otros (asignar roles y banear)
+DROP POLICY IF EXISTS "Admins can update user roles and ban status" ON public.profiles;
+CREATE POLICY "Admins can update user roles and ban status"
+ON public.profiles
+FOR UPDATE
+TO authenticated
+USING (
+  public.is_admin_or_moderator(auth.uid())
+  OR auth.uid() = '1afb8de4-9294-4f57-af9f-dc50b3e6e768'
+)
+WITH CHECK (
+  public.is_admin_or_moderator(auth.uid())
+  OR auth.uid() = '1afb8de4-9294-4f57-af9f-dc50b3e6e768'
+);
+

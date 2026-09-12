@@ -25,12 +25,16 @@ export interface Profile {
   id: string;
   /** Nombre público o alias culinario del usuario */
   username: string;
+  /** Correo electrónico del usuario (para auditoría y gestión de moderación) */
+  email?: string;
   /** Enlace opcional a la imagen de avatar del perfil */
   avatar_url?: string;
   /** Rol administrativo del usuario (admin, moderator o user) */
   role?: UserRole;
   /** Indica si la cuenta del usuario ha sido suspendida por moderación */
   is_banned?: boolean;
+  /** Fecha de registro */
+  created_at?: string;
 }
 
 /**
