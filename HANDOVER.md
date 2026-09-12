@@ -493,6 +493,17 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
+### ✅ Fase 20: Optimización Ergonómica de la Barra de Acciones (`RecipeDetailModal.tsx`)
+- [x] **Integración de Opción PDF dentro de Compartir**:
+  - Se agrupó la descarga/impresión de ficha técnica en PDF dentro del menú desplegable interactivo `Compartir`.
+  - El menú desplegable incluye: Descargar/Imprimir PDF (Ficha gourmet), Copiar enlace directo al portapapeles, Enviar por WhatsApp y Menú nativo del dispositivo (Web Share API).
+  - Se implementó cierre automático con clic externo (`mousedown`/`touchstart`) y tecla `Escape`.
+- [x] **Unificación en la Misma Línea para Acciones de Autor**:
+  - Los botones de edición (`Editar`) y eliminación con confirmación rápida (`Eliminar`/`¿Borrar?`) se posicionan ahora armónicamente en la misma fila horizontal que el grupo `Compartir` y `WhatsApp`.
+  - Se eliminó el salto de línea forzado por el espaciador anterior, ofreciendo una apariencia mucho más limpia, equilibrada y ergonómica en pantallas móviles y de escritorio.
+
+---
+
 ## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.

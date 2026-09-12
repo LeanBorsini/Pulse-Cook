@@ -14,7 +14,7 @@
  * - Inclusión/exclusión directa de la receta en el menú semanal para compras.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Clock,
@@ -34,6 +34,8 @@ import {
   Minus,
   Plus,
   Flag,
+  ChevronDown,
+  Copy,
 } from 'lucide-react';
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
@@ -162,6 +164,31 @@ export function RecipeDetailModal({
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Cerrar menú de compartir al hacer clic fuera o presionar escape
+  useEffect(() => {
+    if (!isShareMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setIsShareMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsShareMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isShareMenuOpen]);
 
   // Estados reactivos y persistentes para calificación con estrellas
   const [ratedState, setRatedState] = useState<{
@@ -540,22 +567,7 @@ export function RecipeDetailModal({
     window.print();
   };
 
-  const handleShare = async () => {
-    const shareData = {
-      title: `${displayedTitle} - Pulse & Cook`,
-      text: `${displayedTitle} - ${displayedDesc || '¡Mira esta deliciosa receta en Pulse & Cook!'}`,
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch {
-        // Fallback to clipboard
-      }
-    }
-
+  const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(
         `🍽️ *${displayedTitle}* (Pulse & Cook)\n⏱️ ${recipe.prep_time || 15} min | 👥 ${recipe.servings || 1} porciones\n\n${displayedDesc || ''}\n\n👉 Mira la receta completa aquí: ${window.location.href}`
@@ -566,6 +578,24 @@ export function RecipeDetailModal({
       // Fallback
     }
   };
+
+  const handleNativeShare = async () => {
+    const shareData = {
+      title: `${displayedTitle} - Pulse & Cook`,
+      text: `${displayedTitle} - ${displayedDesc || '¡Mira esta deliciosa receta en Pulse & Cook!'}`,
+      url: window.location.href,
+    };
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // Usuario canceló o no soportado
+      }
+    }
+  };
+
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
   const handleStarClick = (starValue: number) => {
     if (!user) {
@@ -722,180 +752,305 @@ export function RecipeDetailModal({
           </div>
 
           {/* Barra de Acciones Gastronómicas */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Botón Cocinar Paso a Paso */}
-            <button
-              onClick={() => setIsCookingMode(true)}
-              title={lang === 'ES' ? 'Modo Cocina Paso a Paso' : 'Step-by-Step Cooking Mode'}
-              className="p-2 px-3.5 rounded-xl bg-[#2C3523] text-white hover:bg-[#3D4932] transition-colors flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer active:scale-95"
-            >
-              <ChefHat className="w-4 h-4 text-amber-300" />
-              <span>{lang === 'ES' ? 'Cocinar Paso a Paso' : 'Cook Step-by-Step'}</span>
-            </button>
-
-            {/* Botón Añadir / Gestionar en Menú */}
-            {onToggleMenu && (
-              isInMenu && user ? (
-                <div className="flex items-center bg-[#2C3523] text-[#F7F5EC] rounded-xl px-2 py-1 border border-[#2C3523] text-xs font-semibold shadow-xs">
-                  <span className="flex items-center gap-1 mr-1.5 text-[11px]">
-                    <ShoppingCart className="w-3.5 h-3.5 text-amber-200" />
-                    <span>{lang === 'ES' ? 'En Menú' : 'In Menu'}</span>
-                  </span>
-                  <div className="flex items-center bg-black/25 rounded-lg p-0.5 mr-1">
-                    <button
-                      type="button"
-                      onClick={() => handleStepServings(-1)}
-                      disabled={detailServings <= 1}
-                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
-                      title={lang === 'ES' ? 'Menos comensales' : 'Fewer servings'}
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="px-1.5 text-center flex items-center gap-1 font-bold text-[11px]">
-                      <Users className="w-3 h-3 text-amber-200" />
-                      <span>{detailServings}p</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleStepServings(1)}
-                      disabled={detailServings >= 99}
-                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
-                      title={lang === 'ES' ? 'Más comensales' : 'More servings'}
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onToggleMenu(recipe.id)}
-                    className="p-1 hover:text-rose-300 transition-colors cursor-pointer"
-                    title={lang === 'ES' ? 'Quitar del Menú' : 'Remove from Menu'}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (!user) {
-                      onOpenAuth();
-                      return;
-                    }
-                    onToggleMenu(recipe.id, detailServings);
-                  }}
-                  title={lang === 'ES' ? (user ? 'Añadir al Menú Semanal' : 'Inicia sesión para añadir al Menú') : (user ? 'Add to Weekly Menu' : 'Sign in to add to Menu')}
-                  className="p-2 px-3 rounded-xl border transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer bg-[#EFECE1] border-[#D8D3C4] text-[#5C6650] hover:bg-[#E2DEC2]"
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                  <span>{lang === 'ES' ? `+ Menú (${detailServings}p)` : `+ Menu (${detailServings}s)`}</span>
-                </button>
-              )
-            )}
-
-            {/* Botón Compartir */}
-            <button
-              onClick={handleShare}
-              title={lang === 'ES' ? 'Compartir receta' : 'Share recipe'}
-              className="p-2 px-3 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
-            >
-              {copiedLink ? <Check className="w-4 h-4 text-emerald-600" /> : <Share2 className="w-4 h-4" />}
-              <span>{copiedLink ? (lang === 'ES' ? '¡Copiado!' : 'Copied!') : (lang === 'ES' ? 'Compartir' : 'Share')}</span>
-            </button>
-
-            {/* Botón Compartir por WhatsApp */}
-            <button
-              onClick={handleShareWhatsApp}
-              title={lang === 'ES' ? 'Enviar receta por WhatsApp' : 'Send recipe via WhatsApp'}
-              className="p-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#128C7E] transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95"
-            >
-              <svg className="w-3.5 h-3.5 fill-current text-[#25D366]" viewBox="0 0 24 24">
-                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.974.531 1.83.813 2.796.814 3.183 0 5.769-2.588 5.77-5.768 0-3.181-2.587-5.768-5.77-5.768zm3.364 8.163c-.141.398-.711.758-1.034.792-.324.034-.737.154-2.433-.553-1.472-.614-2.42-2.115-2.493-2.213-.074-.098-.598-.796-.598-1.518 0-.722.378-1.076.513-1.223.134-.147.294-.184.392-.184.098 0 .196 0 .282.006.09.006.211-.034.33.251.123.294.417 1.018.454 1.092.037.074.062.16.012.257-.049.098-.074.16-.147.245-.074.086-.156.192-.223.257-.074.074-.151.155-.065.302.086.147.383.633.823 1.025.566.505 1.043.662 1.19.736.147.074.233.061.32-.037.086-.098.368-.429.466-.576.098-.147.196-.123.331-.074.135.049.859.405 1.006.478.147.074.245.11.282.172.037.061.037.356-.104.754z" />
-                <path d="M12 2C6.48 2 2 6.48 2 12c0 1.95.56 3.77 1.53 5.32L2.05 22l4.82-1.44C8.36 21.49 10.13 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18.2c-1.68 0-3.25-.49-4.58-1.33l-.33-.21-2.86.85.86-2.77-.22-.35A8.16 8.16 0 013.8 12c0-4.52 3.68-8.2 8.2-8.2 4.52 0 8.2 3.68 8.2 8.2 0 4.52-3.68 8.2-8.2 8.2z" />
-              </svg>
-              <span>WhatsApp</span>
-            </button>
-
-            {/* Botón Imprimir / PDF */}
-            <button
-              onClick={handlePrint}
-              title={lang === 'ES' ? 'Imprimir / Guardar en PDF' : 'Print / Save as PDF'}
-              className="p-2 px-3 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
-            >
-              <Printer className="w-4 h-4 text-[#425035]" />
-              <span>PDF</span>
-            </button>
-
-            {/* Botón Denunciar Receta */}
-            {!isOwner && onReportRecipe && (
+          <div className="flex flex-col gap-2">
+            {/* Fila 1: Acciones Principales (Cocinar Paso a Paso & Añadir/Gestionar Menú) */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Botón Cocinar Paso a Paso */}
               <button
                 type="button"
-                onClick={() => {
-                  if (!user) {
-                    onOpenAuth();
-                    return;
-                  }
-                  onReportRecipe(recipe);
-                }}
-                title={lang === 'ES' ? 'Denunciar receta' : 'Report recipe'}
-                className="p-2 px-2.5 rounded-xl bg-[#EFECE1] hover:bg-red-50 border border-[#D8D3C4] hover:border-red-300 text-[#5C6650] hover:text-red-700 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer active:scale-95"
+                onClick={() => setIsCookingMode(true)}
+                title={lang === 'ES' ? 'Modo Cocina Paso a Paso' : 'Step-by-Step Cooking Mode'}
+                className="p-2 px-3.5 rounded-xl bg-[#2C3523] text-white hover:bg-[#3D4932] transition-colors flex items-center gap-1.5 text-xs font-bold shadow-xs cursor-pointer active:scale-95"
               >
-                <Flag className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{lang === 'ES' ? 'Denunciar' : 'Report'}</span>
+                <ChefHat className="w-4 h-4 text-amber-300" />
+                <span>{lang === 'ES' ? 'Cocinar Paso a Paso' : 'Cook Step-by-Step'}</span>
               </button>
-            )}
 
-            {/* Acciones de Autor Unificadas: Editar y Eliminar pequeños */}
-            {isOwner && (
-              <div className="flex items-center gap-1.5 ml-auto">
-                {/* Botón Editar Receta */}
-                <button
-                  type="button"
-                  onClick={() => onEdit(recipe, ingredients)}
-                  title={lang === 'ES' ? 'Editar Receta' : 'Edit Recipe'}
-                  className="p-2 px-2.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
-                >
-                  <Edit className="w-3.5 h-3.5 text-[#425035]" />
-                  <span className="hidden sm:inline">{lang === 'ES' ? 'Editar' : 'Edit'}</span>
-                </button>
-
-                {/* Botón Eliminar con confirmación compacta */}
-                {showDeleteConfirm ? (
-                  <div className="flex items-center gap-1 bg-red-100/90 border border-red-300 p-1 px-2 rounded-xl">
-                    <span className="text-[11px] font-bold text-red-900 hidden sm:inline">
-                      {lang === 'ES' ? '¿Borrar?' : 'Delete?'}
+              {/* Botón Añadir / Gestionar en Menú */}
+              {onToggleMenu && (
+                isInMenu && user ? (
+                  <div className="flex items-center bg-[#2C3523] text-[#F7F5EC] rounded-xl px-2 py-1 border border-[#2C3523] text-xs font-semibold shadow-xs">
+                    <span className="flex items-center gap-1 mr-1.5 text-[11px]">
+                      <ShoppingCart className="w-3.5 h-3.5 text-amber-200" />
+                      <span>{lang === 'ES' ? 'En Menú' : 'In Menu'}</span>
                     </span>
+                    <div className="flex items-center bg-black/25 rounded-lg p-0.5 mr-1">
+                      <button
+                        type="button"
+                        onClick={() => handleStepServings(-1)}
+                        disabled={detailServings <= 1}
+                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                        title={lang === 'ES' ? 'Menos comensales' : 'Fewer servings'}
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="px-1.5 text-center flex items-center gap-1 font-bold text-[11px]">
+                        <Users className="w-3 h-3 text-amber-200" />
+                        <span>{detailServings}p</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleStepServings(1)}
+                        disabled={detailServings >= 99}
+                        className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 active:scale-90 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+                        title={lang === 'ES' ? 'Más comensales' : 'More servings'}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        onDelete(recipe.id);
-                        setShowDeleteConfirm(false);
-                      }}
-                      className="px-2 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors text-xs font-bold cursor-pointer shadow-xs active:scale-95"
+                      onClick={() => onToggleMenu(recipe.id)}
+                      className="p-1 hover:text-rose-300 transition-colors cursor-pointer"
+                      title={lang === 'ES' ? 'Quitar del Menú' : 'Remove from Menu'}
                     >
-                      {lang === 'ES' ? 'Sí' : 'Yes'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(false)}
-                      className="px-1.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors text-xs font-medium cursor-pointer"
-                      title={lang === 'ES' ? 'Cancelar' : 'Cancel'}
-                    >
-                      ✕
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    title={lang === 'ES' ? 'Eliminar Receta' : 'Delete Recipe'}
-                    className="p-2 px-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
+                    onClick={() => {
+                      if (!user) {
+                        onOpenAuth();
+                        return;
+                      }
+                      onToggleMenu(recipe.id, detailServings);
+                    }}
+                    title={lang === 'ES' ? (user ? 'Añadir al Menú Semanal' : 'Inicia sesión para añadir al Menú') : (user ? 'Add to Weekly Menu' : 'Sign in to add to Menu')}
+                    className="p-2 px-3 rounded-xl border transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer bg-[#EFECE1] border-[#D8D3C4] text-[#5C6650] hover:bg-[#E2DEC2]"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
+                    <ShoppingCart className="w-4 h-4" />
+                    <span>{lang === 'ES' ? `+ Menú (${detailServings}p)` : `+ Menu (${detailServings}s)`}</span>
                   </button>
-                )}
+                )
+              )}
+            </div>
+
+            {/* Fila 2: Compartir (con opción PDF integrada), WhatsApp, y acciones de Autor (Editar / Borrar) en la MISMA LÍNEA */}
+            <div className="flex items-center justify-between gap-2 pt-0.5">
+              {/* Acciones de Difusión y Compartir (Izquierda) */}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* Botón y Menú Desplegable Compartir (con PDF integrado) */}
+                <div className="relative" ref={shareMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsShareMenuOpen((prev) => !prev)}
+                    title={lang === 'ES' ? 'Compartir o guardar en PDF' : 'Share or save as PDF'}
+                    className={`p-2 px-3 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs ${
+                      isShareMenuOpen
+                        ? 'bg-[#2C3523] text-white border-[#2C3523]'
+                        : 'bg-[#EFECE1] border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2]'
+                    }`}
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>{lang === 'ES' ? 'Compartir' : 'Share'}</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isShareMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Menú Desplegable con PDF y opciones de compartir */}
+                  {isShareMenuOpen && (
+                    <div className="absolute left-0 top-full mt-2 w-64 sm:w-72 bg-[#FAF8F2] border border-[#D8D3C4] rounded-2xl shadow-xl z-50 p-2 animate-fadeIn text-[#2C3523]">
+                      <div className="px-2.5 py-1.5 mb-1 border-b border-[#E7E2D3] flex items-center justify-between">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#5C6650]">
+                          {lang === 'ES' ? 'Compartir Receta' : 'Share Recipe'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsShareMenuOpen(false)}
+                          className="w-5 h-5 rounded-full hover:bg-black/10 flex items-center justify-center text-stone-500 text-xs cursor-pointer"
+                          title={lang === 'ES' ? 'Cerrar' : 'Close'}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        {/* Opción PDF / Imprimir (¡Dentro de Compartir!) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsShareMenuOpen(false);
+                            handlePrint();
+                          }}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#EFECE1] transition-colors text-left cursor-pointer group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 text-amber-900 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            <Printer className="w-4 h-4 text-amber-800" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-bold text-[#2C3523] flex items-center gap-1.5">
+                              <span>{lang === 'ES' ? 'Descargar / Imprimir PDF' : 'Download / Print PDF'}</span>
+                              <span className="text-[10px] font-bold bg-[#2C3523] text-[#F7F5EC] px-1.5 py-0.2 rounded">PDF</span>
+                            </div>
+                            <p className="text-[11px] text-[#5C6650] truncate">
+                              {lang === 'ES' ? 'Ficha gourmet lista para cocina' : 'Gourmet printable kitchen sheet'}
+                            </p>
+                          </div>
+                        </button>
+
+                        {/* Opción Copiar Enlace Directo */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await handleCopyLink();
+                          }}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#EFECE1] transition-colors text-left cursor-pointer group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-900 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            {copiedLink ? <Check className="w-4 h-4 text-emerald-700" /> : <Copy className="w-4 h-4 text-emerald-800" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-bold text-[#2C3523]">
+                              {copiedLink
+                                ? (lang === 'ES' ? '¡Enlace copiado!' : 'Link copied!')
+                                : (lang === 'ES' ? 'Copiar enlace directo' : 'Copy direct link')}
+                            </div>
+                            <p className="text-[11px] text-[#5C6650] truncate">
+                              {lang === 'ES' ? 'Pega el link en cualquier chat o nota' : 'Paste link anywhere to share'}
+                            </p>
+                          </div>
+                        </button>
+
+                        {/* Opción Enviar por WhatsApp */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsShareMenuOpen(false);
+                            handleShareWhatsApp();
+                          }}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#EFECE1] transition-colors text-left cursor-pointer group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-[#25D366]/20 border border-[#25D366]/30 text-[#128C7E] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            <svg className="w-4 h-4 fill-current text-[#25D366]" viewBox="0 0 24 24">
+                              <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.974.531 1.83.813 2.796.814 3.183 0 5.769-2.588 5.77-5.768 0-3.181-2.587-5.768-5.77-5.768zm3.364 8.163c-.141.398-.711.758-1.034.792-.324.034-.737.154-2.433-.553-1.472-.614-2.42-2.115-2.493-2.213-.074-.098-.598-.796-.598-1.518 0-.722.378-1.076.513-1.223.134-.147.294-.184.392-.184.098 0 .196 0 .282.006.09.006.211-.034.33.251.123.294.417 1.018.454 1.092.037.074.062.16.012.257-.049.098-.074.16-.147.245-.074.086-.156.192-.223.257-.074.074-.151.155-.065.302.086.147.383.633.823 1.025.566.505 1.043.662 1.19.736.147.074.233.061.32-.037.086-.098.368-.429.466-.576.098-.147.196-.123.331-.074.135.049.859.405 1.006.478.147.074.245.11.282.172.037.061.037.356-.104.754z" />
+                              <path d="M12 2C6.48 2 2 6.48 2 12c0 1.95.56 3.77 1.53 5.32L2.05 22l4.82-1.44C8.36 21.49 10.13 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18.2c-1.68 0-3.25-.49-4.58-1.33l-.33-.21-2.86.85.86-2.77-.22-.35A8.16 8.16 0 013.8 12c0-4.52 3.68-8.2 8.2-8.2 4.52 0 8.2 3.68 8.2 8.2 0 4.52-3.68 8.2-8.2 8.2z" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-bold text-[#2C3523]">
+                              {lang === 'ES' ? 'Enviar por WhatsApp' : 'Send via WhatsApp'}
+                            </div>
+                            <p className="text-[11px] text-[#5C6650] truncate">
+                              {lang === 'ES' ? 'Resumen con tiempos y enlace' : 'Summary with times & link'}
+                            </p>
+                          </div>
+                        </button>
+
+                        {/* Opción Nativa si está disponible */}
+                        {canNativeShare && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsShareMenuOpen(false);
+                              handleNativeShare();
+                            }}
+                            className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#EFECE1] transition-colors text-left cursor-pointer group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-stone-200 border border-stone-300 text-stone-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                              <Share2 className="w-4 h-4 text-stone-700" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-[#2C3523]">
+                                {lang === 'ES' ? 'Más aplicaciones...' : 'More apps...'}
+                              </div>
+                              <p className="text-[11px] text-[#5C6650] truncate">
+                                {lang === 'ES' ? 'Abrir menú nativo del dispositivo' : 'Open system share dialog'}
+                              </p>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Botón WhatsApp de acceso rápido */}
+                <button
+                  type="button"
+                  onClick={handleShareWhatsApp}
+                  title={lang === 'ES' ? 'Enviar receta por WhatsApp' : 'Send recipe via WhatsApp'}
+                  className="p-2 px-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#128C7E] transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs shrink-0"
+                >
+                  <svg className="w-3.5 h-3.5 fill-current text-[#25D366]" viewBox="0 0 24 24">
+                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.699c.974.531 1.83.813 2.796.814 3.183 0 5.769-2.588 5.77-5.768 0-3.181-2.587-5.768-5.77-5.768zm3.364 8.163c-.141.398-.711.758-1.034.792-.324.034-.737.154-2.433-.553-1.472-.614-2.42-2.115-2.493-2.213-.074-.098-.598-.796-.598-1.518 0-.722.378-1.076.513-1.223.134-.147.294-.184.392-.184.098 0 .196 0 .282.006.09.006.211-.034.33.251.123.294.417 1.018.454 1.092.037.074.062.16.012.257-.049.098-.074.16-.147.245-.074.086-.156.192-.223.257-.074.074-.151.155-.065.302.086.147.383.633.823 1.025.566.505 1.043.662 1.19.736.147.074.233.061.32-.037.086-.098.368-.429.466-.576.098-.147.196-.123.331-.074.135.049.859.405 1.006.478.147.074.245.11.282.172.037.061.037.356-.104.754z" />
+                    <path d="M12 2C6.48 2 2 6.48 2 12c0 1.95.56 3.77 1.53 5.32L2.05 22l4.82-1.44C8.36 21.49 10.13 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18.2c-1.68 0-3.25-.49-4.58-1.33l-.33-.21-2.86.85.86-2.77-.22-.35A8.16 8.16 0 013.8 12c0-4.52 3.68-8.2 8.2-8.2 4.52 0 8.2 3.68 8.2 8.2 0 4.52-3.68 8.2-8.2 8.2z" />
+                  </svg>
+                  <span>WhatsApp</span>
+                </button>
               </div>
-            )}
+
+              {/* Acciones de Autor (Editar / Borrar) o Denunciar (Derecha) - EN LA MISMA LÍNEA */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isOwner ? (
+                  <>
+                    {/* Botón Editar Receta */}
+                    <button
+                      type="button"
+                      onClick={() => onEdit(recipe, ingredients)}
+                      title={lang === 'ES' ? 'Editar Receta' : 'Edit Recipe'}
+                      className="p-2 px-2.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
+                    >
+                      <Edit className="w-3.5 h-3.5 text-[#425035]" />
+                      <span className="hidden md:inline">{lang === 'ES' ? 'Editar' : 'Edit'}</span>
+                    </button>
+
+                    {/* Botón Eliminar con confirmación compacta */}
+                    {showDeleteConfirm ? (
+                      <div className="flex items-center gap-1 bg-red-100/90 border border-red-300 p-1 px-1.5 rounded-xl animate-fadeIn">
+                        <span className="text-[11px] font-bold text-red-900 hidden sm:inline">
+                          {lang === 'ES' ? '¿Borrar?' : 'Delete?'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onDelete(recipe.id);
+                            setShowDeleteConfirm(false);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors text-xs font-bold cursor-pointer shadow-xs active:scale-95"
+                        >
+                          {lang === 'ES' ? 'Sí' : 'Yes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="px-1.5 py-1 rounded-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 transition-colors text-xs font-medium cursor-pointer"
+                          title={lang === 'ES' ? 'Cancelar' : 'Cancel'}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(true)}
+                        title={lang === 'ES' ? 'Eliminar Receta' : 'Delete Recipe'}
+                        className="p-2 px-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden md:inline">{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
+                      </button>
+                    )}
+                  </>
+                ) : onReportRecipe ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!user) {
+                        onOpenAuth();
+                        return;
+                      }
+                      onReportRecipe(recipe);
+                    }}
+                    title={lang === 'ES' ? 'Denunciar receta' : 'Report recipe'}
+                    className="p-2 px-2.5 rounded-xl bg-[#EFECE1] hover:bg-red-50 border border-[#D8D3C4] hover:border-red-300 text-[#5C6650] hover:text-red-700 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
+                  >
+                    <Flag className="w-3.5 h-3.5" />
+                    <span className="hidden md:inline">{lang === 'ES' ? 'Denunciar' : 'Report'}</span>
+                  </button>
+                ) : null}
+              </div>
+            </div>
           </div>
 
           {/* Metadatos y Sistema de Valoración por Estrellas */}
