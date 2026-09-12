@@ -46,6 +46,14 @@ Diseñada bajo una filosofía **offline-first resiliente**: la aplicación funci
    - Si Supabase no está configurado o falla la conexión, la aplicación almacena y lee automáticamente todas las recetas e ingredientes de `localStorage` (`lib/recipeStore.ts`).
    - Sin pantallas de carga infinitas ni bloqueos si el usuario no inicia sesión.
 
+7. **Tips & Hacks Culinarios de la Comunidad (`ChefTipsModal.tsx` & `ChefTipsFeed.tsx`)**:
+   - Catálogo interactivo de técnicas, conservación y trucos de cocina con búsqueda instantánea y filtros por categoría.
+   - Puntuación con estrellas, likes directos y sección de experiencias compartidas por la comunidad.
+
+8. **Moderación y Reportes Comunitarios (`ModerationDrawer.tsx` & `ReportModal.tsx`)**:
+   - Sistema de reporte de contenido inapropiado con clasificación por motivos.
+   - Umbral automático de revisión preventiva y cajón administrativo para moderadores y administradores con auditoría en tiempo real.
+
 ---
 
 ## 🏗️ Estructura del Proyecto
@@ -59,14 +67,22 @@ pulse-and-cook/
 │   ├── components/
 │   │   ├── AuthModal.tsx             # Modal de inicio de sesión y registro (Supabase Auth)
 │   │   ├── ChefAssistantModal.tsx    # Interfaz interactiva del Chef Remy
-│   │   ├── CookingModeModal.tsx      # Modo cocina paso a paso con temporizadores automáticos
+│   │   ├── ChefTipsModal.tsx         # Catálogo de Tips & Hacks culinarios con categorías y filtros
+│   │   ├── ChefTipsFeed.tsx          # Feed interactivo de tips, valoraciones y experiencias
+│   │   ├── ChefTipDetailModal.tsx    # Detalle de tip con calificaciones y comentarios comunitarios
+│   │   ├── ChefTipFormModal.tsx      # Creación y edición de hacks de cocina
+│   │   ├── CookingModeModal.tsx      # Modo cocina paso a paso con comandos por voz y temporizadores
 │   │   ├── Header.tsx                # Barra superior con cambio de idioma, menú, compras y perfil
+│   │   ├── ModerationDrawer.tsx      # Cajón de moderación y auditoría para administradores
+│   │   ├── NavMenuDrawer.tsx         # Menú lateral responsive organizado por secciones
 │   │   ├── RecipeCard.tsx            # Tarjeta de receta con rating, tags, tiempo e imagen
 │   │   ├── RecipeDetailModal.tsx     # Vista en detalle con selector de idioma, videos e ingredientes
 │   │   ├── RecipeFormModal.tsx       # Formulario de alta y edición con subida de imágenes y traducción
 │   │   ├── RecipePrintView.tsx       # Hoja de impresión optimizada para recetas individuales
 │   │   ├── RemyIcon.tsx              # Icono SVG personalizado del Chef Remy
+│   │   ├── ReportModal.tsx           # Modal de denuncia y reporte comunitario de contenido
 │   │   ├── SearchBar.tsx             # Barra de búsqueda con filtros por categoría y tiempo
+│   │   ├── ShareAppModal.tsx         # Modal para compartir la app con código QR descargable
 │   │   ├── ShoppingListModal.tsx     # Planificador de compras consolidado
 │   │   ├── ShoppingListPrintView.tsx # Hoja de impresión de la lista de compras clasificada
 │   │   ├── UsernameSetupModal.tsx    # Asignación de alias al registrarse
@@ -80,13 +96,18 @@ pulse-and-cook/
 │   └── ARCHITECTURE.md           # Documentación técnica profunda de arquitectura y flujos de datos
 ├── lib/
 │   ├── chefRemyOffline.ts        # Motor heurístico offline para el Chef Remy (recetas y sustitutos)
+│   ├── chefTipsData.ts           # Banco de hacks y consejos gastronómicos iniciales
+│   ├── constants.ts              # Constantes del sistema, autor principal y helpers de roles
 │   ├── culinaryDictionary.ts     # Diccionario bilingüe culinario (términos, ingredientes y categorías)
 │   ├── groceryConsolidator.ts    # Algoritmo de unificación de ingredientes y conversión de unidades
+│   ├── ratingStore.ts            # Gestión de calificaciones en Supabase y respaldo local
 │   ├── recipeStore.ts            # Capa de persistencia local (localStorage) resiliente
 │   ├── recipeTranslator.ts       # Motor de traducción heurístico y detector de idioma culinario
+│   ├── reportStore.ts            # Capa de moderación, registro de reportes y auditoría
 │   ├── sampleData.ts             # Datos iniciales de demostración
 │   ├── storage.ts                # Compresión de imágenes en Canvas y subida a Supabase Storage
-│   └── supabase.ts               # Inicialización del cliente Supabase con detección de estado
+│   ├── supabase.ts               # Inicialización del cliente Supabase con detección de estado
+│   └── tipStore.ts               # Persistencia de tips culinarios y experiencias comunitarias
 ├── HANDOVER.md                   # Registro histórico de fases completadas y decisiones técnicas
 ├── metadata.json                 # Metadatos de la plataforma AI Studio
 └── package.json                  # Dependencias y scripts del proyecto

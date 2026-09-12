@@ -49,10 +49,13 @@ import { OfflineIndicator } from './components/OfflineIndicator';
 import { ChefTipsModal } from './components/ChefTipsModal';
 import { ChefTipDetailModal } from './components/ChefTipDetailModal';
 import { ChefTipFormModal } from './components/ChefTipFormModal';
+import { ReportModal, ReportModalTarget } from './components/ReportModal';
+import { ModerationDrawer } from './components/ModerationDrawer';
 import { UtensilsCrossed, Clock, Star, ArrowUpDown, Plus, Sparkles } from 'lucide-react';
 import { getCategoryKey, getCategoryLabel } from '@/lib/categories';
 import { translateIngredientName } from '@/lib/culinaryDictionary';
-import { MAIN_AUTHOR_CONFIG } from '@/lib/constants';
+import { MAIN_AUTHOR_CONFIG, isModeratorOrAdmin } from '@/lib/constants';
+import { getPendingReportsCount } from '@/lib/reportStore';
 
 interface SupabaseRatingRow {
   recipe_id?: string;
@@ -84,6 +87,8 @@ interface SupabaseRecipeRow {
   images?: string[];
   dietary_tags?: string[] | string;
   created_at?: string;
+  status?: 'active' | 'under_review' | 'hidden' | 'deleted';
+  reports_count?: number;
 }
 
 /**
@@ -264,6 +269,64 @@ export default function Home() {
   const [newCommentMessage, setNewCommentMessage] = useState<string>('');
   const [currentUserRating, setCurrentUserRating] = useState<number>(0);
 
+  // Moderación & Denuncias
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [pendingReportsCount, setPendingReportsCount] = useState<number>(0);
+  const [isModerationDrawerOpen, setIsModerationDrawerOpen] = useState<boolean>(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [reportModalTarget, setReportModalTarget] = useState<ReportModalTarget | null>(null);
+
+  const handleOpenReport = useCallback((target: ReportModalTarget) => {
+    setReportModalTarget(target);
+    setIsReportModalOpen(true);
+  }, []);
+
+  const refreshPendingReportsCount = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser) {
+      setPendingReportsCount(0);
+      return;
+    }
+    const isMod = isModeratorOrAdmin(currentUser, profileUsername, userRole);
+    if (!isMod) {
+      setPendingReportsCount(0);
+      return;
+    }
+    try {
+      const count = await getPendingReportsCount(currentUser, profileUsername, userRole);
+      setPendingReportsCount(count);
+    } catch (err) {
+      console.warn('Error refreshing reports count:', err);
+    }
+  }, [profileUsername, userRole]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const updateReportsCount = async () => {
+      await Promise.resolve();
+      if (isCancelled) return;
+      if (!user) {
+        setPendingReportsCount(0);
+        return;
+      }
+      const isMod = isModeratorOrAdmin(user, profileUsername, userRole);
+      if (!isMod) {
+        setPendingReportsCount(0);
+        return;
+      }
+      try {
+        const count = await getPendingReportsCount(user, profileUsername, userRole);
+        if (!isCancelled) setPendingReportsCount(count);
+      } catch (err) {
+        console.warn('Error refreshing reports count:', err);
+      }
+    };
+    updateReportsCount();
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, userRole, profileUsername]);
+
   const handleSetLang = (newLang: 'ES' | 'EN') => {
     setLang(newLang);
     try {
@@ -275,14 +338,26 @@ export default function Home() {
 
   const loadUserProfile = useCallback(async (userId: string) => {
     try {
+      const isMain = userId === MAIN_AUTHOR_CONFIG.UUID || userRef.current?.email === MAIN_AUTHOR_CONFIG.EMAIL;
+      if (isMain) {
+        setUserRole('admin');
+      }
+
       const { data, error } = await supabase
         .from('profiles')
-        .select('username')
+        .select('username, role')
         .eq('id', userId)
         .single();
 
-      if (data && data.username) {
-        setProfileUsername(data.username);
+      if (data) {
+        if (data.username) {
+          setProfileUsername(data.username);
+        }
+        if (data.role) {
+          setUserRole(data.role);
+        } else if (isMain) {
+          setUserRole('admin');
+        }
       } else if (!error || error.code === 'PGRST116') {
         setShowUsernameSetup(true);
       }
@@ -425,6 +500,8 @@ export default function Home() {
             ratings_count: count || (item.ratings_count || 0),
             user_rating: myRating > 0 ? myRating : undefined,
             created_at: item.created_at,
+            status: item.status || 'active',
+            reports_count: item.reports_count || 0,
           };
         });
 
@@ -976,8 +1053,16 @@ export default function Home() {
 
   // Filtered and Sorted Recipes
   const filteredRecipes = useMemo(() => {
+    const isMod = isModeratorOrAdmin(user, profileUsername, userRole);
+
     return recipes
       .filter((r) => {
+        // Moderación: Ocultar recetas eliminadas, ocultas o bajo revisión al público general
+        if (r.status === 'deleted') return false;
+        if (r.status === 'hidden' && !isMod) return false;
+        const isAuthor = user && r.user_id === user.id;
+        if (r.status === 'under_review' && !isMod && !isAuthor) return false;
+
         // Filtro por categorías seleccionadas (OR: coincide con cualquiera de las seleccionadas)
         if (selectedCategories.length > 0) {
           const recCatKey = getCategoryKey(r.category);
@@ -1039,7 +1124,7 @@ export default function Home() {
         const dateB = new Date(b.created_at || 0).getTime();
         return dateB - dateA;
       });
-  }, [recipes, searchTerm, selectedCategories, selectedTags, sortBy]);
+  }, [recipes, searchTerm, selectedCategories, selectedTags, sortBy, user, profileUsername, userRole]);
 
   const isEs = lang === 'ES';
 
@@ -1056,6 +1141,8 @@ export default function Home() {
           await supabase.auth.signOut();
           setUser(null);
           setProfileUsername(null);
+          setUserRole(null);
+          setPendingReportsCount(0);
           setSelectedRecipeIds([]);
           setMenuServings({});
           setShowShoppingList(false);
@@ -1082,6 +1169,9 @@ export default function Home() {
         onOpenWelcome={() => setShowWelcomeModal(true)}
         onOpenShareApp={() => setShowShareApp(true)}
         onOpenChefTips={() => setShowChefTipsModal(true)}
+        userRole={userRole}
+        pendingReportsCount={pendingReportsCount}
+        onOpenModeration={() => setIsModerationDrawerOpen(true)}
       />
 
       {/* Buscador & Combobox de Filtros Inteligente */}
@@ -1272,6 +1362,26 @@ export default function Home() {
           onUpdateComment={handleUpdateComment}
           onDeleteComment={handleDeleteComment}
           onOpenAuth={() => setShowAuthModal(true)}
+          onReportRecipe={(rec) => {
+            handleOpenReport({
+              type: 'recipe',
+              id: rec.id,
+              title: lang === 'ES' ? rec.title_es : rec.title_en || rec.title_es,
+              snippet: lang === 'ES' ? rec.description_es : rec.description_en,
+              reportedUserId: rec.user_id,
+              reportedUsername: rec.profiles?.username || rec.author_name,
+            });
+          }}
+          onReportComment={(cmt) => {
+            handleOpenReport({
+              type: 'comment',
+              id: cmt.id,
+              title: lang === 'ES' ? `Comentario de ${cmt.user_name}` : `Comment by ${cmt.user_name}`,
+              snippet: cmt.message,
+              reportedUserId: cmt.user_id,
+              reportedUsername: cmt.user_name,
+            });
+          }}
         />
       )}
 
@@ -1366,7 +1476,14 @@ export default function Home() {
       <ChefTipsModal
         isOpen={showChefTipsModal}
         onClose={() => setShowChefTipsModal(false)}
-        tips={chefTips}
+        tips={chefTips.filter((t) => {
+          const isMod = isModeratorOrAdmin(user, profileUsername, userRole);
+          const isAuthor = user && (t.author_id === user.id || t.user_id === user.id);
+          if (t.status === 'deleted') return false;
+          if (t.status === 'hidden' && !isMod) return false;
+          if (t.status === 'under_review' && !isMod && !isAuthor) return false;
+          return true;
+        })}
         lang={lang}
         user={user}
         profileUsername={profileUsername}
@@ -1405,6 +1522,26 @@ export default function Home() {
           onDeleteTip={handleDeleteChefTip}
           onTipUpdated={handleChefTipUpdated}
           onOpenAuth={() => setShowAuthModal(true)}
+          onReportTip={(tip) => {
+            handleOpenReport({
+              type: 'tip',
+              id: tip.id,
+              title: lang === 'ES' ? tip.title_es : tip.title_en || tip.title_es,
+              snippet: lang === 'ES' ? tip.summary_es : tip.summary_en,
+              reportedUserId: tip.author_id || tip.user_id,
+              reportedUsername: tip.profiles?.username || tip.author_username,
+            });
+          }}
+          onReportExperience={(exp) => {
+            handleOpenReport({
+              type: 'comment',
+              id: exp.id,
+              title: lang === 'ES' ? `Experiencia de ${exp.author_name}` : `Experience by ${exp.author_name}`,
+              snippet: exp.comment,
+              reportedUserId: exp.user_id,
+              reportedUsername: exp.author_name,
+            });
+          }}
         />
       )}
 
@@ -1421,6 +1558,41 @@ export default function Home() {
           onSave={handleSaveChefTip}
         />
       )}
+
+      {/* Modal para Reportar / Denunciar Contenido */}
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => {
+          setIsReportModalOpen(false);
+          setReportModalTarget(null);
+        }}
+        lang={lang}
+        user={user}
+        profileUsername={profileUsername}
+        target={reportModalTarget}
+        onOpenAuth={() => setShowAuthModal(true)}
+        onReportSubmitted={() => {
+          refreshPendingReportsCount();
+        }}
+      />
+
+      {/* Cajón de Moderación para Administradores y Moderadores */}
+      <ModerationDrawer
+        isOpen={isModerationDrawerOpen}
+        onClose={() => {
+          setIsModerationDrawerOpen(false);
+          refreshPendingReportsCount();
+        }}
+        lang={lang}
+        user={user}
+        profileUsername={profileUsername}
+        userRole={userRole}
+        onContentUpdated={() => {
+          fetchRecipes();
+          fetchTipsWithSync(user?.id).then((tips) => setChefTips(tips));
+          refreshPendingReportsCount();
+        }}
+      />
 
       {/* Indicador sutil de conectividad offline para PWA */}
       <OfflineIndicator lang={lang} />

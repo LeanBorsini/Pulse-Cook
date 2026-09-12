@@ -33,6 +33,7 @@ import {
   ShoppingCart,
   Minus,
   Plus,
+  Flag,
 } from 'lucide-react';
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
@@ -91,6 +92,8 @@ interface RecipeDetailModalProps {
   servingsCount?: number;
   onToggleMenu?: (id: string, customServings?: number) => void;
   onUpdateServings?: (id: string, newServings: number) => void;
+  onReportRecipe?: (recipe: Recipe) => void;
+  onReportComment?: (comment: Comment) => void;
 }
 
 /**
@@ -132,6 +135,8 @@ export function RecipeDetailModal({
   servingsCount,
   onToggleMenu,
   onUpdateServings,
+  onReportRecipe,
+  onReportComment,
 }: RecipeDetailModalProps) {
   const baseServings = Math.max(1, Number(recipe.servings) || 1);
   const [userServingsOverride, setUserServingsOverride] = useState<number | null>(null);
@@ -563,6 +568,11 @@ export function RecipeDetailModal({
   };
 
   const handleStarClick = (starValue: number) => {
+    if (!user) {
+      onOpenAuth();
+      return;
+    }
+
     // 1. Guardar de forma inmediata en almacenamiento local persistente (soporta re-calificar y actualizar voto)
     const summary = saveLocalRating(recipe.id, starValue, user?.id);
 
@@ -814,6 +824,25 @@ export function RecipeDetailModal({
               <Printer className="w-4 h-4 text-[#425035]" />
               <span>PDF</span>
             </button>
+
+            {/* Botón Denunciar Receta */}
+            {!isOwner && onReportRecipe && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!user) {
+                    onOpenAuth();
+                    return;
+                  }
+                  onReportRecipe(recipe);
+                }}
+                title={lang === 'ES' ? 'Denunciar receta' : 'Report recipe'}
+                className="p-2 px-2.5 rounded-xl bg-[#EFECE1] hover:bg-red-50 border border-[#D8D3C4] hover:border-red-300 text-[#5C6650] hover:text-red-700 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer active:scale-95"
+              >
+                <Flag className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{lang === 'ES' ? 'Denunciar' : 'Report'}</span>
+              </button>
+            )}
 
             {/* Acciones de Autor Unificadas: Editar y Eliminar pequeños */}
             {isOwner && (
@@ -1176,6 +1205,24 @@ export function RecipeDetailModal({
                           <span className="text-[10px] text-stone-400">
                             {c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}
                           </span>
+
+                          {/* Botón denunciar comentario si no es propio */}
+                          {!isOwner && onReportComment && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!user) {
+                                  onOpenAuth();
+                                  return;
+                                }
+                                onReportComment(c);
+                              }}
+                              title={isEs ? 'Denunciar comentario' : 'Report comment'}
+                              className="p-1 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            >
+                              <Flag className="w-3 h-3" />
+                            </button>
+                          )}
 
                           {/* Acciones para el dueño del comentario: Editar y Borrar */}
                           {isOwner && !isEditing && !isDeleting && (

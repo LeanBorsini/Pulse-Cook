@@ -22,6 +22,7 @@ import {
   Send,
   Camera,
   CheckCircle2,
+  Flag,
 } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 
@@ -36,6 +37,8 @@ interface ChefTipDetailModalProps {
   onDeleteTip: (tipId: string) => void;
   onTipUpdated?: (updatedTip: ChefTip) => void;
   onOpenAuth?: () => void;
+  onReportTip?: (tip: ChefTip) => void;
+  onReportExperience?: (exp: TipExperience) => void;
 }
 
 export function ChefTipDetailModal({
@@ -49,6 +52,8 @@ export function ChefTipDetailModal({
   onDeleteTip,
   onTipUpdated,
   onOpenAuth,
+  onReportTip,
+  onReportExperience,
 }: ChefTipDetailModalProps) {
   const isEs = lang === 'ES';
 
@@ -96,6 +101,11 @@ export function ChefTipDetailModal({
 
   // Manejar Like
   const handleLike = async () => {
+    if (!user) {
+      onOpenAuth?.();
+      return;
+    }
+
     setJustLiked(true);
     setTimeout(() => setJustLiked(false), 400);
 
@@ -111,6 +121,11 @@ export function ChefTipDetailModal({
 
   // Manejar Rating con Estrellas
   const handleRate = async (stars: number) => {
+    if (!user) {
+      onOpenAuth?.();
+      return;
+    }
+
     setJustRated(true);
     setTimeout(() => setJustRated(false), 1200);
 
@@ -132,6 +147,11 @@ export function ChefTipDetailModal({
   // Enviar comentario o experiencia
   const handleAddExperience = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      onOpenAuth?.();
+      return;
+    }
+
     if (!newComment.trim()) return;
 
     setIsSubmittingComment(true);
@@ -323,6 +343,24 @@ export function ChefTipDetailModal({
                 ({currentTip.ratings_count || 0})
               </span>
             </div>
+
+            {/* Botón Denunciar Tip */}
+            {!canManage && onReportTip && (
+              <button
+                onClick={() => {
+                  if (!user) {
+                    onOpenAuth?.();
+                    return;
+                  }
+                  onReportTip(currentTip);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#D8D3C4] hover:border-red-300 hover:bg-red-50 text-[#5C6650] hover:text-red-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ml-auto"
+                title={isEs ? 'Denunciar este tip' : 'Report this tip'}
+              >
+                <Flag className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{isEs ? 'Denunciar' : 'Report'}</span>
+              </button>
+            )}
           </div>
 
           {/* Feedback tras votar */}
@@ -485,12 +523,31 @@ export function ChefTipDetailModal({
                           {exp.author_name}
                         </span>
                       </div>
-                      <span className="text-[10px] text-[#5C6650]">
-                        {new Date(exp.created_at).toLocaleDateString(isEs ? 'es-ES' : 'en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-[#5C6650]">
+                          {new Date(exp.created_at).toLocaleDateString(isEs ? 'es-ES' : 'en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                        {/* Botón denunciar experiencia si no es propia */}
+                        {exp.user_id !== user?.id && onReportExperience && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!user) {
+                                onOpenAuth?.();
+                                return;
+                              }
+                              onReportExperience(exp);
+                            }}
+                            title={isEs ? 'Denunciar comentario' : 'Report comment'}
+                            className="p-1 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                          >
+                            <Flag className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <p className="font-cozy text-xs sm:text-sm text-[#38432E] leading-relaxed">{exp.comment}</p>

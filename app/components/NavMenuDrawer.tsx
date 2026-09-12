@@ -16,9 +16,11 @@ import {
   Smartphone,
   Lock,
   Lightbulb,
+  ShieldAlert,
 } from 'lucide-react';
 import { RemyIcon } from './RemyIcon';
 import { usePWAInstall } from './usePWAInstall';
+import { isModeratorOrAdmin } from '@/lib/constants';
 
 interface NavMenuDrawerProps {
   isOpen: boolean;
@@ -36,6 +38,9 @@ interface NavMenuDrawerProps {
   onOpenWelcome?: () => void;
   onOpenShareApp?: () => void;
   onOpenChefTips: () => void;
+  userRole?: string | null;
+  pendingReportsCount?: number;
+  onOpenModeration?: () => void;
 }
 
 export function NavMenuDrawer({
@@ -54,6 +59,9 @@ export function NavMenuDrawer({
   onOpenWelcome,
   onOpenShareApp,
   onOpenChefTips,
+  userRole,
+  pendingReportsCount = 0,
+  onOpenModeration,
 }: NavMenuDrawerProps) {
   const isEs = lang === 'ES';
   const displayAlias = profileUsername || (user?.email ? user.email.split('@')[0] : 'chef');
@@ -319,6 +327,54 @@ export function NavMenuDrawer({
               <ChevronRight className="w-4 h-4 text-[#5C6650] group-hover:translate-x-0.5 transition-transform" />
             </button>
           </section>
+
+          {/* SECCIÓN ESPECIAL: Panel de Moderación & Denuncias (Admin / Moderador) */}
+          {isModeratorOrAdmin(user, profileUsername, userRole) && (
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
+                  <span>{isEs ? 'Panel de Moderación' : 'Moderation Control'}</span>
+                </h3>
+                <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-amber-200 text-amber-900 rounded-md">
+                  {userRole === 'moderator' ? (isEs ? 'Moderador' : 'Moderator') : (isEs ? 'Admin' : 'Admin')}
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenModeration?.();
+                }}
+                className="w-full flex items-center justify-between p-3.5 bg-amber-50/80 border border-amber-300/80 rounded-2xl hover:bg-amber-100/70 transition-all cursor-pointer active:scale-98 group text-left shadow-2xs"
+                id="menu-drawer-moderation-btn"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-[#2C3523] text-white flex items-center justify-center shrink-0">
+                    <ShieldAlert className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs sm:text-sm font-bold text-[#2C3523] leading-tight">
+                        {isEs ? 'Buzón de Denuncias' : 'Reports Inbox'}
+                      </h4>
+                      {typeof pendingReportsCount === 'number' && pendingReportsCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px] font-black animate-pulse">
+                          {pendingReportsCount}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[#5C6650] mt-0.5">
+                      {isEs
+                        ? 'Gestiona recetas, tips y comentarios reportados'
+                        : 'Review flagged recipes, tips & comments'}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[#5C6650] group-hover:translate-x-0.5 transition-transform" />
+              </button>
+            </section>
+          )}
 
           {/* SECCIÓN 3: Preferencias & Utilidades */}
           <section className="space-y-2.5">

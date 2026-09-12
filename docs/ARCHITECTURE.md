@@ -203,8 +203,14 @@ A diferencia de editores parciales que solo modificaban texto de instrucciones, 
 | `app/components/ChefAssistantModal.tsx` | Modal | Asistente IA "Chef Remy" para recetas por ingredientes en la nevera o sustituciones. |
 | `app/components/SearchBar.tsx` | Barra de búsqueda | Búsqueda por texto y menú desplegable tipo combobox para categorías y dietas. |
 | `app/components/RecipePrintView.tsx` | Impresión | Ficha técnica optimizada para impresión física o guardado en PDF de alta calidad. |
+| `app/components/ChefTipsModal.tsx` | Modal | Catálogo principal de Tips & Hacks gastronómicos con categorías. |
+| `app/components/ChefTipDetailModal.tsx` | Modal | Detalle interactivo de tip con estrellas, likes y muro de experiencias. |
+| `app/components/ModerationDrawer.tsx` | Panel Lateral | Panel de control de moderación y auditoría para administradores. |
+| `app/components/ReportModal.tsx` | Modal | Sistema de denuncia comunitaria de contenido inapropiado. |
 | `lib/recipeStore.ts` | Almacenamiento | Persistencia local offline-first (`localStorage` v3) de recetas e ingredientes. |
 | `lib/recipeTranslator.ts` | Traducción | Motor de detección lingüística, saneamiento léxico anti-Spanglish y traducción. |
 | `lib/groceryConsolidator.ts` | Consolidación | Fusión matemática de cantidades, normalización de unidades y clasificación en pasillos. |
+| `lib/tipStore.ts` | Almacenamiento | Persistencia y sincronización híbrida de tips y experiencias culinarias. |
+| `lib/reportStore.ts` | Almacenamiento | Gestión de denuncias, umbrales automáticos y bitácora de moderación. |
 | `lib/supabase.ts` | Base de datos | Cliente Supabase tipado y detección de estado de configuración remota. |
 

@@ -75,3 +75,20 @@ export function isRecipeAuthor(
 
   return false;
 }
+
+/**
+ * Determina si el usuario actual tiene privilegios de moderador o administrador.
+ * Tiene acceso al panel de denuncias, revisión de contenido, desestimación, ocultamiento y baneo de infractores.
+ */
+export function isModeratorOrAdmin(
+  user?: User | null,
+  profileUsername?: string | null,
+  userRole?: string | null
+): boolean {
+  if (!user) return false;
+  // 1. leanBorsini es Administrador Supremo / Dueño
+  if (isMainAdminUser(user, profileUsername)) return true;
+  // 2. Rol específico asignado en profiles ('admin' o 'moderator')
+  if (userRole === 'admin' || userRole === 'moderator') return true;
+  return false;
+}

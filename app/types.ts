@@ -5,6 +5,19 @@
 export type Language = 'es' | 'en' | 'ES' | 'EN';
 
 /**
+ * Roles de usuario admitidos en la plataforma para control de acceso y moderación.
+ */
+export type UserRole = 'admin' | 'moderator' | 'user';
+
+/**
+ * Estado de moderación del contenido generado por usuarios.
+ * - 'active': Visible al público general.
+ * - 'under_review': Ocultado preventivamente por acumulación de denuncias o en revisión.
+ * - 'hidden': Ocultado o invalidado por un moderador/admin.
+ */
+export type ContentStatus = 'active' | 'under_review' | 'hidden' | 'deleted';
+
+/**
  * Perfil público del autor de una receta (asociado a la tabla `profiles` de Supabase).
  */
 export interface Profile {
@@ -14,6 +27,10 @@ export interface Profile {
   username: string;
   /** Enlace opcional a la imagen de avatar del perfil */
   avatar_url?: string;
+  /** Rol administrativo del usuario (admin, moderator o user) */
+  role?: UserRole;
+  /** Indica si la cuenta del usuario ha sido suspendida por moderación */
+  is_banned?: boolean;
 }
 
 /**
@@ -60,6 +77,10 @@ export interface Comment {
   avatar_url?: string;
   /** Texto del comentario */
   message: string;
+  /** Estado de moderación del comentario */
+  status?: ContentStatus;
+  /** Conteo acumulado de denuncias recibidas */
+  reports_count?: number;
   /** Marca de tiempo ISO de publicación */
   created_at: string;
 }
@@ -113,6 +134,10 @@ export interface Recipe {
   user_rating?: number;
   /** Información nutricional orientativa estimada por ración */
   nutrition_info?: NutritionInfo;
+  /** Estado de moderación de la receta */
+  status?: ContentStatus;
+  /** Conteo acumulado de denuncias recibidas */
+  reports_count?: number;
   /** Marca de tiempo ISO de creación de la receta */
   created_at?: string;
 }
@@ -179,6 +204,8 @@ export interface ChefTip {
   id: string;
   /** Identificador del autor en profiles / auth.users */
   author_id?: string;
+  /** Alias de compatibilidad con auth.users id */
+  user_id?: string;
   /** Perfil enriquecido del autor obtenido de profiles */
   profiles?: Profile | null;
   /** Alias legible del autor si profiles no está disponible */
@@ -215,6 +242,10 @@ export interface ChefTip {
   experiences_count?: number;
   /** Alias para contador de comentarios */
   comments_count?: number;
+  /** Estado de moderación del tip */
+  status?: ContentStatus;
+  /** Conteo acumulado de denuncias recibidas */
+  reports_count?: number;
   /** Fecha ISO de publicación */
   created_at?: string;
 }
@@ -237,6 +268,10 @@ export interface TipExperience {
   comment: string;
   /** URL de foto demostrativa opcional subida por el usuario */
   photo_url?: string;
+  /** Estado de moderación del comentario/experiencia */
+  status?: ContentStatus;
+  /** Conteo acumulado de denuncias recibidas */
+  reports_count?: number;
   /** Marca de tiempo ISO */
   created_at: string;
 }
@@ -250,5 +285,75 @@ export interface TipRating {
   user_id: string;
   stars: number;
   created_at?: string;
+}
+
+/**
+ * Tipo de contenido susceptible de ser denunciado.
+ */
+export type ReportTargetType = 'recipe' | 'tip' | 'comment' | 'tip_experience' | 'user';
+
+/**
+ * Categorías estándar de motivos de denuncia para preservar la calidad y seguridad de Pulse&Cook.
+ */
+export type ReportReasonCategory =
+  | 'spam_scam'
+  | 'inappropriate_nudity'
+  | 'offensive_harassment'
+  | 'dangerous_misleading'
+  | 'other';
+
+/**
+ * Estado del trámite de una denuncia.
+ */
+export type ReportStatus = 'pending' | 'resolved' | 'dismissed';
+
+/**
+ * Acción tomada por los moderadores o el administrador.
+ */
+export type ReportActionTaken =
+  | 'none'
+  | 'dismissed'
+  | 'hidden'
+  | 'deleted'
+  | 'user_banned';
+
+/**
+ * Registro de una denuncia de contenido en la plataforma (`content_reports`).
+ */
+export interface ContentReport {
+  /** Identificador único de la denuncia (UUID) */
+  id: string;
+  /** UUID del usuario que emite la denuncia (auth.users) */
+  reporter_id: string;
+  /** Alias o nombre público del denunciante si está disponible */
+  reporter_username?: string;
+  /** Correo del denunciante para moderadores */
+  reporter_email?: string;
+  /** Tipo de entidad denunciada */
+  target_type: ReportTargetType;
+  /** ID de la receta, tip o comentario denunciado */
+  target_id: string;
+  /** Título o identificador legible de lo denunciado para revisión rápida */
+  target_title?: string;
+  /** Fragmento textual de la publicación denunciada */
+  target_snippet?: string;
+  /** UUID del autor de la publicación denunciada (si se conoce) */
+  reported_user_id?: string;
+  /** Nombre o alias del autor denunciado */
+  reported_username?: string;
+  /** Categoría tipificada del motivo de la denuncia */
+  reason_category: ReportReasonCategory;
+  /** Justificación o explicación detallada aportada por el denunciante */
+  reason_text: string;
+  /** Estado de tramitación de la denuncia */
+  status: ReportStatus;
+  /** Medida disciplinaria o correctiva aplicada */
+  action_taken?: ReportActionTaken;
+  /** UUID del administrador o moderador que resolvió la denuncia */
+  resolved_by?: string;
+  /** Marca de tiempo ISO de resolución */
+  resolved_at?: string;
+  /** Marca de tiempo ISO de emisión de la denuncia */
+  created_at: string;
 }
 

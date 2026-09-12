@@ -473,6 +473,26 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
+### ✅ Fase 19: Sistema de Moderación y Denuncias de Contenido (COMPLETADA)
+- [x] **Botón y Modal de Reporte Comunitario (`ReportModal.tsx`)**:
+  - Reporte granular y contextual para Recetas, Comentarios, Tips de Chef y Experiencias.
+  - Categorías de denuncia estructuradas: *Spam / Estafa*, *Inapropiado / Desnudez*, *Ofensivo / Acoso*, *Peligroso / Engañoso* y *Otro*.
+  - Validación de justificación obligatoria y prevención de denuncias duplicadas por el mismo usuario (`content_reports_unique_reporter_target`).
+- [x] **Umbral Automático de Revisión Preventiva**:
+  - Si un contenido suma 3 o más reportes de usuarios distintos, pasa automáticamente al estado `under_review` quedando oculto al público general hasta la revisión de un moderador.
+  - Protección algorítmica para el contenido creado por el autor principal (`leanBorsini`).
+- [x] **Cajón de Moderación para Administradores (`ModerationDrawer.tsx`)**:
+  - Panel administrativo accesible desde el menú desplegable (`NavMenuDrawer.tsx`) con insignia y contador dinámico de reportes pendientes.
+  - Búsqueda en tiempo real por título, denunciante o infractor, y filtros por estado y categoría.
+  - Acciones ejecutables con confirmación: *Desestimar*, *Ocultar*, *Eliminar* y *Suspender/Banear usuario*.
+- [x] **Almacenamiento y Sincronización Resiliente (`lib/reportStore.ts`)**:
+  - Soporte híbrido: almacenamiento en Supabase (`public.content_reports`) con fallback completo en `localStorage` ante interrupciones de red o usuarios sin configurar.
+  - Auditoría mediante bitácora de moderación (`public.moderation_logs`).
+- [x] **Script SQL Idempotente**:
+  - Documentado y generado en `supabase_moderation_reports_migration.sql` listo para ejecución en Supabase SQL Editor.
+
+---
+
 ## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.

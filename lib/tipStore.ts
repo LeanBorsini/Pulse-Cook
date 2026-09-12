@@ -22,6 +22,7 @@ export function canManageTip(
   if (!user) return false;
   if (user.id === LEAN_BORSINI_ID || user.email === 'leoborsini12@gmail.com') return true;
   if (tip.author_id && tip.author_id === user.id) return true;
+  if (tip.user_id && tip.user_id === user.id) return true;
   return false;
 }
 

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { Menu, ShoppingCart } from 'lucide-react';
+import { Menu, ShoppingCart, ShieldAlert } from 'lucide-react';
 import { NavMenuDrawer } from './NavMenuDrawer';
+import { isModeratorOrAdmin } from '@/lib/constants';
 
 interface HeaderProps {
   lang: 'ES' | 'EN';
@@ -19,6 +20,9 @@ interface HeaderProps {
   onOpenWelcome?: () => void;
   onOpenShareApp?: () => void;
   onOpenChefTips: () => void;
+  userRole?: string | null;
+  pendingReportsCount?: number;
+  onOpenModeration?: () => void;
 }
 
 export function Header({
@@ -35,6 +39,9 @@ export function Header({
   onOpenWelcome,
   onOpenShareApp,
   onOpenChefTips,
+  userRole,
+  pendingReportsCount = 0,
+  onOpenModeration,
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const displayAlias = profileUsername || (user?.email ? user.email.split('@')[0] : 'chef');
@@ -74,6 +81,23 @@ export function Header({
               <span className="bg-[#FAF8F2] text-[#2C3523] text-[10px] font-black px-1.5 py-0.5 rounded-full">
                 {selectedCount}
               </span>
+            </button>
+          )}
+
+          {/* Acceso rápido a Moderación para Admins / Moderadores */}
+          {isModeratorOrAdmin(user, profileUsername, userRole) && (
+            <button
+              onClick={onOpenModeration}
+              className="relative p-2 bg-[#EFECE1] hover:bg-amber-100/70 border border-amber-300/80 text-amber-900 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
+              title={isEs ? 'Buzón de Moderación' : 'Moderation Inbox'}
+              id="header-moderation-btn"
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-800" />
+              {typeof pendingReportsCount === 'number' && pendingReportsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center animate-pulse">
+                  {pendingReportsCount}
+                </span>
+              )}
             </button>
           )}
 
@@ -118,6 +142,9 @@ export function Header({
         onOpenWelcome={onOpenWelcome}
         onOpenShareApp={onOpenShareApp}
         onOpenChefTips={onOpenChefTips}
+        userRole={userRole}
+        pendingReportsCount={pendingReportsCount}
+        onOpenModeration={onOpenModeration}
       />
     </>
   );
