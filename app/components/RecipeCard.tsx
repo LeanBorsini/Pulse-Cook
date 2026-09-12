@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Clock, Users, Plus, Minus, Star, Images, X } from 'lucide-react';
+import { Clock, Users, Plus, Minus, Star, Images, X, Flag } from 'lucide-react';
 import { Recipe } from '../types';
 import { User } from '@supabase/supabase-js';
 import { translateRecipeField } from '../../lib/recipeTranslator';
@@ -18,6 +18,7 @@ interface RecipeCardProps {
   onToggleMenu: (recipeId: string, customServings?: number) => void;
   onUpdateServings?: (recipeId: string, newServings: number) => void;
   onOpenAuth?: () => void;
+  onReportRecipe?: (recipe: Recipe) => void;
 }
 
 export function RecipeCard({
@@ -30,6 +31,7 @@ export function RecipeCard({
   onToggleMenu,
   onUpdateServings,
   onOpenAuth,
+  onReportRecipe,
 }: RecipeCardProps) {
   const title = translateRecipeField(recipe.title_es, recipe.title_en, lang);
   const description = translateRecipeField(recipe.description_es, recipe.description_en, lang);
@@ -103,6 +105,23 @@ export function RecipeCard({
           <h2 className="text-xl font-serif font-bold text-[#2C3523] group-hover:text-[#3D4932] transition-colors leading-tight">
             {title}
           </h2>
+          {onReportRecipe && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!user) {
+                  onOpenAuth?.();
+                  return;
+                }
+                onReportRecipe(recipe);
+              }}
+              title={lang === 'ES' ? 'Denunciar receta' : 'Report recipe'}
+              className="p-1 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors shrink-0 cursor-pointer"
+            >
+              <Flag className="w-3.5 h-3.5 text-red-500/80" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2 text-xs text-[#5C6650] mb-2.5 font-medium flex-wrap">

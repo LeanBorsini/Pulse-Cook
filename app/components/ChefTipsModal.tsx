@@ -18,6 +18,7 @@ interface ChefTipsModalProps {
   onDeleteTip: (tipId: string) => void;
   onTipUpdated?: (updatedTip: ChefTip) => void;
   onOpenAuth: () => void;
+  onReportTip?: (tip: ChefTip) => void;
 }
 
 export function ChefTipsModal({
@@ -33,6 +34,7 @@ export function ChefTipsModal({
   onDeleteTip,
   onTipUpdated,
   onOpenAuth,
+  onReportTip,
 }: ChefTipsModalProps) {
   const isEs = lang === 'ES';
 
@@ -93,6 +95,7 @@ export function ChefTipsModal({
             onDeleteTip={onDeleteTip}
             onTipUpdated={onTipUpdated}
             onOpenAuth={onOpenAuth}
+            onReportTip={onReportTip}
           />
         </div>
       </div>

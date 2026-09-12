@@ -1319,6 +1319,16 @@ export default function Home() {
                   onToggleMenu={handleToggleMenu}
                   onUpdateServings={handleUpdateMenuServings}
                   onOpenAuth={() => setShowAuthModal(true)}
+                  onReportRecipe={(rec) => {
+                    handleOpenReport({
+                      type: 'recipe',
+                      id: rec.id,
+                      title: lang === 'ES' ? rec.title_es : rec.title_en || rec.title_es,
+                      snippet: lang === 'ES' ? rec.description_es : rec.description_en,
+                      reportedUserId: rec.user_id,
+                      reportedUsername: rec.profiles?.username || rec.author_name,
+                    });
+                  }}
                 />
               ))}
             </div>
@@ -1503,6 +1513,16 @@ export default function Home() {
         onDeleteTip={handleDeleteChefTip}
         onTipUpdated={handleChefTipUpdated}
         onOpenAuth={() => setShowAuthModal(true)}
+        onReportTip={(tip) => {
+          handleOpenReport({
+            type: 'tip',
+            id: tip.id,
+            title: lang === 'ES' ? tip.title_es : tip.title_en || tip.title_es,
+            snippet: lang === 'ES' ? tip.summary_es : tip.summary_en,
+            reportedUserId: tip.author_id || tip.user_id,
+            reportedUsername: tip.profiles?.username || tip.author_username,
+          });
+        }}
       />
 
       {/* Modal Detalle de Tip de Chef (Interactivo con Estrellas, Likes y Comentarios) */}

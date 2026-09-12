@@ -22,6 +22,7 @@ import {
   Scissors,
   Zap,
   Cake,
+  Flag,
 } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 
@@ -36,6 +37,7 @@ interface ChefTipsFeedProps {
   onDeleteTip: (tipId: string) => void;
   onTipUpdated?: (updatedTip: ChefTip) => void;
   onOpenAuth: () => void;
+  onReportTip?: (tip: ChefTip) => void;
 }
 
 export function ChefTipsFeed({
@@ -48,6 +50,7 @@ export function ChefTipsFeed({
   onDeleteTip,
   onTipUpdated,
   onOpenAuth,
+  onReportTip,
 }: ChefTipsFeedProps) {
   const isEs = lang === 'ES';
 
@@ -494,6 +497,24 @@ export function ChefTipsFeed({
                             <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
+                      )}
+
+                      {onReportTip && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!user) {
+                              onOpenAuth();
+                              return;
+                            }
+                            onReportTip(tip);
+                          }}
+                          className="p-1 hover:bg-red-50 text-stone-400 hover:text-red-600 rounded-lg transition-colors ml-0.5"
+                          title={isEs ? 'Denunciar tip' : 'Report tip'}
+                        >
+                          <Flag className="w-3 h-3 text-red-500/80" />
+                        </button>
                       )}
                     </div>
                   </div>

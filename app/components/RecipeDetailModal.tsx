@@ -663,6 +663,26 @@ export function RecipeDetailModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Botón Denunciar Receta en Cabecera */}
+            {onReportRecipe && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!user) {
+                    onOpenAuth();
+                    return;
+                  }
+                  onReportRecipe(recipe);
+                }}
+                className="h-8 px-2.5 rounded-full bg-[#EAE5D6] hover:bg-red-50 hover:text-red-700 hover:border-red-300 active:scale-90 text-[#5C6650] flex items-center gap-1.5 border border-[#D8D3C4] transition-all cursor-pointer shadow-xs text-xs font-semibold"
+                title={isEs ? 'Denunciar esta receta' : 'Report this recipe'}
+                aria-label={isEs ? 'Denunciar' : 'Report'}
+              >
+                <Flag className="w-3.5 h-3.5 text-red-500" />
+                <span className="hidden sm:inline">{isEs ? 'Denunciar' : 'Report'}</span>
+              </button>
+            )}
+
             {/* Botón Cerrar (X) - SIEMPRE VISIBLE Y NUNCA OCULTO */}
             <button
               type="button"
@@ -960,6 +980,37 @@ export function RecipeDetailModal({
                             </div>
                           </button>
                         )}
+
+                        {/* Opción Denunciar dentro de Compartir */}
+                        {onReportRecipe && (
+                          <>
+                            <div className="my-1 border-t border-[#D8D3C4]/60" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsShareMenuOpen(false);
+                                if (!user) {
+                                  onOpenAuth();
+                                  return;
+                                }
+                                onReportRecipe(recipe);
+                              }}
+                              className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-red-50 text-red-700 transition-colors text-left cursor-pointer group"
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-red-100 border border-red-200 text-red-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                                <Flag className="w-4 h-4 text-red-600" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-bold text-red-800">
+                                  {lang === 'ES' ? 'Denunciar receta' : 'Report recipe'}
+                                </div>
+                                <p className="text-[11px] text-red-600/80 truncate">
+                                  {lang === 'ES' ? 'Reportar contenido inapropiado o falso' : 'Report inappropriate content'}
+                                </p>
+                              </div>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -980,9 +1031,9 @@ export function RecipeDetailModal({
                 </button>
               </div>
 
-              {/* Acciones de Autor (Editar / Borrar) o Denunciar (Derecha) - EN LA MISMA LÍNEA */}
+              {/* Acciones de Autor (Editar / Borrar) y Denunciar (Derecha) - EN LA MISMA LÍNEA */}
               <div className="flex items-center gap-1.5 shrink-0">
-                {isOwner ? (
+                {isOwner && (
                   <>
                     {/* Botón Editar Receta */}
                     <button
@@ -992,7 +1043,7 @@ export function RecipeDetailModal({
                       className="p-2 px-2.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] hover:bg-[#E2DEC2] transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
                     >
                       <Edit className="w-3.5 h-3.5 text-[#425035]" />
-                      <span className="hidden md:inline">{lang === 'ES' ? 'Editar' : 'Edit'}</span>
+                      <span className="hidden sm:inline">{lang === 'ES' ? 'Editar' : 'Edit'}</span>
                     </button>
 
                     {/* Botón Eliminar con confirmación compacta */}
@@ -1028,11 +1079,14 @@ export function RecipeDetailModal({
                         className="p-2 px-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span className="hidden md:inline">{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
+                        <span className="hidden sm:inline">{lang === 'ES' ? 'Eliminar' : 'Delete'}</span>
                       </button>
                     )}
                   </>
-                ) : onReportRecipe ? (
+                )}
+
+                {/* Botón Denunciar Receta - SIEMPRE VISIBLE */}
+                {onReportRecipe && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1045,10 +1099,10 @@ export function RecipeDetailModal({
                     title={lang === 'ES' ? 'Denunciar receta' : 'Report recipe'}
                     className="p-2 px-2.5 rounded-xl bg-[#EFECE1] hover:bg-red-50 border border-[#D8D3C4] hover:border-red-300 text-[#5C6650] hover:text-red-700 transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer active:scale-95 shadow-2xs"
                   >
-                    <Flag className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">{lang === 'ES' ? 'Denunciar' : 'Report'}</span>
+                    <Flag className="w-3.5 h-3.5 text-red-500" />
+                    <span>{lang === 'ES' ? 'Denunciar' : 'Report'}</span>
                   </button>
-                ) : null}
+                )}
               </div>
             </div>
           </div>
@@ -1361,8 +1415,8 @@ export function RecipeDetailModal({
                             {c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}
                           </span>
 
-                          {/* Botón denunciar comentario si no es propio */}
-                          {!isOwner && onReportComment && (
+                          {/* Botón denunciar comentario - SIEMPRE VISIBLE */}
+                          {onReportComment && (
                             <button
                               type="button"
                               onClick={() => {
@@ -1373,9 +1427,12 @@ export function RecipeDetailModal({
                                 onReportComment(c);
                               }}
                               title={isEs ? 'Denunciar comentario' : 'Report comment'}
-                              className="p-1 rounded-md text-stone-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-stone-500 hover:text-red-700 hover:bg-red-50 border border-stone-300/60 hover:border-red-300 bg-white/70 transition-all cursor-pointer shadow-2xs"
                             >
-                              <Flag className="w-3 h-3" />
+                              <Flag className="w-3 h-3 text-red-500" />
+                              <span className="text-[10px] font-semibold text-stone-600 hover:text-red-700">
+                                {isEs ? 'Denunciar' : 'Report'}
+                              </span>
                             </button>
                           )}
 

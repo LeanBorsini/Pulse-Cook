@@ -504,6 +504,24 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
+### ✅ Fase 21: Visibilidad Universal y Accesibilidad del Sistema de Denuncias (Banderitas de Reporte)
+- [x] **Visibilidad Omnipresente para Administradores y Usuarios**:
+  - Se eliminaron las restricciones que ocultaban las banderitas de denuncia a los autores o administradores (`isOwner` / `canManage`), permitiendo que el administrador pueda auditar, probar y activar el flujo de reporte desde cualquier vista.
+- [x] **Puntos de Contacto para Denunciar Recetas**:
+  - **Barra Superior Fija (`RecipeDetailModal.tsx`)**: Botón con banderita roja y texto "Denunciar" ubicado en el sticky header junto a la cruz de cierre, siempre visible en pantallas móviles y desktop sin necesidad de hacer scroll.
+  - **Barra de Acciones en Misma Línea**: Botón "Denunciar" integrado permanentemente en la fila de acciones junto a Editar/Eliminar y Compartir.
+  - **Menú Desplegable Compartir**: Opción adicional con icono y descripción clara para reportar contenido inapropiado.
+  - **Tarjeta de Receta (`RecipeCard.tsx`)**: Icono de bandera discreto y accesible junto al título de la receta en el feed principal.
+- [x] **Puntos de Contacto para Denunciar Comentarios**:
+  - **Lista de Comentarios (`RecipeDetailModal.tsx`)**: Cada comentario dispone de un botón visible "Denunciar" con banderita roja y fondo estilizado (`border`, `hover:bg-red-50`).
+- [x] **Puntos de Contacto para Denunciar Tips de Chef y Experiencias**:
+  - **Cabecera del Modal de Tip (`ChefTipDetailModal.tsx`)**: Botón flotante "Denunciar" junto al botón de cerrar.
+  - **Fila de Calificación/Estadísticas**: Botón con banderita y texto "Denunciar" visible en todo momento.
+  - **Experiencias Comunitarias**: Botón estilizado de denuncia en cada reseña/experiencia de la comunidad.
+  - **Feed de Tips (`ChefTipsFeed.tsx`)**: Banderita de reporte en el pie de cada tarjeta de tip.
+
+---
+
 ## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.
