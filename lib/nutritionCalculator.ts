@@ -28,9 +28,30 @@ interface FoodProfile {
  * Base de datos culinaria estándar de alimentos (valores promedio por 100g)
  */
 const FOOD_DATABASE: FoodProfile[] = [
-  // Carnes y aves
+  // Carnes vacunas, cortes de res, ternera y medallones
   {
-    nameMatch: ['pechuga de pollo', 'pechuga', 'chicken breast', 'pechugas'],
+    nameMatch: [
+      'medallon de res', 'medallones de res', 'medallon de ternera', 'medallones de ternera',
+      'medallon', 'medallones',
+      'res', 'carne de res', 'carne vacuna', 'carne de vaca', 'carne de ternera', 'ternera',
+      'carne', 'beef', 'steak', 'roast beef',
+      'bife', 'bifes', 'bife de chorizo', 'bife ancho', 'bife angosto', 'ojo de bife',
+      'lomo', 'lomo de res', 'lomo de ternera', 'solomillo', 'solomillo de ternera', 'solomillo de res',
+      'peceto', 'entrecot', 'chuleton', 'chuleta de res', 'costilla de res', 'costeleta',
+      'carne picada', 'carne molida', 'ground beef', 'minced meat',
+      'asado', 'tira de asado', 'vacio', 'matambre', 'cuadril', 'colita de cuadril',
+      'hamburguesa', 'hamburguesas', 'paty', 'filete de ternera', 'filete de res', 'filete', 'milanesa'
+    ],
+    calPer100g: 245,
+    proteinPer100g: 26,
+    carbsPer100g: 0,
+    fatPer100g: 15,
+    unitWeightGrams: 180, // 1 medallón, bife o porción individual estándar
+  },
+
+  // Carnes de ave
+  {
+    nameMatch: ['pechuga de pollo', 'pechuga', 'chicken breast', 'pechugas', 'suprema de pollo', 'suprema'],
     calPer100g: 165,
     proteinPer100g: 31,
     carbsPer100g: 0,
@@ -38,7 +59,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 200,
   },
   {
-    nameMatch: ['pollo', 'chicken', 'muslo de pollo', 'pata de pollo', 'alitas de pollo', 'chicken thigh'],
+    nameMatch: ['pollo', 'chicken', 'muslo de pollo', 'muslos', 'pata de pollo', 'pata muslo', 'alitas de pollo', 'alitas', 'chicken thigh'],
     calPer100g: 215,
     proteinPer100g: 24,
     carbsPer100g: 0,
@@ -46,15 +67,17 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 150,
   },
   {
-    nameMatch: ['carne picada', 'carne molida', 'ground beef', 'minced meat', 'ternera', 'beef', 'lomo'],
-    calPer100g: 240,
-    proteinPer100g: 26,
+    nameMatch: ['pavo', 'pechuga de pavo', 'turkey'],
+    calPer100g: 135,
+    proteinPer100g: 30,
     carbsPer100g: 0,
-    fatPer100g: 15,
+    fatPer100g: 1.5,
     unitWeightGrams: 180,
   },
+
+  // Cerdo y embutidos
   {
-    nameMatch: ['cerdo', 'pork', 'lomo de cerdo', 'costillas'],
+    nameMatch: ['cerdo', 'pork', 'lomo de cerdo', 'solomillo de cerdo', 'costillas de cerdo', 'costillitas', 'bondiola', 'chuleta de cerdo'],
     calPer100g: 220,
     proteinPer100g: 25,
     carbsPer100g: 0,
@@ -62,7 +85,15 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 160,
   },
   {
-    nameMatch: ['jamon', 'ham', 'prosciutto', 'bacon', 'panceta', 'tocino'],
+    nameMatch: ['cordero', 'lamb', 'costillas de cordero', 'pierna de cordero'],
+    calPer100g: 260,
+    proteinPer100g: 25,
+    carbsPer100g: 0,
+    fatPer100g: 17,
+    unitWeightGrams: 150,
+  },
+  {
+    nameMatch: ['jamon', 'ham', 'prosciutto', 'bacon', 'panceta', 'tocino', 'jamon cocido', 'jamon crudo'],
     calPer100g: 350,
     proteinPer100g: 20,
     carbsPer100g: 1.5,
@@ -72,7 +103,7 @@ const FOOD_DATABASE: FoodProfile[] = [
 
   // Pescados y Mariscos
   {
-    nameMatch: ['salmon', 'salmón'],
+    nameMatch: ['salmon', 'salmón', 'salmon rosado'],
     calPer100g: 208,
     proteinPer100g: 22,
     carbsPer100g: 0,
@@ -80,15 +111,15 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 180,
   },
   {
-    nameMatch: ['atun', 'atún', 'tuna'],
+    nameMatch: ['atun', 'atún', 'tuna', 'lata de atun'],
     calPer100g: 130,
     proteinPer100g: 28,
     carbsPer100g: 0,
     fatPer100g: 1,
-    unitWeightGrams: 80,
+    unitWeightGrams: 120,
   },
   {
-    nameMatch: ['merluza', 'bacalao', 'pescado blanco', 'cod', 'white fish', 'tilapia'],
+    nameMatch: ['merluza', 'bacalao', 'pescado blanco', 'cod', 'white fish', 'tilapia', 'trucha', 'lenguado', 'corvina', 'dorada', 'lubina', 'pejerrey'],
     calPer100g: 90,
     proteinPer100g: 19,
     carbsPer100g: 0,
@@ -96,12 +127,20 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 150,
   },
   {
-    nameMatch: ['camaron', 'camarones', 'gamba', 'gambas', 'shrimp', 'langostino'],
+    nameMatch: ['camaron', 'camarones', 'gamba', 'gambas', 'shrimp', 'langostino', 'langostinos'],
     calPer100g: 99,
     proteinPer100g: 24,
     carbsPer100g: 0.2,
     fatPer100g: 0.3,
     unitWeightGrams: 15,
+  },
+  {
+    nameMatch: ['calamar', 'calamares', 'pulpo', 'mejillones', 'squid', 'octopus'],
+    calPer100g: 92,
+    proteinPer100g: 16,
+    carbsPer100g: 3,
+    fatPer100g: 1.4,
+    unitWeightGrams: 50,
   },
 
   // Huevos y Lácteos
@@ -111,7 +150,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     proteinPer100g: 12.6,
     carbsPer100g: 0.7,
     fatPer100g: 9.5,
-    unitWeightGrams: 50,
+    unitWeightGrams: 55,
   },
   {
     nameMatch: ['clara de huevo', 'egg white'],
@@ -122,7 +161,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 33,
   },
   {
-    nameMatch: ['leche', 'milk'],
+    nameMatch: ['leche', 'milk', 'leche entera', 'leche descremada'],
     calPer100g: 50,
     proteinPer100g: 3.3,
     carbsPer100g: 4.8,
@@ -130,7 +169,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 240, // 1 vaso/taza
   },
   {
-    nameMatch: ['crema', 'nata', 'heavy cream', 'whipping cream', 'crema de leche'],
+    nameMatch: ['crema', 'crema de leche', 'nata', 'heavy cream', 'whipping cream', 'crema para batir', 'crema para cocinar'],
     calPer100g: 345,
     proteinPer100g: 2.5,
     carbsPer100g: 3,
@@ -138,7 +177,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 15, // 1 cda
   },
   {
-    nameMatch: ['parmesano', 'parmesan', 'grana padano', 'queso curado'],
+    nameMatch: ['parmesano', 'parmesan', 'grana padano', 'queso curado', 'queso rallado', 'sardo'],
     calPer100g: 431,
     proteinPer100g: 38,
     carbsPer100g: 4.1,
@@ -146,7 +185,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 20,
   },
   {
-    nameMatch: ['mozzarella', 'queso fresco', 'ricotta', 'queso cremoso'],
+    nameMatch: ['mozzarella', 'muzzarella', 'queso fresco', 'ricotta', 'queso cremoso', 'burrata'],
     calPer100g: 280,
     proteinPer100g: 22,
     carbsPer100g: 2.2,
@@ -154,11 +193,11 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 30,
   },
   {
-    nameMatch: ['queso cheddar', 'cheddar', 'queso gouda', 'queso', 'cheese'],
-    calPer100g: 400,
-    proteinPer100g: 25,
-    carbsPer100g: 1.3,
-    fatPer100g: 33,
+    nameMatch: ['queso cheddar', 'cheddar', 'queso gouda', 'queso', 'cheese', 'queso crema', 'cream cheese'],
+    calPer100g: 380,
+    proteinPer100g: 23,
+    carbsPer100g: 2,
+    fatPer100g: 32,
     unitWeightGrams: 30,
   },
   {
@@ -180,7 +219,7 @@ const FOOD_DATABASE: FoodProfile[] = [
 
   // Aceites y Grasas
   {
-    nameMatch: ['aceite de oliva', 'aceite', 'olive oil', 'oil', 'aceite de girasol'],
+    nameMatch: ['aceite de oliva', 'aceite', 'olive oil', 'oil', 'aceite de girasol', 'aceite de maiz', 'aceite vegetal'],
     calPer100g: 884,
     proteinPer100g: 0,
     carbsPer100g: 0,
@@ -199,7 +238,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 75, // ración cruda
   },
   {
-    nameMatch: ['pasta', 'espaguetis', 'spaghetti', 'macarrones', 'fideos', 'noodles', 'penne'],
+    nameMatch: ['pasta', 'espaguetis', 'spaghetti', 'macarrones', 'fideos', 'noodles', 'penne', 'tallarines', 'ravioles'],
     calPer100g: 370,
     proteinPer100g: 13,
     carbsPer100g: 74,
@@ -217,7 +256,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 40, // 1 rebanada
   },
   {
-    nameMatch: ['harina', 'harina de trigo', 'flour', 'wheat flour'],
+    nameMatch: ['harina', 'harina de trigo', 'flour', 'wheat flour', 'maicena'],
     calPer100g: 364,
     proteinPer100g: 10,
     carbsPer100g: 76,
@@ -275,7 +314,7 @@ const FOOD_DATABASE: FoodProfile[] = [
 
   // Vegetales y Hortalizas
   {
-    nameMatch: ['cebolla', 'onion', 'cebollas'],
+    nameMatch: ['cebolla', 'onion', 'cebollas', 'cebolla morada', 'chalota'],
     calPer100g: 40,
     proteinPer100g: 1.1,
     carbsPer100g: 9.3,
@@ -284,7 +323,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 150, // 1 cebolla mediana
   },
   {
-    nameMatch: ['ajo', 'garlic', 'diente de ajo', 'dientes de ajo'],
+    nameMatch: ['ajo', 'garlic', 'diente de ajo', 'dientes de ajo', 'ajos'],
     calPer100g: 149,
     proteinPer100g: 6.4,
     carbsPer100g: 33,
@@ -293,7 +332,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 4, // 1 diente
   },
   {
-    nameMatch: ['tomate', 'tomato', 'tomates', 'tomate triturado', 'salsa de tomate'],
+    nameMatch: ['tomate', 'tomato', 'tomates', 'tomate triturado', 'salsa de tomate', 'tomate frito'],
     calPer100g: 20,
     proteinPer100g: 0.9,
     carbsPer100g: 3.9,
@@ -320,7 +359,7 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 80, // 1 zanahoria mediana
   },
   {
-    nameMatch: ['espinaca', 'spinach', 'espinacas'],
+    nameMatch: ['espinaca', 'spinach', 'espinacas', 'acelga'],
     calPer100g: 23,
     proteinPer100g: 2.9,
     carbsPer100g: 3.6,
@@ -329,7 +368,10 @@ const FOOD_DATABASE: FoodProfile[] = [
     unitWeightGrams: 50,
   },
   {
-    nameMatch: ['champiñones', 'setas', 'mushrooms', 'hongos', 'boletus'],
+    nameMatch: [
+      'champinones', 'champinon', 'champiñones', 'champiñon',
+      'mushrooms', 'mushroom', 'setas', 'seta', 'portobello', 'hongos', 'boletus', 'girgolas'
+    ],
     calPer100g: 28,
     proteinPer100g: 3.1,
     carbsPer100g: 3.3,
@@ -363,6 +405,50 @@ const FOOD_DATABASE: FoodProfile[] = [
     fatPer100g: 15,
     fiberPer100g: 6.7,
     unitWeightGrams: 150,
+  },
+
+  // Bebidas y licores culinarios
+  {
+    nameMatch: ['conac', 'coñac', 'cognac', 'brandy', 'whisky', 'ron'],
+    calPer100g: 235,
+    proteinPer100g: 0,
+    carbsPer100g: 0.1,
+    fatPer100g: 0,
+    unitWeightGrams: 30, // 1 chorro/copita
+  },
+  {
+    nameMatch: ['vino blanco', 'vino tinto', 'vino', 'wine', 'white wine', 'red wine'],
+    calPer100g: 83,
+    proteinPer100g: 0.1,
+    carbsPer100g: 2.6,
+    fatPer100g: 0,
+    unitWeightGrams: 100,
+  },
+  {
+    nameMatch: ['caldo', 'caldo de carne', 'caldo de res', 'caldo de pollo', 'caldo de verduras', 'bouillon', 'stock'],
+    calPer100g: 15,
+    proteinPer100g: 1.2,
+    carbsPer100g: 1,
+    fatPer100g: 0.5,
+    unitWeightGrams: 200,
+  },
+
+  // Especias y condimentos
+  {
+    nameMatch: ['pimienta', 'pimienta negra', 'pepper', 'black pepper', 'granos de pimienta'],
+    calPer100g: 250,
+    proteinPer100g: 10,
+    carbsPer100g: 64,
+    fatPer100g: 3.3,
+    unitWeightGrams: 2, // 1 pizca o cucharadita
+  },
+  {
+    nameMatch: ['sal', 'salt', 'sal fina', 'sal gruesa'],
+    calPer100g: 0,
+    proteinPer100g: 0,
+    carbsPer100g: 0,
+    fatPer100g: 0,
+    unitWeightGrams: 3,
   },
 
   // Frutas y Azúcares
@@ -422,6 +508,11 @@ const FOOD_DATABASE: FoodProfile[] = [
   },
 ];
 
+const STOP_WORDS = new Set([
+  'de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas',
+  'en', 'con', 'sin', 'por', 'para', 'al', 'a', 'y', 'e', 'o', 'u'
+]);
+
 /**
  * Normaliza una cadena de texto para coincidencia culinaria flexible
  */
@@ -439,23 +530,38 @@ function cleanText(text: string): string {
  */
 function matchFoodProfile(ingredientName: string): FoodProfile | null {
   const cleaned = cleanText(ingredientName);
+  if (!cleaned) return null;
 
-  // 1. Coincidencia exacta o contiene frase
+  const words = cleaned.split(/\s+/).filter((w) => !STOP_WORDS.has(w));
+
+  // 1. Coincidencia exacta o contenida como frase completa (ej. "medallones de res", "pechuga de pollo")
   for (const item of FOOD_DATABASE) {
     for (const match of item.nameMatch) {
       const cleanedMatch = cleanText(match);
-      if (cleaned.includes(cleanedMatch) || cleanedMatch.includes(cleaned)) {
+      if (cleaned === cleanedMatch) {
+        return item;
+      }
+      if (cleanedMatch.includes(' ') && cleaned.includes(cleanedMatch)) {
         return item;
       }
     }
   }
 
-  // 2. Coincidencia por palabra clave
-  const words = cleaned.split(/\s+/);
+  // 2. Coincidencia de palabra completa relevante (ej. "res", "lomo", "bife", "pollo", "salmon")
   for (const item of FOOD_DATABASE) {
     for (const match of item.nameMatch) {
-      const matchWords = cleanText(match).split(/\s+/);
-      if (matchWords.some((mw) => mw.length > 3 && words.includes(mw))) {
+      const cleanedMatch = cleanText(match);
+      if (!cleanedMatch.includes(' ') && words.includes(cleanedMatch)) {
+        return item;
+      }
+    }
+  }
+
+  // 3. Coincidencia secundaria substring en cualquier dirección
+  for (const item of FOOD_DATABASE) {
+    for (const match of item.nameMatch) {
+      const cleanedMatch = cleanText(match);
+      if (cleaned.includes(cleanedMatch) || cleanedMatch.includes(cleaned)) {
         return item;
       }
     }
@@ -469,7 +575,7 @@ function matchFoodProfile(ingredientName: string): FoodProfile | null {
  */
 function estimateWeightInGrams(amount: number, unit: string, profile: FoodProfile | null): number {
   const normUnit = cleanText(unit);
-  const safeAmount = Math.max(0.1, Number(amount) || 1);
+  const safeAmount = Math.max(0.01, Number(amount) || 1);
 
   if (normUnit.startsWith('kg') || normUnit.includes('kilo')) {
     return safeAmount * 1000;
@@ -484,7 +590,7 @@ function estimateWeightInGrams(amount: number, unit: string, profile: FoodProfil
     return safeAmount * 1000;
   }
   if (normUnit.includes('cda') || normUnit.includes('cucharada') || normUnit.includes('tbsp')) {
-    return safeAmount * (profile?.unitWeightGrams || 14);
+    return safeAmount * (profile?.unitWeightGrams ? Math.min(profile.unitWeightGrams, 15) : 14);
   }
   if (normUnit.includes('cdta') || normUnit.includes('cucharadita') || normUnit.includes('tsp')) {
     return safeAmount * 5;
@@ -496,16 +602,22 @@ function estimateWeightInGrams(amount: number, unit: string, profile: FoodProfil
     return safeAmount * 1;
   }
   if (normUnit.includes('chorro') || normUnit.includes('chorrito') || normUnit.includes('splash')) {
-    return safeAmount * 10;
+    return safeAmount * 15;
+  }
+  if (normUnit.includes('diente')) {
+    return safeAmount * 4;
+  }
+  if (normUnit.includes('rebanada') || normUnit.includes('feta') || normUnit.includes('slice')) {
+    return safeAmount * (profile?.unitWeightGrams ? Math.min(profile.unitWeightGrams, 30) : 25);
   }
 
-  // Si la unidad es "unidad", "diente", "rebanada", "pieza", etc., usar unitWeightGrams
+  // Si la unidad es "unidad", "un", "u", "pieza", "medallon", "bife" o no está especificada:
   if (profile?.unitWeightGrams) {
     return safeAmount * profile.unitWeightGrams;
   }
 
-  // Valor por defecto para unidades sin especificar
-  return safeAmount * 50;
+  // Valor por defecto para unidades genéricas no catalogadas
+  return safeAmount * 60;
 }
 
 /**
@@ -551,12 +663,12 @@ export function calculateLocalNutrition(
         totalFiber += profile.fiberPer100g * factor;
       }
     } else {
-      // Ingrediente genérico vegetal / condimento estimado (~50 kcal / 100g)
+      // Ingrediente genérico no clasificado (~60 kcal / 100g promedio)
       const factor = weightGrams / 100;
-      totalCalories += 50 * factor;
-      totalProtein += 1.5 * factor;
+      totalCalories += 60 * factor;
+      totalProtein += 2 * factor;
       totalCarbs += 8 * factor;
-      totalFat += 0.5 * factor;
+      totalFat += 1 * factor;
     }
   }
 
@@ -581,24 +693,26 @@ export function calculateLocalNutrition(
  * Obtiene o calcula la estimación nutricional para una receta:
  * 1. Revisa si ya viene en la receta (`recipe.nutrition_info`).
  * 2. Revisa si existe en la caché local de `localStorage`.
- * 3. Si no existe, lanza el cálculo local instantáneo y opcionalmente llama a `/api/nutrition`
+ * 3. Si no existe, lanza el cálculo local instantáneo y llama a `/api/nutrition`
  *    para refinar la precisión con IA en segundo plano.
+ * 4. Permite un callback opcional `onRefined` para actualizar la interfaz en vivo.
  */
 export async function getOrCalculateNutrition(
   recipeId: string,
   ingredients: Ingredient[],
   servings: number,
-  existingNutrition?: NutritionInfo
+  existingNutrition?: NutritionInfo,
+  onRefined?: (refined: NutritionInfo) => void
 ): Promise<NutritionInfo> {
-  // 1. Si ya viene persistido en la receta
-  if (existingNutrition && existingNutrition.calories > 0) {
+  // 1. Si ya viene persistido en la receta con valores válidos
+  if (existingNutrition && existingNutrition.calories > 20) {
     return existingNutrition;
   }
 
-  // 2. Si está en caché local
+  // 2. Si está en caché local y no está corrompido
   if (recipeId) {
     const cached = getCachedNutrition(recipeId);
-    if (cached && cached.calories > 0) {
+    if (cached && cached.calories > 30) {
       return cached;
     }
   }
@@ -613,7 +727,6 @@ export async function getOrCalculateNutrition(
 
   // 4. Refinamiento en segundo plano mediante /api/nutrition (no bloqueante)
   if (typeof window !== 'undefined' && ingredients.length > 0) {
-    // Lanzar fetch en background sin bloquear
     fetch('/api/nutrition', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -630,19 +743,21 @@ export async function getOrCalculateNutrition(
         if (data && data.calories > 0 && recipeId) {
           const refinedEstimate: NutritionInfo = {
             calories: Math.round(data.calories),
-            protein: Math.round(data.protein || localEstimate.protein),
-            carbs: Math.round(data.carbs || localEstimate.carbs),
-            fat: Math.round(data.fat || localEstimate.fat),
+            protein: Math.round(data.protein ?? localEstimate.protein),
+            carbs: Math.round(data.carbs ?? localEstimate.carbs),
+            fat: Math.round(data.fat ?? localEstimate.fat),
             fiber: data.fiber ? Math.round(data.fiber) : localEstimate.fiber,
             summary: data.summary,
             is_estimated: true,
             calculated_at: new Date().toISOString(),
           };
           saveCachedNutrition(recipeId, refinedEstimate);
+          if (onRefined) {
+            onRefined(refinedEstimate);
+          }
         }
       })
       .catch((err) => {
-        // En caso de fallo de red o cuota, el valor local ya está activo y seguro
         console.debug('Background nutrition refinement notice:', err);
       });
   }

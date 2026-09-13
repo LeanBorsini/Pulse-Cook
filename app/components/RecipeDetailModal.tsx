@@ -248,7 +248,7 @@ export function RecipeDetailModal({
 
     async function loadNutrition() {
       const cached = recipe.nutrition_info || getCachedNutrition(recipe.id);
-      if (cached && cached.calories > 0) {
+      if (cached && cached.calories > 30) {
         if (isMounted) setNutrition(cached);
         return;
       }
@@ -261,7 +261,12 @@ export function RecipeDetailModal({
           recipe.id,
           ingredients,
           baseServings,
-          recipe.nutrition_info
+          recipe.nutrition_info,
+          (refined) => {
+            if (isMounted && refined) {
+              setNutrition(refined);
+            }
+          }
         );
         if (isMounted && est) {
           setNutrition(est);

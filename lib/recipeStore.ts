@@ -231,8 +231,11 @@ export function saveLocalRecipe(recipe: Recipe, ingredients?: Ingredient[]): Rec
       }
       updated = [...customRecipes];
       updated[existingIndex] = recipe;
+      deleteCachedNutrition(oldId);
+      deleteCachedNutrition(recipe.id);
     } else {
       updated = [recipe, ...customRecipes];
+      deleteCachedNutrition(recipe.id);
     }
 
     safeSaveRecipes(updated);
@@ -341,7 +344,7 @@ export function batchSaveLocalIngredients(map: Record<string, Ingredient[]>) {
 }
 
 /** Clave de localStorage para la caché de información nutricional { [recipeId]: NutritionInfo } */
-const NUTRITION_STORAGE_KEY = 'pulse_cook_nutrition_cache_v1';
+const NUTRITION_STORAGE_KEY = 'pulse_cook_nutrition_cache_v2';
 
 /**
  * Obtiene la información nutricional en caché de una receta
