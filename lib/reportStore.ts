@@ -560,8 +560,69 @@ export function saveLocalManagedProfiles(profiles: Profile[]): void {
 }
 
 /**
+ * Evalúa con coincidencia inteligente si un perfil responde a la búsqueda.
+ * Soporta búsqueda por alias (@username), correo electrónico, UUID,
+ * o raíz léxica (por ejemplo: buscar "daniela" o "dani" encuentra a "daniCooker",
+ * o buscar "lean" / "leandro" encuentra a "leanBorsini").
+ */
+export function matchProfileQuery(profile: Profile, rawQuery: string): boolean {
+  if (!rawQuery || !rawQuery.trim()) return true;
+  const q = rawQuery.trim().toLowerCase();
+  const uname = (profile.username || '').toLowerCase();
+  const email = (profile.email || '').toLowerCase();
+  const id = (profile.id || '').toLowerCase();
+
+  // 1. Coincidencia directa o subcadena en username, email o ID
+  if (uname.includes(q) || (email && email.includes(q)) || id.includes(q)) {
+    return true;
+  }
+
+  // 2. Si se busca con prefijo de mención '@'
+  const cleanQ = q.startsWith('@') ? q.slice(1) : q;
+  if (cleanQ && (uname.includes(cleanQ) || (email && email.includes(cleanQ)))) {
+    return true;
+  }
+
+  // 3. Raíz léxica de prefijo común (3 o más caracteres)
+  // Ej: Buscar "daniela" (raíz "dani") coincide con "daniCooker"
+  // Ej: Buscar "mari" coincide con "mariela"
+  if (cleanQ.length >= 3) {
+    const qPrefix3 = cleanQ.slice(0, 3);
+    const qPrefix4 = cleanQ.slice(0, 4);
+    if (uname.startsWith(qPrefix4) || uname.startsWith(qPrefix3)) {
+      return true;
+    }
+    // Raíces de palabras compuestas (CamelCase o separadores)
+    const unameParts = uname.split(/(?=[A-Z])|[^a-z0-9]/).filter(Boolean);
+    for (const part of unameParts) {
+      if (part.startsWith(qPrefix3) || (cleanQ.length >= 4 && cleanQ.startsWith(part.slice(0, 3)))) {
+        return true;
+      }
+    }
+    // Si la búsqueda es más larga y contiene el inicio del username
+    if (cleanQ.startsWith(uname.slice(0, 4)) || cleanQ.startsWith(uname.slice(0, 3))) {
+      return true;
+    }
+  }
+
+  // 4. Búsqueda por palabras múltiples separadas
+  const words = cleanQ.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    const allWordsMatch = words.every(
+      (w) =>
+        uname.includes(w) ||
+        (email && email.includes(w)) ||
+        (w.length >= 3 && (uname.startsWith(w.slice(0, 3)) || w.startsWith(uname.slice(0, 3))))
+    );
+    if (allWordsMatch) return true;
+  }
+
+  return false;
+}
+
+/**
  * Consulta la lista de usuarios y perfiles para gestión administrativa.
- * Soporta búsqueda en tiempo real por username, email o ID.
+ * Soporta búsqueda en tiempo real por username, email o ID de manera tolerante y robusta.
  */
 export async function searchAndFetchProfiles(
   query: string = ''
@@ -570,36 +631,46 @@ export async function searchAndFetchProfiles(
   const trimmed = query.trim().toLowerCase();
 
   try {
-    // 1. Intentar consultar la tabla `profiles` en Supabase
-    let req = supabase.from('profiles').select('id, username, avatar_url, role, is_banned, created_at');
-
-    if (trimmed) {
-      req = req.or(`username.ilike.%${trimmed}%,id.eq.${trimmed}`);
-    }
-
-    const { data, error } = await req.limit(50);
+    // 1. Consultar la tabla `profiles` en Supabase usando select('*')
+    // Esto es 100% tolerante si created_at o email no existen aún en la base de datos
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('updated_at', { ascending: false });
 
     if (!error && data) {
-      const remoteProfiles: Profile[] = (data as Profile[]).map((p) => {
-        // Garantizar que leanBorsini siempre figure como admin
-        if (p.id === MAIN_AUTHOR_CONFIG.UUID || p.username?.toLowerCase() === 'leanborsini') {
+      const remoteProfiles: Profile[] = (data as (Profile & { updated_at?: string })[]).map((p) => {
+        // Garantizar que leanBorsini siempre figure como admin y con su email
+        const isMainAuthor =
+          p.id === MAIN_AUTHOR_CONFIG.UUID ||
+          p.username?.toLowerCase() === MAIN_AUTHOR_CONFIG.USERNAME.toLowerCase() ||
+          p.username?.toLowerCase() === 'leanborsini' ||
+          (p.email && p.email.toLowerCase() === MAIN_AUTHOR_CONFIG.EMAIL.toLowerCase());
+
+        if (isMainAuthor) {
           return {
             ...p,
-            email: MAIN_AUTHOR_CONFIG.EMAIL,
-            role: 'admin',
+            email: p.email || MAIN_AUTHOR_CONFIG.EMAIL,
+            role: 'admin' as UserRole,
             is_banned: false,
           };
         }
         return {
           ...p,
+          email: p.email || undefined,
           role: (p.role as UserRole) || 'user',
           is_banned: Boolean(p.is_banned),
         };
       });
 
-      // Si leanBorsini no vino en el resultado y coincide la búsqueda, agregarlo
-      const hasMain = remoteProfiles.some((p) => p.id === MAIN_AUTHOR_CONFIG.UUID);
-      if (!hasMain && (!trimmed || 'leanborsini'.includes(trimmed) || MAIN_AUTHOR_CONFIG.EMAIL.includes(trimmed))) {
+      // Si leanBorsini no vino en el resultado, agregarlo de forma canónica
+      const hasMain = remoteProfiles.some(
+        (p) =>
+          p.id === MAIN_AUTHOR_CONFIG.UUID ||
+          p.username?.toLowerCase() === MAIN_AUTHOR_CONFIG.USERNAME.toLowerCase() ||
+          p.username?.toLowerCase() === 'leanborsini'
+      );
+      if (!hasMain) {
         remoteProfiles.unshift({
           id: MAIN_AUTHOR_CONFIG.UUID,
           username: MAIN_AUTHOR_CONFIG.USERNAME,
@@ -609,9 +680,16 @@ export async function searchAndFetchProfiles(
         });
       }
 
-      // Fusionar con caché local
+      // Fusionar con caché local para persistencia rápida
       saveLocalManagedProfiles(remoteProfiles);
+
+      if (trimmed) {
+        return remoteProfiles.filter((p) => matchProfileQuery(p, trimmed));
+      }
+
       return remoteProfiles;
+    } else if (error) {
+      console.warn('Supabase profiles query error, checking fallback:', error.message);
     }
   } catch (err) {
     console.warn('Error fetching profiles from Supabase, using local fallback:', err);
@@ -626,17 +704,12 @@ export async function searchAndFetchProfiles(
       role: 'admin',
       is_banned: false,
     },
-    ...localList.filter((p) => p.id !== MAIN_AUTHOR_CONFIG.UUID),
+    ...localList.filter((p) => p.id !== MAIN_AUTHOR_CONFIG.UUID && p.username?.toLowerCase() !== 'leanborsini'),
   ];
 
   if (!trimmed) return fallbackProfiles;
 
-  return fallbackProfiles.filter(
-    (p) =>
-      p.username.toLowerCase().includes(trimmed) ||
-      (p.email && p.email.toLowerCase().includes(trimmed)) ||
-      p.id.toLowerCase().includes(trimmed)
-  );
+  return fallbackProfiles.filter((p) => matchProfileQuery(p, trimmed));
 }
 
 /**

@@ -30,6 +30,7 @@ import {
   toggleUserBan,
   isUserLocallyBanned,
   searchAndFetchProfiles,
+  matchProfileQuery,
   updateUserRole,
 } from '@/lib/reportStore';
 import { MAIN_AUTHOR_CONFIG, isMainAdminUser } from '@/lib/constants';
@@ -89,12 +90,12 @@ export function ModerationDrawer({
     }
   }, [user, profileUsername, userRole]);
 
-  // Cargar Usuarios / Perfiles
-  const loadProfiles = useCallback(async (query: string = '') => {
+  // Cargar Usuarios / Perfiles (obtiene siempre la lista completa de la base de datos)
+  const loadProfiles = useCallback(async () => {
     if (!user) return;
     setLoadingUsers(true);
     try {
-      const list = await searchAndFetchProfiles(query);
+      const list = await searchAndFetchProfiles('');
       setProfiles(list);
     } catch (err) {
       console.warn('Error loading profiles:', err);
@@ -182,11 +183,7 @@ export function ModerationDrawer({
       if (userFilterRole === 'users' && effectiveRole !== 'user') return false;
 
       if (userSearchQuery.trim()) {
-        const q = userSearchQuery.toLowerCase();
-        const nameMatch = profile.username.toLowerCase().includes(q);
-        const emailMatch = profile.email?.toLowerCase().includes(q);
-        const idMatch = profile.id.toLowerCase().includes(q);
-        return Boolean(nameMatch || emailMatch || idMatch);
+        return matchProfileQuery(profile, userSearchQuery);
       }
 
       return true;
@@ -437,7 +434,7 @@ export function ModerationDrawer({
             <button
               onClick={() => {
                 if (mainSection === 'reports') loadReports();
-                else loadProfiles(userSearchQuery);
+                else loadProfiles();
               }}
               disabled={loadingReports || loadingUsers}
               className="p-2 rounded-xl text-[#5C6650] hover:text-[#2C3523] hover:bg-[#EAE6DB] transition-colors cursor-pointer"
@@ -798,11 +795,20 @@ export function ModerationDrawer({
                   onChange={(e) => setUserSearchQuery(e.target.value)}
                   placeholder={
                     isEs
-                      ? 'Buscar usuario por @alias, email o ID...'
-                      : 'Search user by @alias, email or ID...'
+                      ? 'Buscar usuario por @alias, email o ID (ej: daniela, lean, mariela)...'
+                      : 'Search user by @alias, email or ID (e.g. daniela, lean, mariela)...'
                   }
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-[#D8D3C4] rounded-xl text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30"
+                  className="w-full pl-9 pr-9 py-2 bg-white border border-[#D8D3C4] rounded-xl text-xs sm:text-sm text-[#2C3523] focus:outline-hidden focus:ring-2 focus:ring-[#2C3523]/30"
                 />
+                {userSearchQuery && (
+                  <button
+                    onClick={() => setUserSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#7A8270] hover:text-[#2C3523] rounded-lg transition-colors cursor-pointer"
+                    title={isEs ? 'Limpiar búsqueda' : 'Clear search'}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
@@ -879,10 +885,38 @@ export function ModerationDrawer({
                     {isEs ? 'No se encontraron usuarios' : 'No users found'}
                   </h3>
                   <p className="text-xs text-[#5C6650] max-w-sm mx-auto">
-                    {isEs
-                      ? 'Intenta buscando por otro alias, correo o cambia los filtros de rol.'
-                      : 'Try searching by a different alias, email or change the role filter.'}
+                    {userSearchQuery
+                      ? isEs
+                        ? `No hay coincidencias para "${userSearchQuery}".`
+                        : `No matches found for "${userSearchQuery}".`
+                      : isEs
+                      ? 'No hay usuarios en esta categoría de filtro.'
+                      : 'No users found in this filter category.'}
                   </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                    {userSearchQuery && (
+                      <button
+                        onClick={() => setUserSearchQuery('')}
+                        className="px-3 py-1.5 rounded-xl bg-[#2C3523] text-white text-xs font-semibold hover:bg-[#3D4931] transition-all cursor-pointer shadow-2xs"
+                      >
+                        {isEs ? 'Limpiar búsqueda' : 'Clear search'}
+                      </button>
+                    )}
+                    {userFilterRole !== 'all' && (
+                      <button
+                        onClick={() => setUserFilterRole('all')}
+                        className="px-3 py-1.5 rounded-xl bg-white border border-[#D8D3C4] text-[#2C3523] text-xs font-semibold hover:bg-[#F2EFE9] transition-all cursor-pointer"
+                      >
+                        {isEs ? 'Ver todos los roles' : 'View all roles'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => loadProfiles()}
+                      className="px-3 py-1.5 rounded-xl bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] text-xs font-semibold hover:bg-[#E2DDD0] transition-all cursor-pointer"
+                    >
+                      {isEs ? 'Recargar usuarios' : 'Reload users'}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 filteredProfiles.map((targetUser) => {

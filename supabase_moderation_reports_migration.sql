@@ -11,9 +11,17 @@
 -- UUID: 1afb8de4-9294-4f57-af9f-dc50b3e6e768
 -- ==============================================================================
 
--- 1. ACTUALIZAR TABLA DE PERFILES: profiles (Roles y Baneo)
+-- 1. ACTUALIZAR TABLA DE PERFILES: profiles (Roles, Email y Baneo)
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT;
+
+-- Sincronizar emails existentes desde auth.users a public.profiles
+UPDATE public.profiles p
+SET email = u.email
+FROM auth.users u
+WHERE p.id = u.id 
+  AND (p.email IS NULL OR p.email = '' OR p.email != u.email);
 
 -- Garantizar restricción de roles válidos
 DO $$
