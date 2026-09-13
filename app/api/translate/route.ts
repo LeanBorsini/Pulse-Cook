@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
         translatedDescription: cleanPure(extDesc || fallbackDesc || description),
         translatedInstructions: cleanPure(extInst || fallbackInst || instructions),
         translatedComments: fallbackComments,
-        suggestedTags: isTargetEn ? ['Quick (<20m)', 'Healthy'] : ['Rápido (<20m)', 'Saludable'],
+        suggestedTags: [],
         note: 'Translated via enhanced multi-engine fallback',
       });
     }

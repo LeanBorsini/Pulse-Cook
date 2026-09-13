@@ -1367,6 +1367,10 @@ export default function Home() {
           servingsCount={activeRecipe ? (menuServings[activeRecipe.id] || activeRecipe.servings || 2) : undefined}
           onToggleMenu={handleToggleMenu}
           onUpdateServings={handleUpdateMenuServings}
+          onUpdateRecipe={(updated) => {
+            setActiveRecipe(updated);
+            setRecipes((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+          }}
           onRate={handleRateRecipe}
           onClose={() => {
             setActiveRecipe(null);

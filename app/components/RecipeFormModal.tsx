@@ -41,7 +41,7 @@ import { calculateLocalNutrition } from '@/lib/nutritionCalculator';
 import {
   translateTextSmart,
 } from '@/lib/recipeTranslator';
-import { translateIngredientName } from '@/lib/culinaryDictionary';
+import { translateIngredientName, translateTag } from '@/lib/culinaryDictionary';
 import { RECIPE_CATEGORIES, getCategoryKey, getCategoryLabel } from '@/lib/categories';
 import { MAIN_AUTHOR_CONFIG } from '@/lib/constants';
 
@@ -53,21 +53,6 @@ interface RecipeFormModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
-
-const COMMON_TAGS = [
-  'Vegetariano',
-  'Vegano',
-  'Sin Gluten',
-  'Keto',
-  'Bajo en Carbohidratos',
-  'Rápido (<30min)',
-  'Fácil',
-  'Repostería',
-  'Pasta',
-  'Carne',
-  'Pescado',
-  'Saludable',
-];
 
 /**
  * Modal de Creación y Edición Integral de Recetas (RecipeFormModal)
@@ -259,21 +244,97 @@ export function RecipeFormModal({
   };
 
   // Tags Management
-  const toggleTag = (tag: string) => {
+  const removeTag = (tagToRemove: string) => {
     setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.filter(
+        (t) =>
+          t.toLowerCase().trim() !== tagToRemove.toLowerCase().trim() &&
+          translateTag(t, lang).toLowerCase().trim() !== tagToRemove.toLowerCase().trim()
+      )
     );
+  };
+
+  const clearAllTags = () => {
+    setSelectedTags([]);
+  };
+
+  const toggleTag = (tag: string) => {
+    const isAlreadySelected = selectedTags.some(
+      (t) =>
+        t.toLowerCase().trim() === tag.toLowerCase().trim() ||
+        translateTag(t, lang).toLowerCase().trim() === tag.toLowerCase().trim()
+    );
+    if (isAlreadySelected) {
+      removeTag(tag);
+    } else {
+      setSelectedTags((prev) => [...prev, tag]);
+    }
   };
 
   const addCustomTag = (e: React.KeyboardEvent | React.MouseEvent) => {
     if ('key' in e && e.key !== 'Enter') return;
     e.preventDefault();
     const clean = customTagInput.trim();
-    if (clean && !selectedTags.includes(clean)) {
+    if (!clean) return;
+
+    const alreadyExists = selectedTags.some(
+      (t) => t.toLowerCase().trim() === clean.toLowerCase().trim()
+    );
+    if (!alreadyExists) {
       setSelectedTags((prev) => [...prev, clean]);
       setCustomTagInput('');
     }
   };
+
+  // Sugerencias inteligentes de etiquetas según idioma y tiempo de preparación
+  const suggestedTagsList = React.useMemo(() => {
+    const numPrep = Number(prepTime) || 0;
+    const baseTags = isEs
+      ? [
+          'Vegetariano',
+          'Vegano',
+          'Sin Gluten',
+          'Keto',
+          'Bajo en Carbohidratos',
+          'Fácil',
+          'Saludable',
+          'Repostería',
+          'Pasta',
+          'Carne',
+          'Pescado',
+          'Air Fryer',
+          'Gourmet',
+          'Económico',
+          'Tradicional',
+        ]
+      : [
+          'Vegetarian',
+          'Vegan',
+          'Gluten-Free',
+          'Keto',
+          'Low Carb',
+          'Easy',
+          'Healthy',
+          'Baking & Dessert',
+          'Pasta',
+          'Meat',
+          'Fish',
+          'Air Fryer',
+          'Gourmet',
+          'Budget-Friendly',
+          'Traditional',
+        ];
+
+    // Inclusión condicional estricta de velocidad según minutos de preparación reales:
+    if (numPrep > 0 && numPrep <= 20) {
+      baseTags.unshift(isEs ? 'Rápido (<20min)' : 'Quick (<20min)');
+    } else if (numPrep > 20 && numPrep <= 35) {
+      baseTags.unshift(isEs ? 'Rápido (<30min)' : 'Quick (<30min)');
+    }
+    // Si numPrep > 35, NUNCA sugerir "Rápido"
+
+    return baseTags;
+  }, [isEs, prepTime]);
 
   // Manejo de carga de imágenes
   const handleFilesSelected = async (files: FileList | null) => {
@@ -418,14 +479,6 @@ export function RecipeFormModal({
             finalTitleEs = translated.translatedTitle || translateTextSmart(rawTitle, 'EN', 'ES');
             finalDescEs = translated.translatedDescription || translateTextSmart(rawDescription, 'EN', 'ES');
             finalInstEs = (translated.translatedInstructions || translateTextSmart(rawInstructions, 'EN', 'ES')).trim();
-          }
-
-          if (translated.suggestedTags && Array.isArray(translated.suggestedTags)) {
-            translated.suggestedTags.forEach((t: string) => {
-              if (t && !selectedTags.includes(t) && selectedTags.length < 8) {
-                selectedTags.push(t);
-              }
-            });
           }
         } else {
           // Fallback offline si la API no responde
@@ -1022,44 +1075,118 @@ export function RecipeFormModal({
             ))}
           </div>
 
-          {/* 7. Etiquetas Gastronómicas */}
-          <div>
-            <label className="block text-xs font-bold text-[#2C3523] mb-1.5">
-              {isEs ? 'Etiquetas Culinarias' : 'Dietary Tags & Filters'}
-            </label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {COMMON_TAGS.map((tag) => {
-                const active = selectedTags.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-all ${
-                      active
-                        ? 'bg-[#2C3523] text-[#FDFBF7] border-[#2C3523]'
-                        : 'bg-[#F4F1EA] text-[#5C6650] border-[#D8D3C4] hover:bg-[#EAE5D6]'
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                );
-              })}
+          {/* 7. Etiquetas Gastronómicas y Filtros */}
+          <div className="space-y-3 pt-1 border-t border-[#EFECE1]">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-[#2C3523]">
+                {isEs ? 'Etiquetas Culinarias & Dietéticas' : 'Dietary & Culinary Tags'}
+              </label>
+              {selectedTags.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAllTags}
+                  className="text-[11px] text-red-600 hover:text-red-800 font-semibold cursor-pointer underline-offset-2 hover:underline"
+                >
+                  {isEs ? 'Limpiar todas' : 'Clear all'}
+                </button>
+              )}
             </div>
 
-            <div className="flex gap-2">
+            {/* Lista de Etiquetas Asignadas con Botón de Eliminar (X) */}
+            <div>
+              <div className="text-[11px] font-medium text-[#5C6650] mb-1.5 flex items-center justify-between">
+                <span>
+                  {isEs
+                    ? 'Etiquetas activas en la receta (haz clic en × para quitar):'
+                    : 'Active tags on recipe (click × to remove):'}
+                </span>
+                <span className="text-[10px] font-bold text-[#2C3523] bg-[#EFECE1] px-2 py-0.5 rounded-full border border-[#D8D3C4]">
+                  {selectedTags.length}
+                </span>
+              </div>
+
+              {selectedTags.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 p-2.5 bg-[#FAF8F2] border border-[#D8D3C4] rounded-xl shadow-2xs">
+                  {selectedTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#2C3523] text-[#FDFBF7] shadow-xs"
+                    >
+                      <span>{translateTag(tag, lang)}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeTag(tag);
+                        }}
+                        title={isEs ? `Quitar "${tag}"` : `Remove "${tag}"`}
+                        aria-label={isEs ? `Quitar "${tag}"` : `Remove "${tag}"`}
+                        className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-white/20 text-white/90 hover:text-white transition-colors cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 bg-[#FAF8F2] border border-dashed border-[#D8D3C4] rounded-xl text-center text-xs text-[#5C6650]/80 italic">
+                  {isEs
+                    ? 'Sin etiquetas asignadas. Toca una sugerencia abajo o añade una personalizada.'
+                    : 'No tags assigned. Tap a suggestion below or add a custom one.'}
+                </div>
+              )}
+            </div>
+
+            {/* Sugerencias Rápidas */}
+            <div>
+              <div className="text-[11px] font-semibold text-[#5C6650] mb-1.5">
+                {isEs ? 'Sugerencias para añadir / quitar:' : 'Suggestions to add / remove:'}
+              </div>
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                {suggestedTagsList.map((tag) => {
+                  const active = selectedTags.some(
+                    (t) =>
+                      t.toLowerCase().trim() === tag.toLowerCase().trim() ||
+                      translateTag(t, lang).toLowerCase().trim() === tag.toLowerCase().trim()
+                  );
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                        active
+                          ? 'bg-[#2C3523] text-[#FDFBF7] border-[#2C3523] shadow-xs'
+                          : 'bg-[#F4F1EA] text-[#5C6650] border-[#D8D3C4] hover:bg-[#EAE5D6] hover:text-[#2C3523]'
+                      }`}
+                    >
+                      {active ? <Check className="w-3 h-3 text-emerald-400" /> : <Plus className="w-3 h-3 opacity-60" />}
+                      <span>{tag}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Input para Etiqueta Personalizada */}
+            <div className="flex gap-2 pt-1">
               <input
                 type="text"
                 value={customTagInput}
                 onChange={(e) => setCustomTagInput(e.target.value)}
                 onKeyDown={addCustomTag}
-                placeholder={isEs ? 'Añadir etiqueta personalizada...' : 'Add custom tag...'}
-                className="flex-1 bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-1.5 rounded-lg text-xs outline-none"
+                placeholder={
+                  isEs
+                    ? 'Escribe otra etiqueta (ej: Sin Lactosa, Air Fryer, Horneado)...'
+                    : 'Type another tag (e.g. Dairy-Free, Air Fryer, Baked)...'
+                }
+                className="flex-1 bg-[#F4F1EA] border border-[#D8D3C4] px-3 py-2 rounded-xl text-xs text-[#2C3523] placeholder-[#5C6650]/60 outline-none focus:ring-2 focus:ring-[#2C3523]/30"
               />
               <button
                 type="button"
                 onClick={addCustomTag}
-                className="px-3 py-1.5 bg-[#EFECE1] hover:bg-[#E5E0D0] text-[#2C3523] font-semibold text-xs rounded-lg border border-[#D8D3C4]"
+                disabled={!customTagInput.trim()}
+                className="px-4 py-2 bg-[#EFECE1] hover:bg-[#E5E0D0] text-[#2C3523] font-bold text-xs rounded-xl border border-[#D8D3C4] disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
               >
                 {isEs ? 'Añadir' : 'Add'}
               </button>

@@ -69,7 +69,8 @@ import {
 import { NutritionInfo } from '../types';
 import { NutritionBadge } from './NutritionBadge';
 import { getOrCalculateNutrition } from '@/lib/nutritionCalculator';
-import { getCachedNutrition } from '@/lib/recipeStore';
+import { getCachedNutrition, saveLocalRecipe } from '@/lib/recipeStore';
+import { supabase } from '@/lib/supabase';
 
 interface RecipeDetailModalProps {
   recipe: Recipe;
@@ -95,6 +96,7 @@ interface RecipeDetailModalProps {
   servingsCount?: number;
   onToggleMenu?: (id: string, customServings?: number) => void;
   onUpdateServings?: (id: string, newServings: number) => void;
+  onUpdateRecipe?: (recipe: Recipe) => void;
   onReportRecipe?: (recipe: Recipe) => void;
   onReportComment?: (comment: Comment) => void;
 }
@@ -138,6 +140,7 @@ export function RecipeDetailModal({
   servingsCount,
   onToggleMenu,
   onUpdateServings,
+  onUpdateRecipe,
   onReportRecipe,
   onReportComment,
 }: RecipeDetailModalProps) {
@@ -639,6 +642,60 @@ export function RecipeDetailModal({
     // 4. Notificar al componente padre
     if (onRate) {
       onRate(starValue);
+    }
+  };
+
+  // Gestión y remoción rápida en vivo de etiquetas gastronómicas (si es autor/admin)
+  const [removedTags, setRemovedTags] = useState<string[]>([]);
+  const [prevRecipeIdForTags, setPrevRecipeIdForTags] = useState(recipe.id);
+  const [deletingTag, setDeletingTag] = useState<string | null>(null);
+
+  if (recipe.id !== prevRecipeIdForTags) {
+    setPrevRecipeIdForTags(recipe.id);
+    setRemovedTags([]);
+  }
+
+  const recipeTags = (recipe.dietary_tags || []).filter(
+    (t) =>
+      !removedTags.some(
+        (rt) =>
+          rt.toLowerCase().trim() === t.toLowerCase().trim() ||
+          translateTag(rt, lang).toLowerCase().trim() === translateTag(t, lang).toLowerCase().trim()
+      )
+  );
+
+  const handleRemoveTagInline = async (tagToRemove: string) => {
+    if (!isOwner) return;
+    setDeletingTag(tagToRemove);
+    try {
+      const updatedTags = recipeTags.filter(
+        (t) =>
+          t.toLowerCase().trim() !== tagToRemove.toLowerCase().trim() &&
+          translateTag(t, lang).toLowerCase().trim() !== tagToRemove.toLowerCase().trim()
+      );
+      setRemovedTags((prev) => [...prev, tagToRemove]);
+
+      const updatedRecipe: Recipe = { ...recipe, dietary_tags: updatedTags };
+
+      // 1. Guardar de inmediato en almacenamiento local persistente
+      saveLocalRecipe(updatedRecipe, ingredients);
+
+      // 2. Si es receta remota de Supabase, sincronizar inmediatamente
+      if (recipe.id && !recipe.id.startsWith('user_') && !recipe.id.startsWith('local_')) {
+        await supabase
+          .from('recipes')
+          .update({ dietary_tags: updatedTags })
+          .eq('id', recipe.id);
+      }
+
+      // 3. Notificar al componente padre para que la lista general se actualice
+      if (onUpdateRecipe) {
+        onUpdateRecipe(updatedRecipe);
+      }
+    } catch (err) {
+      console.warn('Error removing tag inline:', err);
+    } finally {
+      setDeletingTag(null);
     }
   };
 
@@ -1186,14 +1243,33 @@ export function RecipeDetailModal({
           </div>
 
           {/* Tags Gastronómicos */}
-          {recipe.dietary_tags && recipe.dietary_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {recipe.dietary_tags.map((tag) => (
+          {recipeTags && recipeTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {recipeTags.map((tag) => (
                 <span
                   key={tag}
-                  className="text-[10px] bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] px-2.5 py-0.5 rounded-full font-medium"
+                  className="group text-[10px] bg-[#EFECE1] border border-[#D8D3C4] text-[#2C3523] pl-2.5 pr-2 py-0.5 rounded-full font-medium inline-flex items-center gap-1 transition-colors hover:border-[#2C3523]/40 shadow-2xs"
                 >
-                  {translateTag(tag, lang)}
+                  <span>{translateTag(tag, lang)}</span>
+                  {isOwner && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveTagInline(tag);
+                      }}
+                      disabled={deletingTag === tag}
+                      title={isEs ? `Quitar etiqueta "${tag}"` : `Remove tag "${tag}"`}
+                      aria-label={isEs ? `Quitar etiqueta "${tag}"` : `Remove tag "${tag}"`}
+                      className="w-3.5 h-3.5 rounded-full flex items-center justify-center hover:bg-black/10 text-[#5C6650] hover:text-red-700 transition-colors cursor-pointer"
+                    >
+                      {deletingTag === tag ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin text-red-600" />
+                      ) : (
+                        <X className="w-2.5 h-2.5" />
+                      )}
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
