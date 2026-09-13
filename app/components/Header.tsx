@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { User } from '@supabase/supabase-js';
-import { Menu, ShoppingCart, ShieldAlert } from 'lucide-react';
+import { Menu, ShoppingCart, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { NavMenuDrawer } from './NavMenuDrawer';
 import { isModeratorOrAdmin } from '@/lib/constants';
 
@@ -85,21 +85,40 @@ export function Header({
           )}
 
           {/* Acceso rápido a Moderación para Admins / Moderadores */}
-          {isModeratorOrAdmin(user, profileUsername, userRole) && (
-            <button
-              onClick={onOpenModeration}
-              className="relative p-2 bg-[#EFECE1] hover:bg-amber-100/70 border border-amber-300/80 text-amber-900 rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
-              title={isEs ? 'Buzón de Moderación' : 'Moderation Inbox'}
-              id="header-moderation-btn"
-            >
-              <ShieldAlert className="w-4 h-4 text-amber-800" />
-              {typeof pendingReportsCount === 'number' && pendingReportsCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center animate-pulse">
-                  {pendingReportsCount}
-                </span>
-              )}
-            </button>
-          )}
+          {isModeratorOrAdmin(user, profileUsername, userRole) && (() => {
+            const hasReports = typeof pendingReportsCount === 'number' && pendingReportsCount > 0;
+            return (
+              <button
+                onClick={onOpenModeration}
+                className={`relative p-2 rounded-xl border transition-all shadow-2xs cursor-pointer active:scale-95 ${
+                  hasReports
+                    ? 'bg-rose-50 hover:bg-rose-100 border-rose-300 text-rose-700 animate-pulse'
+                    : 'bg-emerald-50 hover:bg-emerald-100/80 border-emerald-300/80 text-emerald-700'
+                }`}
+                title={
+                  hasReports
+                    ? isEs
+                      ? `Panel de Moderación (${pendingReportsCount} pendientes)`
+                      : `Moderation Panel (${pendingReportsCount} pending)`
+                    : isEs
+                    ? 'Panel de Moderación (Sin reportes pendientes)'
+                    : 'Moderation Panel (All clear)'
+                }
+                id="header-moderation-btn"
+              >
+                {hasReports ? (
+                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                )}
+                {hasReports && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-xs">
+                    {pendingReportsCount}
+                  </span>
+                )}
+              </button>
+            );
+          })()}
 
           {/* Botón Principal de Menú Desplegable */}
           <button

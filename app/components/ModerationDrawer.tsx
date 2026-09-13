@@ -404,8 +404,14 @@ export function ModerationDrawer({
         {/* Encabezado del Panel de Control */}
         <div className="p-4 sm:p-5 border-b border-[#D8D3C4] bg-[#F2EFE9] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#2C3523] text-white flex items-center justify-center shadow-sm shrink-0">
-              <ShieldAlert className="w-5 h-5 text-amber-400" />
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${
+              pendingCount > 0 ? 'bg-rose-600 text-white animate-pulse' : 'bg-[#2C3523] text-emerald-400'
+            }`}>
+              {pendingCount > 0 ? (
+                <ShieldAlert className="w-5 h-5 text-white" />
+              ) : (
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
