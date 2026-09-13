@@ -33,6 +33,7 @@ import {
   ChefHat,
   Camera,
   ChevronDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
@@ -112,39 +113,7 @@ export function RecipeFormModal({
     ];
   });
 
-  // Carga complementaria de ingredientes desde Supabase si la receta editada no los tenía en memoria local
   const recipeIdToLoad = recipeToEdit?.id;
-  useEffect(() => {
-    if (!recipeIdToLoad) return;
-    const targetRecipeId = recipeIdToLoad;
-
-    let isMounted = true;
-    async function loadRemoteIngredients() {
-      try {
-        const { data, error } = await supabase
-          .from('ingredients')
-          .select('*')
-          .eq('recipe_id', targetRecipeId);
-
-        if (!error && data && data.length > 0 && isMounted) {
-          setIngredients((current) => {
-            if (current.some((ing) => ing.name_es?.trim() || ing.name_en?.trim())) {
-              return current;
-            }
-            saveLocalIngredients(targetRecipeId, data);
-            return data;
-          });
-        }
-      } catch (err) {
-        console.warn('Error loading ingredients from Supabase:', err);
-      }
-    }
-
-    loadRemoteIngredients();
-    return () => {
-      isMounted = false;
-    };
-  }, [recipeIdToLoad]);
 
   // Campos complementarios (Categoría normalizada mediante catálogo fijo)
   const [category, setCategory] = useState(() => {
@@ -190,16 +159,165 @@ export function RecipeFormModal({
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // Cerrar con tecla Escape
+  // Snapshot inicial para detectar cambios sin guardar (Dirty State Guard)
+  const initialSnapshotRef = useRef({
+    title,
+    description,
+    instructions,
+    category,
+    prepTime,
+    servings,
+    images,
+    videos,
+    selectedTags,
+    ingredients,
+  });
+
+  // Carga complementaria de ingredientes desde Supabase si la receta editada no los tenía en memoria local
+  useEffect(() => {
+    if (!recipeIdToLoad) return;
+    const targetRecipeId = recipeIdToLoad;
+
+    let isMounted = true;
+    async function loadRemoteIngredients() {
+      try {
+        const { data, error } = await supabase
+          .from('ingredients')
+          .select('*')
+          .eq('recipe_id', targetRecipeId);
+
+        if (!error && data && data.length > 0 && isMounted) {
+          setIngredients((current) => {
+            if (current.some((ing) => ing.name_es?.trim() || ing.name_en?.trim())) {
+              return current;
+            }
+            saveLocalIngredients(targetRecipeId, data);
+            initialSnapshotRef.current.ingredients = data;
+            return data;
+          });
+        }
+      } catch (err) {
+        console.warn('Error loading ingredients from Supabase:', err);
+      }
+    }
+
+    loadRemoteIngredients();
+    return () => {
+      isMounted = false;
+    };
+  }, [recipeIdToLoad]);
+
+  // Estado para modal de confirmación antes de descartar
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  // Verificar si hay cambios sin guardar
+  const checkHasUnsavedChanges = React.useCallback((): boolean => {
+    if (!recipeToEdit) {
+      // Nueva receta: verificar si el usuario ha comenzado a completar datos
+      const hasTitle = title.trim().length > 0;
+      const hasDesc = description.trim().length > 0;
+      const hasInst = instructions.trim().length > 0;
+      const hasImages = images.length > 0;
+      const hasTags = selectedTags.length > 0;
+      const hasVideos = videos.some((v) => v.url.trim().length > 0);
+      const hasIngredients = ingredients.some(
+        (i) => i.name_es.trim().length > 0 || (i.name_en && i.name_en.trim().length > 0)
+      );
+      return (
+        hasTitle ||
+        hasDesc ||
+        hasInst ||
+        hasImages ||
+        hasTags ||
+        hasVideos ||
+        hasIngredients
+      );
+    }
+
+    // Edición de receta existente: verificar si hay diferencias con el snapshot inicial
+    const init = initialSnapshotRef.current;
+    if (title.trim() !== init.title.trim()) return true;
+    if (description.trim() !== init.description.trim()) return true;
+    if (instructions.trim() !== init.instructions.trim()) return true;
+    if (category !== init.category) return true;
+    if (prepTime !== init.prepTime) return true;
+    if (servings !== init.servings) return true;
+    if (
+      images.length !== init.images.length ||
+      images.some((img, idx) => img !== init.images[idx])
+    ) {
+      return true;
+    }
+    if (
+      selectedTags.length !== init.selectedTags.length ||
+      selectedTags.some((t, idx) => t !== init.selectedTags[idx])
+    ) {
+      return true;
+    }
+    if (
+      videos.length !== init.videos.length ||
+      videos.some(
+        (v, idx) =>
+          v.url.trim() !== (init.videos[idx]?.url || '').trim() ||
+          v.title.trim() !== (init.videos[idx]?.title || '').trim()
+      )
+    ) {
+      return true;
+    }
+
+    // Comparar ingredientes
+    if (ingredients.length !== init.ingredients.length) return true;
+    const ingsModified = ingredients.some((ing, idx) => {
+      const orig = init.ingredients[idx];
+      if (!orig) return true;
+      return (
+        ing.name_es.trim() !== orig.name_es.trim() ||
+        (ing.name_en || '').trim() !== (orig.name_en || '').trim() ||
+        Number(ing.amount) !== Number(orig.amount) ||
+        (ing.unit || '').trim() !== (orig.unit || '').trim()
+      );
+    });
+    if (ingsModified) return true;
+
+    return false;
+  }, [
+    recipeToEdit,
+    title,
+    description,
+    instructions,
+    category,
+    prepTime,
+    servings,
+    images,
+    selectedTags,
+    videos,
+    ingredients,
+  ]);
+
+  // Manejo de cierre seguro (con confirmación si hay cambios)
+  const handleRequestClose = React.useCallback(() => {
+    if (saving) return;
+    if (checkHasUnsavedChanges()) {
+      setShowDiscardConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [saving, checkHasUnsavedChanges, onClose]);
+
+  // Cerrar con tecla Escape de forma segura
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !saving) {
-        onClose();
+        if (showDiscardConfirm) {
+          setShowDiscardConfirm(false);
+        } else {
+          handleRequestClose();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, saving]);
+  }, [handleRequestClose, saving, showDiscardConfirm]);
 
   // Ingredients Management
   const addIngredientField = () => {
@@ -689,9 +807,6 @@ export function RecipeFormModal({
 
   return (
     <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !saving) onClose();
-      }}
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50 animate-fadeIn"
     >
       <div className="bg-[#FDFBF7] border border-[#D8D3C4] rounded-2xl max-w-2xl w-full shadow-2xl relative max-h-[92vh] flex flex-col text-[#2C3523] overflow-hidden">
@@ -713,7 +828,7 @@ export function RecipeFormModal({
             {/* Botón Cerrar (X) - SIEMPRE VISIBLE */}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleRequestClose}
               disabled={saving}
               className="w-8 h-8 rounded-full bg-[#EAE5D6] hover:bg-[#DED8C6] active:scale-90 text-[#2C3523] flex items-center justify-center border border-[#D8D3C4] transition-all cursor-pointer shadow-xs disabled:opacity-50"
               title={isEs ? 'Cerrar' : 'Close'}
@@ -1205,9 +1320,9 @@ export function RecipeFormModal({
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EFECE1]">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleRequestClose}
               disabled={saving}
-              className="px-4 py-2 text-xs font-semibold text-[#5C6650] hover:text-[#2C3523] rounded-xl hover:bg-[#EFECE1] transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-[#5C6650] hover:text-[#2C3523] rounded-xl hover:bg-[#EFECE1] transition-colors cursor-pointer"
             >
               {isEs ? 'Cancelar' : 'Cancel'}
             </button>
@@ -1231,6 +1346,54 @@ export function RecipeFormModal({
           </div>
         </form>
       </div>
+
+      {/* Diálogo de Confirmación para Descartar Cambios (Dirty State Guard) */}
+      {showDiscardConfirm && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.stopPropagation()}
+          className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div className="bg-[#FDFBF7] border border-[#D8D3C4] rounded-2xl max-w-sm w-full p-5 sm:p-6 shadow-2xl space-y-4 animate-scaleUp">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-700" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-serif font-bold text-[#2C3523]">
+                  {isEs ? '¿Descartar los cambios?' : 'Discard unsaved changes?'}
+                </h3>
+                <p className="text-xs text-[#5C6650] leading-relaxed">
+                  {isEs
+                    ? 'Tienes información sin guardar en esta receta. Si sales ahora, todos los datos ingresados se perderán.'
+                    : 'You have unsaved changes in this recipe. If you leave now, all entered information will be lost.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#EFECE1]">
+              <button
+                type="button"
+                onClick={() => setShowDiscardConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-[#2C3523] text-[#FDFBF7] hover:bg-[#3D4932] transition-colors cursor-pointer shadow-xs"
+              >
+                {isEs ? 'Continuar editando' : 'Keep editing'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDiscardConfirm(false);
+                  onClose();
+                }}
+                className="px-4 py-2 text-xs font-semibold rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors cursor-pointer"
+              >
+                {isEs ? 'Descartar y salir' : 'Discard & exit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Captura con Cámara en Vivo */}
       <CameraCaptureModal
