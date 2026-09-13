@@ -22,6 +22,33 @@ const LEGACY_STORAGE_KEY = 'pulse_cook_local_recipes_v2';
 const DEMO_IDS = new Set(['rec_1', 'rec_2', 'rec_3', 'rec_4', '1', '2', '3', '4']);
 
 /**
+ * Guarda recetas en localStorage con protección contra QuotaExceededError en dispositivos móviles.
+ * Si el espacio del navegador es limitado (ej. Safari iOS), optimiza eliminando Base64 pesados
+ * para no romper la carga de la aplicación.
+ */
+function safeSaveRecipes(recipes: Recipe[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(recipes));
+  } catch (err) {
+    console.warn('[recipeStore] Quota de localStorage alcanzada, guardando versión ligera:', err);
+    try {
+      const lightweight = recipes.map((r) => {
+        const isGiantImage = r.image_url && r.image_url.startsWith('data:') && r.image_url.length > 50000;
+        return {
+          ...r,
+          image_url: isGiantImage ? '' : r.image_url,
+          images: (r.images || []).filter((img) => !img.startsWith('data:') || img.length <= 50000),
+        };
+      });
+      localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(lightweight));
+    } catch (innerErr) {
+      console.warn('[recipeStore] No se pudo escribir en localStorage:', innerErr);
+    }
+  }
+}
+
+/**
  * Obtiene todas las recetas guardadas localmente por el usuario.
  * Realiza migración transparente desde esquemas anteriores y filtra demos.
  *
@@ -39,7 +66,7 @@ export function getLocalRecipes(): Recipe[] {
       if (legacyRaw) {
         const parsedLegacy: Recipe[] = JSON.parse(legacyRaw);
         const cleanedLegacy = parsedLegacy.filter((r) => !DEMO_IDS.has(r.id));
-        localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(cleanedLegacy));
+        safeSaveRecipes(cleanedLegacy);
         raw = JSON.stringify(cleanedLegacy);
       }
     }
@@ -87,7 +114,7 @@ export function getLocalRecipes(): Recipe[] {
     });
 
     if (deduplicated.length !== customRecipes.length || correctedAny) {
-      localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(deduplicated));
+      safeSaveRecipes(deduplicated);
     }
 
     return deduplicated;
@@ -170,7 +197,7 @@ export function reconcileLocalRecipesWithRemote(remoteRecipes: Recipe[]): Recipe
   });
 
   if (purgedAny) {
-    localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(remainingLocal));
+    safeSaveRecipes(remainingLocal);
   }
 
   return remainingLocal;
@@ -208,7 +235,7 @@ export function saveLocalRecipe(recipe: Recipe, ingredients?: Ingredient[]): Rec
       updated = [recipe, ...customRecipes];
     }
 
-    localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(updated));
+    safeSaveRecipes(updated);
 
     // Guardar ingredientes asociados si se proveen
     if (ingredients && ingredients.length > 0) {
@@ -231,7 +258,7 @@ export function deleteLocalRecipe(recipeId: string): Recipe[] {
   try {
     const customRecipes: Recipe[] = getLocalRecipes();
     const filtered = customRecipes.filter((r) => r.id !== recipeId);
-    localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(filtered));
+    safeSaveRecipes(filtered);
     deleteLocalIngredients(recipeId);
     deleteCachedNutrition(recipeId);
     return filtered;

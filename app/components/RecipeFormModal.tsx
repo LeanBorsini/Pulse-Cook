@@ -952,6 +952,8 @@ export function RecipeFormModal({
                       alt={`Foto ${idx + 1}`}
                       loading="lazy"
                       decoding="async"
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
                       className="w-full h-full object-cover"
                     />
                     {idx === 0 && (

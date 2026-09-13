@@ -36,6 +36,7 @@ import {
   Flag,
   ChevronDown,
   Copy,
+  UtensilsCrossed,
 } from 'lucide-react';
 import { Recipe, Ingredient, Comment } from '../types';
 import { User } from '@supabase/supabase-js';
@@ -163,9 +164,18 @@ export function RecipeDetailModal({
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
   const [hoverRating, setHoverRating] = useState<number>(0);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const [copiedLink, setCopiedLink] = useState(false);
   const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Resetear estados de imagen al cambiar de receta
+  const [lastRecipeId, setLastRecipeId] = useState(recipe.id);
+  if (lastRecipeId !== recipe.id) {
+    setLastRecipeId(recipe.id);
+    setActiveImageIndex(0);
+    setFailedImages({});
+  }
 
   // Cerrar menú de compartir al hacer clic fuera o presionar escape
   useEffect(() => {
@@ -701,20 +711,31 @@ export function RecipeDetailModal({
           {/* Renderizado de Galería de Imágenes */}
           {recipeImages.length > 0 && currentImage && (
             <div className="space-y-2">
-              <div className="w-full h-56 sm:h-64 rounded-xl overflow-hidden border border-[#D8D3C4] bg-black/5 relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={currentImage}
-                  alt={`${displayedTitle} - ${activeImageIndex + 1}`}
-                  loading="lazy"
-                  decoding="async"
-                  className="w-full h-full object-cover transition-all duration-300"
-                  onError={(e) => {
-                    (e.target as HTMLElement).parentElement!.style.display = 'none';
-                  }}
-                />
-                {recipeImages.length > 1 && (
-                  <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+              <div className="w-full h-56 sm:h-64 rounded-xl overflow-hidden border border-[#D8D3C4] bg-[#EAE5D6] relative flex items-center justify-center">
+                {!failedImages[activeImageIndex] ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={currentImage}
+                    alt={`${displayedTitle} - ${activeImageIndex + 1}`}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-cover transition-all duration-300"
+                    onError={() => {
+                      setFailedImages((prev) => ({ ...prev, [activeImageIndex]: true }));
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#EAE5D6] to-[#D8D3C4]/60 text-[#5C6650] p-6 select-none">
+                    <UtensilsCrossed className="w-10 h-10 text-[#5C6650]/50 mb-2" />
+                    <span className="text-xs font-semibold uppercase tracking-wider opacity-80">
+                      {getCategoryLabel(recipe.category, lang)}
+                    </span>
+                  </div>
+                )}
+                {recipeImages.length > 1 && !failedImages[activeImageIndex] && (
+                  <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-semibold px-2 py-0.5 rounded-full pointer-events-none">
                     {activeImageIndex + 1} / {recipeImages.length}
                   </div>
                 )}
@@ -740,6 +761,8 @@ export function RecipeDetailModal({
                         alt={`Miniatura ${idx + 1}`}
                         loading="lazy"
                         decoding="async"
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
                         className="w-full h-full object-cover"
                       />
                     </button>

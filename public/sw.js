@@ -1,5 +1,5 @@
 // Service Worker for Pulse&Cook PWA
-const CACHE_NAME = 'pulse-cook-v1';
+const CACHE_NAME = 'pulse-cook-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -39,8 +39,16 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and browser extensions
-  if (request.method !== 'GET' || url.protocol.startsWith('chrome-extension')) {
+  // Skip non-GET requests and non-http/https protocols
+  if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // CRITICAL FIX: Only handle same-origin requests!
+  // Cross-origin requests (Supabase storage, Supabase API, Unsplash, external CDNs)
+  // must be handled natively by the browser to avoid opaque response errors, WebKit
+  // 'Load failed' in iOS Safari, and CORS caching problems across mobile devices.
+  if (url.origin !== self.location.origin) {
     return;
   }
 
@@ -60,7 +68,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale-while-revalidate for static assets and page shell
+  // Stale-while-revalidate for local static assets and page shell
   event.respondWith(
     caches.open(CACHE_NAME).then(async (cache) => {
       const cachedResponse = await cache.match(request);

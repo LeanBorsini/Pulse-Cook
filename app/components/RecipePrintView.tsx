@@ -124,6 +124,8 @@ export function RecipePrintView({
             alt={title}
             loading="lazy"
             decoding="async"
+            referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
             className="w-full h-48 object-cover"
           />
         </div>

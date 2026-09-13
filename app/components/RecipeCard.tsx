@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Clock, Users, Plus, Minus, Star, Images, X, Flag } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Clock, Users, Plus, Minus, Star, Images, X, Flag, UtensilsCrossed } from 'lucide-react';
 import { Recipe } from '../types';
 import { User } from '@supabase/supabase-js';
 import { translateRecipeField } from '../../lib/recipeTranslator';
@@ -65,6 +65,7 @@ export function RecipeCard({
 
   const hasRating = (recipe.avg_rating && recipe.avg_rating > 0) || (recipe.ratings_count && recipe.ratings_count > 0);
   const imagesCount = recipe.images?.length || (recipe.image_url ? 1 : 0);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div
@@ -72,34 +73,42 @@ export function RecipeCard({
       className="bg-[#F7F5EC] rounded-2xl p-5 border border-[#D8D3C4] shadow-sm hover:shadow-md hover:border-[#2C3523]/40 transition-all flex flex-col justify-between cursor-pointer group"
     >
       <div>
-        {recipe.image_url && (
-          <div className="w-full h-48 rounded-xl overflow-hidden mb-4 border border-[#D8D3C4]/60 bg-black/5 relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+        <div className="w-full h-48 rounded-xl overflow-hidden mb-4 border border-[#D8D3C4]/60 bg-[#EAE5D6] relative flex items-center justify-center">
+          {recipe.image_url && !imgError ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={recipe.image_url}
               alt={title}
               loading="lazy"
               decoding="async"
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              onError={(e) => {
-                (e.target as HTMLElement).parentElement!.style.display = 'none';
-              }}
+              onError={() => setImgError(true)}
             />
-            {hasRating && (
-              <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm">
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                <span>{recipe.avg_rating?.toFixed(1)}</span>
-                <span className="text-[9px] text-stone-300 font-normal">({recipe.ratings_count})</span>
-              </div>
-            )}
-            {imagesCount > 1 && (
-              <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm">
-                <Images className="w-3 h-3" />
-                <span>{imagesCount}</span>
-              </div>
-            )}
-          </div>
-        )}
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#EAE5D6] to-[#D8D3C4]/60 text-[#5C6650] p-4 select-none">
+              <UtensilsCrossed className="w-8 h-8 text-[#5C6650]/50 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-medium tracking-wide uppercase opacity-70">
+                {getCategoryLabel(recipe.category, lang)}
+              </span>
+            </div>
+          )}
+
+          {hasRating && (
+            <div className="absolute top-2.5 right-2.5 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm pointer-events-none">
+              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+              <span>{recipe.avg_rating?.toFixed(1)}</span>
+              <span className="text-[9px] text-stone-300 font-normal">({recipe.ratings_count})</span>
+            </div>
+          )}
+          {imagesCount > 1 && !imgError && (
+            <div className="absolute bottom-2.5 left-2.5 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-lg text-[10px] font-semibold flex items-center gap-1 shadow-sm pointer-events-none">
+              <Images className="w-3 h-3" />
+              <span>{imagesCount}</span>
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-between items-start gap-2 mb-1.5">
           <h2 className="text-xl font-serif font-bold text-[#2C3523] group-hover:text-[#3D4932] transition-colors leading-tight">

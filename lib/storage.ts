@@ -64,30 +64,42 @@ export async function compressImage(file: File, maxWidth = 1600, quality = 0.85)
 }
 
 /**
- * Sube una imagen a Supabase Storage (Bucket: 'recipe-images')
+ * Sube una imagen a Supabase Storage (Bucket primario: 'recipes', fallback: 'recipe-images')
  */
 export async function uploadRecipeImage(file: File, userId: string): Promise<string> {
   try {
     const compressedBlob = await compressImage(file);
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filePath = `recipes/${userId || 'public'}/${Date.now()}_${cleanFileName}`;
+    const filePath = `dishes/${userId || 'public'}_${Date.now()}_${cleanFileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from('recipe-images')
+    let bucketName = 'recipes';
+    let uploadRes = await supabase.storage
+      .from(bucketName)
       .upload(filePath, compressedBlob, {
         contentType: 'image/jpeg',
         upsert: true,
       });
 
-    if (uploadError) {
-      console.warn('[Pulse&Cook] Storage upload error:', uploadError.message);
-      // Si el bucket no está configurado en Supabase, generar Data URL para no bloquear al usuario
+    // Si falla con 'recipes', probar con 'recipe-images'
+    if (uploadRes.error) {
+      bucketName = 'recipe-images';
+      uploadRes = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, compressedBlob, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+    }
+
+    if (uploadRes.error) {
+      console.warn('[Pulse&Cook] Storage upload error:', uploadRes.error.message);
+      // Si ambos buckets fallan, generar Data URL para no bloquear al usuario
       return await fileToDataUrl(compressedBlob);
     }
 
     const {
       data: { publicUrl },
-    } = supabase.storage.from('recipe-images').getPublicUrl(filePath);
+    } = supabase.storage.from(bucketName).getPublicUrl(filePath);
 
     return publicUrl;
   } catch (err) {
