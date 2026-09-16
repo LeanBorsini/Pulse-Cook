@@ -1,125 +1,79 @@
 /**
  * @file recipeStore.ts
- * @description Capa de persistencia local (Offline-First) en el navegador usando localStorage.
- * Permite guardar, recuperar, actualizar y eliminar recetas e ingredientes asociados
- * sin depender de conexión a internet o de la disponibilidad de Supabase.
- *
- * Incluye lógica de migración para esquemas v2 -> v3 y purga estricta de recetas demo.
+ * @description Capa de caché de lectura rápida (Mirror de Supabase) en el navegador.
+ * Supabase es la ÚNICA fuente de la verdad para recetas e ingredientes de todos los usuarios.
+ * localStorage se utiliza exclusivamente como caché de lectura temporal para garantizar
+ * tiempos de renderizado de 0 ms en el inicio de la app sin parpadeos, pero NUNCA crea
+ * recetas fantasmas locales ni sobrescribe datos de Supabase.
  */
 
 import { Recipe, Ingredient, NutritionInfo } from '../app/types';
 
-/** Clave de localStorage para el arreglo principal de recetas del usuario */
-const RECIPES_STORAGE_KEY = 'pulse_cook_local_recipes_v3';
+/** Clave de localStorage para el espejo de recetas canónicas de Supabase */
+const SUPABASE_CACHE_KEY = 'pulse_cook_supabase_cache_v4';
 
-/** Clave de localStorage para el mapa de ingredientes { [recipeId]: Ingredient[] } */
-const INGREDIENTS_STORAGE_KEY = 'pulse_cook_local_ingredients_v3';
+/** Clave de localStorage para el mapa de ingredientes en caché { [recipeId]: Ingredient[] } */
+const INGREDIENTS_STORAGE_KEY = 'pulse_cook_ingredients_cache_v4';
 
-/** Clave heredada de versiones previas para facilitar la migración automática */
-const LEGACY_STORAGE_KEY = 'pulse_cook_local_recipes_v2';
+/** Claves obsoletas de versiones previas que causaban desincronización entre usuarios */
+const LEGACY_STORAGE_KEYS = [
+  'pulse_cook_local_recipes_v3',
+  'pulse_cook_local_recipes_v2',
+  'pulse_cook_local_ingredients_v3',
+  'pulse_cook_local_ingredients_v2',
+];
 
 /** Conjunto de identificadores de recetas de prueba que deben ser excluidas permanentemente */
 const DEMO_IDS = new Set(['rec_1', 'rec_2', 'rec_3', 'rec_4', '1', '2', '3', '4']);
 
 /**
- * Guarda recetas en localStorage con protección contra QuotaExceededError en dispositivos móviles.
- * Si el espacio del navegador es limitado (ej. Safari iOS), optimiza eliminando Base64 pesados
- * para no romper la carga de la aplicación.
+ * Purga de manera estricta todas las claves obsoletas que guardaban recetas offline
+ * o que provocaban que un teléfono sobrescribiera los datos de la nube con versiones locales.
  */
-function safeSaveRecipes(recipes: Recipe[]): void {
+export function clearAllLocalRecipeOverrides(): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(recipes));
+    LEGACY_STORAGE_KEYS.forEach((k) => {
+      localStorage.removeItem(k);
+    });
   } catch (err) {
-    console.warn('[recipeStore] Quota de localStorage alcanzada, guardando versión ligera:', err);
-    try {
-      const lightweight = recipes.map((r) => {
-        const isGiantImage = r.image_url && r.image_url.startsWith('data:') && r.image_url.length > 50000;
-        return {
-          ...r,
-          image_url: isGiantImage ? '' : r.image_url,
-          images: (r.images || []).filter((img) => !img.startsWith('data:') || img.length <= 50000),
-        };
-      });
-      localStorage.setItem(RECIPES_STORAGE_KEY, JSON.stringify(lightweight));
-    } catch (innerErr) {
-      console.warn('[recipeStore] No se pudo escribir en localStorage:', innerErr);
-    }
+    console.warn('[recipeStore] Error limpiando claves heredadas:', err);
   }
 }
 
 /**
- * Obtiene todas las recetas guardadas localmente por el usuario.
- * Realiza migración transparente desde esquemas anteriores y filtra demos.
+ * Guarda el espejo de recetas de Supabase en caché local de solo lectura
+ */
+export function saveCachedSupabaseRecipes(recipes: Recipe[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const validRecipes = (recipes || []).filter((r) => !DEMO_IDS.has(r.id));
+    localStorage.setItem(SUPABASE_CACHE_KEY, JSON.stringify(validRecipes));
+  } catch (err) {
+    console.warn('[recipeStore] Quota de localStorage al guardar caché:', err);
+  }
+}
+
+/**
+ * Obtiene las recetas en caché local (espejo de Supabase) para render instantáneo.
  *
- * @returns {Recipe[]} Lista de recetas locales válidas del usuario.
+ * @returns {Recipe[]} Lista de recetas válidas de Supabase en caché.
  */
 export function getLocalRecipes(): Recipe[] {
   if (typeof window === 'undefined') return [];
 
   try {
-    // 1. Obtener datos locales
-    let raw = localStorage.getItem(RECIPES_STORAGE_KEY);
-    if (!raw) {
-      // Migrar desde versión anterior si existe, filtrando demos
-      const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (legacyRaw) {
-        const parsedLegacy: Recipe[] = JSON.parse(legacyRaw);
-        const cleanedLegacy = parsedLegacy.filter((r) => !DEMO_IDS.has(r.id));
-        safeSaveRecipes(cleanedLegacy);
-        raw = JSON.stringify(cleanedLegacy);
-      }
-    }
+    // 1. Purgar claves heredadas conflictivas
+    clearAllLocalRecipeOverrides();
 
+    // 2. Leer espejo canónico de Supabase
+    const raw = localStorage.getItem(SUPABASE_CACHE_KEY);
     if (!raw) return [];
 
-    const customRecipes: Recipe[] = JSON.parse(raw);
-    // Filtrar estrictamente cualquier receta de prueba
-    const validRecipes = customRecipes.filter((r) => !DEMO_IDS.has(r.id));
-    
-    // Deduplicar automáticamente recetas con el mismo título normalizado, prefiriendo siempre UUID de Supabase
-    const seenTitles = new Map<string, Recipe>();
-    const deduplicated: Recipe[] = [];
-
-    validRecipes.forEach((r) => {
-      const normTitle = normalizeRecipeTitle(r.title_es) || r.id;
-      const existing = seenTitles.get(normTitle);
-      if (!existing) {
-        seenTitles.set(normTitle, r);
-        deduplicated.push(r);
-      } else {
-        const isCurrentUuid = r.id.length === 36 && r.id.includes('-');
-        const isExistingUuid = existing.id.length === 36 && existing.id.includes('-');
-        if (isCurrentUuid && !isExistingUuid) {
-          const idx = deduplicated.findIndex((item) => item.id === existing.id);
-          if (idx >= 0) {
-            deleteLocalIngredients(existing.id);
-            deduplicated[idx] = r;
-            seenTitles.set(normTitle, r);
-          }
-        }
-      }
-    });
-
-    let correctedAny = false;
-    deduplicated.forEach((r) => {
-      const normTitle = (r.title_es || r.title_en || '').toLowerCase();
-      if (normTitle.includes('bizcocho humedo')) {
-        if (r.profiles?.username !== 'daniCooker' || r.author_name !== 'daniCooker') {
-          r.profiles = { id: r.profiles?.id || 'daniCooker', username: 'daniCooker' };
-          r.author_name = 'daniCooker';
-          correctedAny = true;
-        }
-      }
-    });
-
-    if (deduplicated.length !== customRecipes.length || correctedAny) {
-      safeSaveRecipes(deduplicated);
-    }
-
-    return deduplicated;
+    const parsed: Recipe[] = JSON.parse(raw);
+    return parsed.filter((r) => !DEMO_IDS.has(r.id));
   } catch (err) {
-    console.warn('Error reading local recipes:', err);
+    console.warn('Error reading cached recipes:', err);
     return [];
   }
 }
@@ -138,122 +92,49 @@ export function normalizeRecipeTitle(title?: string): string {
 }
 
 /**
- * Reconcilia recetas locales con recetas remotas de Supabase.
- * Detecta si una receta local temporal (con ID que comienza por 'user_', 'rec_', 'local_', o no-UUID)
- * ya existe en Supabase (mismo título normalizado).
- * Si existe: purga la versión local huérfana de localStorage y migra ingredientes si aplica.
+ * Reconciliación: Asegura que el cliente use estrictamente las recetas de Supabase.
+ * Purgará cualquier residuo local que no provenga de la base de datos remota.
  */
 export function reconcileLocalRecipesWithRemote(remoteRecipes: Recipe[]): Recipe[] {
-  if (typeof window === 'undefined') return [];
-  const localRecipes = getLocalRecipes();
-  if (localRecipes.length === 0 || remoteRecipes.length === 0) return localRecipes;
-
-  const remoteTitlesMap = new Map<string, Recipe>();
-  remoteRecipes.forEach((r) => {
-    const normEs = normalizeRecipeTitle(r.title_es);
-    const normEn = normalizeRecipeTitle(r.title_en);
-    if (normEs) remoteTitlesMap.set(normEs, r);
-    if (normEn) remoteTitlesMap.set(normEn, r);
-  });
-
-  const remainingLocal: Recipe[] = [];
-  let purgedAny = false;
-
-  localRecipes.forEach((local) => {
-    // Si la receta local ya tiene exactamente el mismo ID que una remota, se preserva
-    if (remoteRecipes.some((r) => r.id === local.id)) {
-      remainingLocal.push(local);
-      return;
-    }
-
-    // Identificar si tiene un ID temporal generado en el cliente
-    const isTempId =
-      local.id.startsWith('user_') ||
-      local.id.startsWith('local_') ||
-      local.id.startsWith('rec_') ||
-      !local.id.includes('-');
-
-    const normEs = normalizeRecipeTitle(local.title_es);
-    const normEn = normalizeRecipeTitle(local.title_en);
-    const matchingRemote =
-      (normEs ? remoteTitlesMap.get(normEs) : null) ||
-      (normEn ? remoteTitlesMap.get(normEn) : null);
-
-    if (isTempId && matchingRemote) {
-      // Es un duplicado temporal que ya se subió a Supabase con éxito.
-      // Migrar ingredientes locales al ID remoto si el remoto aún no los tiene en caché local
-      const localIngs = getLocalIngredients(local.id);
-      if (localIngs.length > 0) {
-        const remoteIngs = getLocalIngredients(matchingRemote.id);
-        if (remoteIngs.length === 0) {
-          saveLocalIngredients(matchingRemote.id, localIngs);
-        }
-      }
-      deleteLocalRecipe(local.id);
-      purgedAny = true;
-    } else {
-      remainingLocal.push(local);
-    }
-  });
-
-  if (purgedAny) {
-    safeSaveRecipes(remainingLocal);
-  }
-
-  return remainingLocal;
+  if (typeof window === 'undefined') return remoteRecipes || [];
+  clearAllLocalRecipeOverrides();
+  saveCachedSupabaseRecipes(remoteRecipes);
+  return remoteRecipes;
 }
 
 /**
- * Guarda o actualiza una receta en el almacenamiento local
+ * Actualiza una receta en la caché local tras una mutación exitosa en Supabase
  */
 export function saveLocalRecipe(recipe: Recipe, ingredients?: Ingredient[]): Recipe[] {
   if (typeof window === 'undefined') return [];
 
   try {
-    const customRecipes: Recipe[] = getLocalRecipes();
-    // 1. Buscar coincidencia exacta por ID
-    let existingIndex = customRecipes.findIndex((r) => r.id === recipe.id);
-
-    // 2. Si no coincide por ID pero es el mismo título normalizado del mismo autor/receta, actualizarla
-    if (existingIndex === -1 && recipe.title_es) {
-      const normTitle = normalizeRecipeTitle(recipe.title_es);
-      existingIndex = customRecipes.findIndex(
-        (r) => normalizeRecipeTitle(r.title_es) === normTitle
-      );
-    }
+    const cached: Recipe[] = getLocalRecipes();
+    const existingIndex = cached.findIndex((r) => r.id === recipe.id);
 
     let updated: Recipe[];
     if (existingIndex >= 0) {
-      const oldId = customRecipes[existingIndex].id;
-      // Si el ID cambió (ej. de temp user_ a UUID de Supabase), limpiar el viejo
-      if (oldId !== recipe.id) {
-        deleteLocalIngredients(oldId);
-      }
-      updated = [...customRecipes];
+      updated = [...cached];
       updated[existingIndex] = recipe;
-      deleteCachedNutrition(oldId);
-      deleteCachedNutrition(recipe.id);
     } else {
-      updated = [recipe, ...customRecipes];
-      deleteCachedNutrition(recipe.id);
+      updated = [recipe, ...cached];
     }
 
-    safeSaveRecipes(updated);
+    saveCachedSupabaseRecipes(updated);
 
-    // Guardar ingredientes asociados si se proveen
     if (ingredients && ingredients.length > 0) {
       saveLocalIngredients(recipe.id, ingredients);
     }
 
     return updated;
   } catch (err) {
-    console.warn('Error saving local recipe:', err);
+    console.warn('Error saving to cached recipes:', err);
     return getLocalRecipes();
   }
 }
 
 /**
- * Elimina una receta localmente
+ * Elimina una receta de la caché local
  */
 export function deleteLocalRecipe(recipeId: string): Recipe[] {
   if (typeof window === 'undefined') return [];
@@ -261,7 +142,7 @@ export function deleteLocalRecipe(recipeId: string): Recipe[] {
   try {
     const customRecipes: Recipe[] = getLocalRecipes();
     const filtered = customRecipes.filter((r) => r.id !== recipeId);
-    safeSaveRecipes(filtered);
+    saveCachedSupabaseRecipes(filtered);
     deleteLocalIngredients(recipeId);
     deleteCachedNutrition(recipeId);
     return filtered;

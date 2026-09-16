@@ -42,9 +42,10 @@ Diseñada bajo una filosofía **offline-first resiliente**: la aplicación funci
    - Posibilidad de agregar ítems manuales personalizados.
    - Marcar artículos comprados y vista optimizada para impresión en papel o PDF.
 
-6. **Arquitectura Híbrida Offline-First**:
-   - Si Supabase no está configurado o falla la conexión, la aplicación almacena y lee automáticamente todas las recetas e ingredientes de `localStorage` (`lib/recipeStore.ts`).
-   - Sin pantallas de carga infinitas ni bloqueos si el usuario no inicia sesión.
+6. **Sincronización Canónica Universal con Supabase**:
+   - Supabase es la **única fuente de la verdad** para recetas, ingredientes, calificaciones y perfiles.
+   - Rendimiento instantáneo (0 ms): `localStorage` opera estrictamente como caché de lectura ultrarrápida del espejo de Supabase, evitando parpadeos de carga pero sin crear recetas huérfanas ni causar desincronizaciones entre dispositivos.
+   - Sincronización en tiempo real vía `supabase_realtime` y script de migración integral `supabase_sync_recipes_and_ingredients.sql`.
 
 7. **Tips & Hacks Culinarios de la Comunidad (`ChefTipsModal.tsx` & `ChefTipsFeed.tsx`)**:
    - Catálogo interactivo de técnicas, conservación y trucos de cocina con búsqueda instantánea y filtros por categoría.

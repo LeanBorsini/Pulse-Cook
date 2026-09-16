@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { uploadRecipeImage } from '@/lib/storage';
-import { saveLocalRecipe, getLocalIngredients, saveLocalIngredients, deleteLocalRecipe, saveCachedNutrition } from '@/lib/recipeStore';
+import { saveLocalRecipe, getLocalIngredients, saveLocalIngredients, saveCachedNutrition } from '@/lib/recipeStore';
 import { calculateLocalNutrition } from '@/lib/nutritionCalculator';
 import {
   translateTextSmart,
@@ -51,6 +51,7 @@ interface RecipeFormModalProps {
   initialIngredients?: Ingredient[];
   lang: 'ES' | 'EN';
   user: User | null;
+  onOpenAuth?: () => void;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -65,13 +66,14 @@ interface RecipeFormModalProps {
  * 4. Normalización estricta de categorías con catálogo predefinido (`categories.ts`).
  * 5. Carga de fotografías (compresión vía Canvas antes de persistir o subir a Supabase Storage).
  * 6. Soporte multienlace de videos de YouTube y etiquetas dietéticas interactivas.
- * 7. Respaldo local offline-first inmediato antes de enviar a Supabase.
+ * 7. Persistencia estricta en Supabase: todos los usuarios ven las mismas recetas e ingredientes en tiempo real.
  */
 export function RecipeFormModal({
   recipeToEdit,
   initialIngredients,
   lang,
   user,
+  onOpenAuth,
   onClose,
   onSuccess,
 }: RecipeFormModalProps) {
@@ -652,7 +654,6 @@ export function RecipeFormModal({
 
     const standardizedCategory = getCategoryLabel(category, 'ES');
     const isExistingRemote = Boolean(recipeToEdit?.id && !recipeToEdit.id.startsWith('user_') && !recipeToEdit.id.startsWith('rec_'));
-    const oldTempId = recipeToEdit?.id && (recipeToEdit.id.startsWith('user_') || recipeToEdit.id.startsWith('rec_')) ? recipeToEdit.id : null;
 
     let finalRecipeId = isExistingRemote ? recipeToEdit!.id : null;
 
@@ -683,87 +684,114 @@ export function RecipeFormModal({
       dietary_tags: selectedTags,
     };
 
-    // 1. Sincronizar prioritariamente con Supabase si el usuario está autenticado
-    if (user) {
-      try {
-        if (isExistingRemote && recipeToEdit?.id) {
-          // Actualizar receta existente en Supabase: NUNCA sobreescribir el user_id del creador original
-          await supabase
-            .from('recipes')
-            .update(baseRecipePayload)
-            .eq('id', recipeToEdit.id);
-          finalRecipeId = recipeToEdit.id;
-
-          // Actualizar ingredientes en Supabase
-          try {
-            await supabase.from('ingredients').delete().eq('recipe_id', recipeToEdit.id);
-            if (validIngredients.length > 0) {
-              const ingPayload = validIngredients.map((ing) => ({
-                recipe_id: recipeToEdit.id,
-                name_es: ing.name_es,
-                name_en: ing.name_en,
-                amount: ing.amount,
-                unit: ing.unit,
-                aisle: ing.aisle || 'General',
-              }));
-              const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
-              if (ingErr) {
-                console.error('Error inserting ingredients into Supabase on update:', ingErr);
-              }
-            }
-          } catch (ingErr) {
-            console.warn('Ingredients sync note:', ingErr);
-          }
-        } else {
-          // Crear nueva receta en Supabase (asociándola al usuario creador)
-          const { data: supaRecipe, error: supaErr } = await supabase
-            .from('recipes')
-            .insert([{ ...baseRecipePayload, user_id: user.id }])
-            .select()
-            .single();
-
-          if (!supaErr && supaRecipe) {
-            finalRecipeId = supaRecipe.id;
-
-            // Si se editaba una receta que antes era temporal local, purgarla
-            if (oldTempId) {
-              deleteLocalRecipe(oldTempId);
-            }
-
-            if (validIngredients.length > 0) {
-              const ingPayload = validIngredients.map((ing) => ({
-                recipe_id: supaRecipe.id,
-                name_es: ing.name_es,
-                name_en: ing.name_en,
-                amount: ing.amount,
-                unit: ing.unit,
-                aisle: ing.aisle || 'General',
-              }));
-              const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
-              if (ingErr) {
-                console.error('Error inserting ingredients into Supabase on create:', ingErr);
-              }
-            }
-          }
-        }
-      } catch (supaErr) {
-        console.warn('Supabase sync skipped/offline, saving locally:', supaErr);
-      }
+    // Validar autenticación obligatoria para persistencia global en Supabase
+    if (!user) {
+      setStatusMessage(
+        isEs
+          ? 'Debes iniciar sesión para guardar la receta en la nube y que esté disponible para todos los usuarios.'
+          : 'You must log in to save the recipe to the cloud so it is available to all users.'
+      );
+      setSaving(false);
+      return;
     }
 
-    // 2. Si no hay conexión o no hay usuario autenticado, usar ID temporal
-    if (!finalRecipeId) {
-      finalRecipeId = recipeToEdit?.id || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    try {
+      if (isExistingRemote && recipeToEdit?.id) {
+        // 1. Actualizar receta existente en Supabase (preservando el user_id original del creador)
+        const { error: updateErr } = await supabase
+          .from('recipes')
+          .update(baseRecipePayload)
+          .eq('id', recipeToEdit.id);
+
+        if (updateErr) {
+          throw new Error(updateErr.message);
+        }
+        finalRecipeId = recipeToEdit.id;
+
+        // 2. Actualizar ingredientes en Supabase de forma limpia
+        await supabase.from('ingredients').delete().eq('recipe_id', recipeToEdit.id);
+
+        if (validIngredients.length > 0) {
+          const ingPayload = validIngredients.map((ing) => {
+            const rawEs = (ing.name_es || '').trim();
+            let rawEn = (ing.name_en || '').trim();
+            if (!rawEn || rawEn.toLowerCase() === rawEs.toLowerCase()) {
+              rawEn = translateIngredientName(rawEs, undefined, 'EN') || rawEs;
+            }
+            return {
+              recipe_id: recipeToEdit.id,
+              name_es: rawEs,
+              name_en: rawEn,
+              amount: Number(ing.amount) || 1,
+              unit: (ing.unit || '').trim(),
+              aisle: (ing.aisle || 'General').trim(),
+            };
+          });
+
+          const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
+          if (ingErr) {
+            throw new Error(`Error guardando ingredientes: ${ingErr.message}`);
+          }
+        }
+      } else {
+        // 1. Crear nueva receta en Supabase asignada al usuario creador
+        const { data: supaRecipe, error: supaErr } = await supabase
+          .from('recipes')
+          .insert([{ ...baseRecipePayload, user_id: user.id }])
+          .select()
+          .single();
+
+        if (supaErr || !supaRecipe) {
+          throw new Error(supaErr?.message || 'Error al crear la receta en Supabase');
+        }
+
+        finalRecipeId = supaRecipe.id;
+
+        // 2. Insertar ingredientes con traducción bilingüe auténtica
+        if (validIngredients.length > 0) {
+          const ingPayload = validIngredients.map((ing) => {
+            const rawEs = (ing.name_es || '').trim();
+            let rawEn = (ing.name_en || '').trim();
+            if (!rawEn || rawEn.toLowerCase() === rawEs.toLowerCase()) {
+              rawEn = translateIngredientName(rawEs, undefined, 'EN') || rawEs;
+            }
+            return {
+              recipe_id: supaRecipe.id,
+              name_es: rawEs,
+              name_en: rawEn,
+              amount: Number(ing.amount) || 1,
+              unit: (ing.unit || '').trim(),
+              aisle: (ing.aisle || 'General').trim(),
+            };
+          });
+
+          const { error: ingErr } = await supabase.from('ingredients').insert(ingPayload);
+          if (ingErr) {
+            throw new Error(`Error guardando ingredientes: ${ingErr.message}`);
+          }
+        }
+      }
+    } catch (saveErr: unknown) {
+      console.error('Error guardando en Supabase:', saveErr);
+      const errMsg = saveErr instanceof Error ? saveErr.message : (isEs ? 'Error al guardar en Supabase' : 'Error saving to Supabase');
+      setStatusMessage(errMsg);
+      setSaving(false);
+      return;
     }
 
     // Resolver perfil de autor preservando la autoría original
     const resolvedProfile = isBizcochoDani
       ? { id: 'daniCooker', username: 'daniCooker' }
-      : (recipeToEdit?.profiles || (recipeToEdit ? undefined : {
-          id: user?.id || 'local_user',
-          username: (user?.user_metadata as { username?: string })?.username || (user?.email ? user.email.split('@')[0] : MAIN_AUTHOR_CONFIG.USERNAME),
+      : (recipeToEdit?.profiles || {
+          id: user.id,
+          username: (user.user_metadata as { username?: string })?.username || (user.email ? user.email.split('@')[0] : MAIN_AUTHOR_CONFIG.USERNAME),
           avatar_url: '',
-        }));
+        });
+
+    if (!finalRecipeId) {
+      setSaving(false);
+      return;
+    }
 
     const recipeData: Recipe = {
       id: finalRecipeId,
@@ -780,7 +808,7 @@ export function RecipeFormModal({
       images: images,
       youtube_url: validVideos[0]?.url || '',
       video_links: validVideos,
-      user_id: effectiveAuthorUserId || 'local_user',
+      user_id: effectiveAuthorUserId || user.id,
       profiles: resolvedProfile,
       author_name: isBizcochoDani ? 'daniCooker' : (recipeToEdit?.author_name || resolvedProfile?.username),
       dietary_tags: selectedTags,
@@ -790,14 +818,14 @@ export function RecipeFormModal({
       created_at: recipeToEdit?.created_at || new Date().toISOString(),
     };
 
-    // 3. Calcular estimación nutricional orientativa en background y almacenar en caché
+    // Calcular estimación nutricional orientativa y guardar en caché local
     const estimatedNutr = calculateLocalNutrition(validIngredients, Number(servings) || 4);
     if (finalRecipeId && estimatedNutr.calories > 0) {
       saveCachedNutrition(finalRecipeId, estimatedNutr);
       recipeData.nutrition_info = estimatedNutr;
     }
 
-    // 4. Guardar de forma 100% consistente en el almacenamiento local bajo el ID canónico
+    // Guardar copia de acceso rápido en la caché local
     saveLocalRecipe(recipeData, validIngredients);
 
     setSaving(false);
@@ -841,6 +869,28 @@ export function RecipeFormModal({
 
         {/* Formulario Scrolleable */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          {!user && (
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3 text-amber-900 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  {isEs
+                    ? 'No has iniciado sesión. Para que tu receta se guarde en la nube y sea visible para todos, inicia sesión.'
+                    : 'You are not logged in. To save your recipe to the cloud so everyone can see it, please log in.'}
+                </span>
+              </div>
+              {onOpenAuth && (
+                <button
+                  type="button"
+                  onClick={onOpenAuth}
+                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg shrink-0 cursor-pointer transition-colors"
+                >
+                  {isEs ? 'Iniciar Sesión' : 'Log In'}
+                </button>
+              )}
+            </div>
+          )}
+
           <p className="text-xs text-[#737D67]">
             {isEs
               ? 'Escribe tu receta cómodamente. Se auto-traducirá en segundo plano al guardar.'

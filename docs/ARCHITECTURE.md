@@ -47,21 +47,20 @@ Pulse&Cook está construida sobre **Next.js 15 (App Router)** y sigue un patrón
 
 ---
 
-## 2. Estrategia de Persistencia Dual (Offline-First + Cloud)
+## 2. Estrategia de Persistencia Canónica (Supabase Single Source of Truth)
 
-Para asegurar que la aplicación sea utilizable sin necesidad de configurar servicios externos, Pulse&Cook implementa una estrategia de persistencia en capas:
+Para garantizar consistencia absoluta entre todos los dispositivos (móviles, escritorios, visitantes y administradores) y evitar recetas huérfanas o desincronizadas, Pulse&Cook implementa una arquitectura donde **Supabase es la única fuente canónica de la verdad**:
 
-### 2.1 Almacenamiento Local (`lib/recipeStore.ts`)
-- **Claves de almacenamiento**:
-  - `pulse_cook_local_recipes_v3`: Colección de recetas creadas/editadas localmente en formato JSON.
-  - `pulse_cook_local_ingredients_v3`: Mapa de ingredientes asociados indexados por `recipe.id`.
-- **Limpieza de Demos**: Se descartan automáticamente IDs de demostración obsoletos para evitar recetas duplicadas o fantasmas.
-- **Sincronización Inmediata**: Cualquier cambio realizado en la interfaz se guarda inmediatamente en `localStorage` antes de enviar la petición a Supabase.
+### 2.1 Sincronización Canónica con Supabase (`lib/supabase.ts`)
+- Todas las recetas, ingredientes bilingües, calificaciones, comentarios y perfiles se leen y escriben en Supabase.
+- La creación y modificación de recetas requiere autenticación y persiste de manera atómica tanto la entidad principal (`public.recipes`) como sus ingredientes (`public.ingredients`).
+- Las políticas de seguridad Row Level Security (RLS) garantizan que el autor o el administrador principal (`leanBorsini`) puedan editar y gestionar recetas, mientras que la lectura es pública y universal.
+- Suscripción en tiempo real vía `supabase_realtime` para reflejar instantáneamente cualquier cambio en todos los dispositivos conectados.
 
-### 2.2 Sincronización con Supabase (`lib/supabase.ts`)
-- La aplicación verifica si las variables `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` están definidas mediante el booleano exportado `isSupabaseConfigured`.
-- Si Supabase está disponible y el usuario está autenticado, las recetas se sincronizan con las tablas `recipes`, `recipe_ingredients`, `ratings` y `comments`.
-- Si Supabase no está configurado, o si una petición falla (por ejemplo por problemas de red), la aplicación **captura el error silenciosamente y continúa operando con los datos locales**, notificando al usuario de forma amigable sin romper la vista.
+### 2.2 Caché de Lectura en Cliente (`lib/recipeStore.ts`)
+- **Clave de caché ultrarrápida**: `pulse_cook_supabase_cache_v4`.
+- **Rendimiento Instantáneo**: Al abrir la aplicación, las recetas se cargan de inmediato desde la caché local en 0 ms para evitar pantallas en blanco, mientras en paralelo se consulta a Supabase y se actualiza el estado.
+- **Sin Mutaciones Locales Divergentes**: Se eliminó la sobreescritura de datos remotos con versiones locales. La función `clearAllLocalRecipeOverrides()` purga automáticamente claves de versiones anteriores (`pulse_cook_local_recipes_v3`, `v2`, etc.) al inicio para que ningún dispositivo quede desincronizado.
 
 ---
 

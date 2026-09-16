@@ -521,6 +521,39 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
+### ✅ Fase 22: Sincronización Canónica Universal con Supabase & Erradicación de Desincronización Multidispositivo (COMPLETADA)
+- [x] **Diagnóstico y Causa Raíz de la Desincronización**:
+  - En Supabase existían recetas con `instructions` incompletas y 0 ingredientes asociados en la tabla `ingredients`.
+  - En el dispositivo del creador (ej. smartphone), la receta existía completa en el almacenamiento local (`pulse_cook_local_recipes_v3`), y la función de reconciliación anterior sobreescribía la respuesta remota con los datos locales en ese dispositivo en particular.
+  - Como resultado: el creador veía la receta completa en su teléfono, pero otros usuarios o el administrador navegando desde otro dispositivo veían 0 ingredientes o recetas incompletas.
+- [x] **Población y Saneamiento Integral en Supabase**:
+  - Se poblaron las instrucciones bilingües y todos los ingredientes bilingües genuinos (`name_es` y `name_en`) en la tabla `ingredients` para las 14 recetas activas en Supabase:
+    - *Tagliatelle con Crema de Pistacho* (10 ingredientes)
+    - *Pizza rústica con rúcula fresca y tomates cherry* (8 ingredientes)
+    - *Pasta Sotto Bosco* (14 ingredientes)
+    - *Sandwich de Pecceto flambeado* (18 ingredientes)
+    - *Panqueque Nube Japonés* (7 ingredientes)
+    - *Croquetas de atún saludable* (8 ingredientes)
+    - *Mini pizzas de garbanzo y cottage* (9 ingredientes)
+    - *Bizcocho humedo de chocolate* (8 ingredientes)
+    - *Risotto Mare e Sofritto* (10 ingredientes)
+    - *Crepes de trigo sarraceno* (5 ingredientes)
+    - *Peceto de Angus a las finas hierbas* (8 ingredientes)
+    - *Empanadas Árabes* (10 ingredientes)
+    - *Pechuga de pollo crujiente con quinoa inflada* (9 ingredientes)
+    - *Medallones de Res con salsa de Pimienta Negra al Cognac* (9 ingredientes)
+- [x] **Redefinición Arquitectónica de Persistencia (`lib/recipeStore.ts` y `app/page.tsx`)**:
+  - Se transformó la persistencia de "Offline-first que muta datos" a **"Supabase como Única Fuente de la Verdad (Single Source of Truth)"**.
+  - `localStorage` se redujo estrictamente a una caché de lectura ultrarrápida (`pulse_cook_supabase_cache_v4`) para arranque instantáneo (0 ms) sin pantallas de carga ni parpadeos, sin generar jamás recetas locales huérfanas.
+  - Se implementó `clearAllLocalRecipeOverrides()` que purga automáticamente claves heredadas (`pulse_cook_local_recipes_v3`, `v2`, `pulse_cook_local_ingredients_v3`, `v2`) en cualquier cliente para erradicar inconsistencias.
+- [x] **Flujo de Creación y Edición Estricto en la Nube**:
+  - Creación manual (`RecipeFormModal.tsx`) y asistida por Chef Remy (`app/page.tsx`) validan autenticación antes de guardar, persistiendo de manera atómica directamente en `recipes` e `ingredients` en Supabase.
+  - Alerta visual amigable en el formulario si el usuario no tiene sesión iniciada, invitándole a autenticarse con un solo clic.
+- [x] **Script SQL de Sincronización Canónica**:
+  - Generado y documentado en `supabase_sync_recipes_and_ingredients.sql` con esquema de tablas, tipos, índices optimizados, políticas RLS idempotentes y publicación en `supabase_realtime`.
+
+---
+
 ## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.

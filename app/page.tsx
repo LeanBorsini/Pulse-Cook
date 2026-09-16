@@ -18,13 +18,13 @@ import { User } from '@supabase/supabase-js';
 import { Recipe, Ingredient, Comment, ChefTip } from './types';
 import {
   getLocalRecipes,
-  saveLocalRecipe,
   deleteLocalRecipe,
   getLocalIngredients,
   saveLocalIngredients,
   batchSaveLocalIngredients,
   reconcileLocalRecipesWithRemote,
-  normalizeRecipeTitle,
+  clearAllLocalRecipeOverrides,
+  saveCachedSupabaseRecipes,
 } from '@/lib/recipeStore';
 import {
   getLocalUserRating,
@@ -520,37 +520,11 @@ export default function Home() {
           };
         });
 
-        // Reconciliar y purgar cualquier duplicado local temporal que ya exista en Supabase
-        const reconciledLocal = reconcileLocalRecipesWithRemote(formatted);
-
-        // Combinar recetas: base canónica remota de Supabase + locales no sincronizadas
-        const combined = [...formatted];
-        reconciledLocal.forEach((localRecipe) => {
-          const existsById = combined.some((r) => r.id === localRecipe.id);
-          const normLocalTitle = normalizeRecipeTitle(localRecipe.title_es);
-          const existsByTitle = combined.some(
-            (r) => normalizeRecipeTitle(r.title_es) === normLocalTitle
-          );
-
-          if (!existsById && !existsByTitle) {
-            combined.push(localRecipe);
-          } else if (existsById) {
-            const idx = combined.findIndex((r) => r.id === localRecipe.id);
-            combined[idx] = {
-              ...combined[idx],
-              ...localRecipe,
-              profiles: combined[idx].profiles || localRecipe.profiles,
-              user_id: combined[idx].user_id || localRecipe.user_id,
-              author_name: combined[idx].author_name || localRecipe.author_name,
-              avg_rating: combined[idx].avg_rating || localRecipe.avg_rating,
-              ratings_count: combined[idx].ratings_count || localRecipe.ratings_count,
-              user_rating: combined[idx].user_rating || localRecipe.user_rating,
-            };
-          }
-        });
+        // Sincronizar espejo de solo lectura con Supabase como única fuente de la verdad
+        reconcileLocalRecipesWithRemote(formatted);
 
         // Asegurar que cada receta del listado tenga su calificación consolidada al día
-        const finalizedRecipes = combined.map((r) => {
+        const finalizedRecipes = formatted.map((r) => {
           const ratingSummary = getConsolidatedRating(r.id, r.avg_rating, r.ratings_count, currentUser?.id);
           return {
             ...r,
@@ -561,6 +535,7 @@ export default function Home() {
         });
 
         setRecipes(finalizedRecipes);
+        saveCachedSupabaseRecipes(finalizedRecipes);
 
         // 5. Precargar y sincronizar en caché local todos los ingredientes de Supabase en segundo plano
         try {
@@ -595,6 +570,7 @@ export default function Home() {
 
     const initAuthAndRecipes = async () => {
       try {
+        clearAllLocalRecipeOverrides();
         const { data: { session } } = await supabase.auth.getSession();
         if (!isMounted) return;
 
@@ -982,8 +958,12 @@ export default function Home() {
   ) => {
     setShowChefAI(false);
 
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     const standardizedCategory = getCategoryLabel(newRecipe.category, 'ES');
-    let finalRecipeId: string | null = null;
 
     const supabasePayload = {
       title_es: newRecipe.title_es || 'Nueva Receta',
@@ -998,71 +978,41 @@ export default function Home() {
       image_url: newRecipe.image_url || '',
       images: newRecipe.images || (newRecipe.image_url ? [newRecipe.image_url] : []),
       dietary_tags: newRecipe.dietary_tags || [],
-      user_id: user?.id || null,
+      user_id: user.id,
     };
 
-    if (user) {
-      try {
-        const { data: supaRec, error: supaErr } = await supabase
-          .from('recipes')
-          .insert([supabasePayload])
-          .select()
-          .single();
+    try {
+      const { data: supaRec, error: supaErr } = await supabase
+        .from('recipes')
+        .insert([supabasePayload])
+        .select()
+        .single();
 
-        if (!supaErr && supaRec) {
-          finalRecipeId = supaRec.id;
-
-          if (newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
-            const ingPayload = newRecipe.generatedIngredients.map((ing) => {
-              const rawEs = (ing.name_es || '').trim();
-              let rawEn = (ing.name_en || '').trim();
-              if (!rawEn || rawEn.toLowerCase() === rawEs.toLowerCase()) {
-                rawEn = translateIngredientName(rawEs, undefined, 'EN') || rawEs;
-              }
-              return {
-                recipe_id: supaRec.id,
-                name_es: rawEs,
-                name_en: rawEn,
-                amount: ing.amount || 1,
-                unit: ing.unit || '',
-                aisle: 'General',
-              };
-            });
-            const { error: chefIngErr } = await supabase.from('ingredients').insert(ingPayload);
-            if (chefIngErr) console.error('Chef recipe ingredients insert error:', chefIngErr);
-          }
+      if (!supaErr && supaRec) {
+        if (newRecipe.generatedIngredients && newRecipe.generatedIngredients.length > 0) {
+          const ingPayload = newRecipe.generatedIngredients.map((ing) => {
+            const rawEs = (ing.name_es || '').trim();
+            let rawEn = (ing.name_en || '').trim();
+            if (!rawEn || rawEn.toLowerCase() === rawEs.toLowerCase()) {
+              rawEn = translateIngredientName(rawEs, undefined, 'EN') || rawEs;
+            }
+            return {
+              recipe_id: supaRec.id,
+              name_es: rawEs,
+              name_en: rawEn,
+              amount: ing.amount || 1,
+              unit: ing.unit || '',
+              aisle: 'General',
+            };
+          });
+          const { error: chefIngErr } = await supabase.from('ingredients').insert(ingPayload);
+          if (chefIngErr) console.error('Chef recipe ingredients insert error:', chefIngErr);
         }
-      } catch (err) {
-        console.warn('Chef recipe remote sync error, saving locally:', err);
       }
+    } catch (err) {
+      console.warn('Chef recipe remote sync error:', err);
     }
 
-    if (!finalRecipeId) {
-      finalRecipeId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    }
-
-    const localNewRecipe: Recipe = {
-      id: finalRecipeId,
-      user_id: user?.id || 'local_user',
-      profiles: profileUsername
-        ? { id: user?.id || 'local_user', username: profileUsername }
-        : { id: 'local_user', username: user?.email?.split('@')[0] || 'Mi Cocina' },
-      title_es: supabasePayload.title_es,
-      title_en: supabasePayload.title_en,
-      category: supabasePayload.category,
-      prep_time: supabasePayload.prep_time,
-      servings: supabasePayload.servings,
-      description_es: supabasePayload.description_es,
-      description_en: supabasePayload.description_en,
-      instructions_es: supabasePayload.instructions_es,
-      instructions_en: supabasePayload.instructions_en,
-      image_url: supabasePayload.image_url,
-      images: supabasePayload.images,
-      dietary_tags: supabasePayload.dietary_tags,
-      created_at: new Date().toISOString(),
-    };
-
-    saveLocalRecipe(localNewRecipe, newRecipe.generatedIngredients || []);
     await fetchRecipes();
   };
 
@@ -1171,7 +1121,13 @@ export default function Home() {
             }
           }
         }}
-        onOpenNewRecipe={() => setIsCreatingRecipe(true)}
+        onOpenNewRecipe={() => {
+          if (!user) {
+            setShowAuthModal(true);
+          } else {
+            setIsCreatingRecipe(true);
+          }
+        }}
         selectedCount={user ? selectedRecipeIds.length : 0}
         onOpenShoppingList={() => {
           if (!user) {
@@ -1421,6 +1377,7 @@ export default function Home() {
           initialIngredients={recipeToEditIngredients}
           lang={lang}
           user={user}
+          onOpenAuth={() => setShowAuthModal(true)}
           onClose={() => {
             setIsCreatingRecipe(false);
             setRecipeToEdit(null);
