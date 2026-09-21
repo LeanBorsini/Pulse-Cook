@@ -89,7 +89,26 @@ export const INGREDIENT_DICTIONARY: Record<string, { es: string; en: string }> =
   'champiñones': { es: 'Champiñones', en: 'Mushrooms' },
   'hongos': { es: 'Hongos', en: 'Mushrooms' },
 
-  // Harinas, Granos y Legumbres
+  // Harinas, Granos, Masas y Panes
+  'pan de trigo sarraceno': { es: 'Pan de trigo sarraceno', en: 'Buckwheat bread' },
+  'pan de trigo serraceno': { es: 'Pan de trigo sarraceno', en: 'Buckwheat bread' },
+  'pan de masa madre': { es: 'Pan de masa madre', en: 'Sourdough bread' },
+  'pan de molde': { es: 'Pan de molde', en: 'Sliced bread' },
+  'pan integral': { es: 'Pan integral', en: 'Whole wheat bread' },
+  'pan casero': { es: 'Pan casero', en: 'Homemade bread' },
+  'pan rallado': { es: 'Pan rallado', en: 'Breadcrumbs' },
+  'pan': { es: 'Pan', en: 'Bread' },
+  'panes': { es: 'Panes', en: 'Breads' },
+  'harina de trigo sarraceno': { es: 'Harina de trigo sarraceno', en: 'Buckwheat flour' },
+  'harina de trigo serraceno': { es: 'Harina de trigo sarraceno', en: 'Buckwheat flour' },
+  'trigo sarraceno': { es: 'Trigo sarraceno', en: 'Buckwheat' },
+  'trigo serraceno': { es: 'Trigo sarraceno', en: 'Buckwheat' },
+  'masa madre de trigo sarraceno': { es: 'Masa madre de trigo sarraceno', en: 'Buckwheat sourdough starter' },
+  'masa madre de trigo serraceno': { es: 'Masa madre de trigo sarraceno', en: 'Buckwheat sourdough starter' },
+  'masa madre': { es: 'Masa madre', en: 'Sourdough starter' },
+  'levadura fresca': { es: 'Levadura fresca', en: 'Fresh yeast' },
+  'levadura seca': { es: 'Levadura seca', en: 'Dry yeast' },
+  'levadura': { es: 'Levadura', en: 'Yeast' },
   'avena': { es: 'Avena', en: 'Oats' },
   'harina de avena': { es: 'Harina de avena', en: 'Oat flour' },
   'harina de trigo': { es: 'Harina de trigo', en: 'Wheat flour' },
@@ -102,7 +121,17 @@ export const INGREDIENT_DICTIONARY: Record<string, { es: string; en: string }> =
   'garbanzos': { es: 'Garbanzos', en: 'Chickpeas' },
   'quinoa': { es: 'Quinoa', en: 'Quinoa' },
 
-  // Condimentos, Aceites & Especias
+  // Líquidos, Condimentos, Aceites & Especias
+  'agua tibia': { es: 'Agua tibia', en: 'Warm water' },
+  'agua': { es: 'Agua', en: 'Water' },
+  'semillas de chía': { es: 'Semillas de chía', en: 'Chia seeds' },
+  'semillas de chia': { es: 'Semillas de chía', en: 'Chia seeds' },
+  'semillas de lino': { es: 'Semillas de lino', en: 'Flaxseeds' },
+  'semillas de sésamo': { es: 'Semillas de sésamo', en: 'Sesame seeds' },
+  'semillas de sesamo': { es: 'Semillas de sésamo', en: 'Sesame seeds' },
+  'semillas de girasol': { es: 'Semillas de girasol', en: 'Sunflower seeds' },
+  'psyllium': { es: 'Psyllium', en: 'Psyllium husk' },
+  'cáscara de psyllium': { es: 'Cáscara de psyllium', en: 'Psyllium husk' },
   'sal': { es: 'Sal', en: 'Salt' },
   'pimienta': { es: 'Pimienta', en: 'Black pepper' },
   'pimienta negra': { es: 'Pimienta negra', en: 'Black pepper' },
@@ -160,7 +189,27 @@ const EN_TO_ES_MAP: Record<string, string> = {
   flour: 'Harina',
   'wheat flour': 'Harina de trigo',
   'oat flour': 'Harina de avena',
+  'buckwheat flour': 'Harina de trigo sarraceno',
   oats: 'Avena',
+  bread: 'Pan',
+  'buckwheat bread': 'Pan de trigo sarraceno',
+  'sourdough bread': 'Pan de masa madre',
+  'sliced bread': 'Pan de molde',
+  'whole wheat bread': 'Pan integral',
+  breadcrumbs: 'Pan rallado',
+  buckwheat: 'Trigo sarraceno',
+  'sourdough starter': 'Masa madre',
+  sourdough: 'Masa madre',
+  yeast: 'Levadura',
+  'fresh yeast': 'Levadura fresca',
+  'dry yeast': 'Levadura seca',
+  water: 'Agua',
+  'warm water': 'Agua tibia',
+  'chia seeds': 'Semillas de chía',
+  'flax seeds': 'Semillas de lino',
+  'sesame seeds': 'Semillas de sésamo',
+  'sunflower seeds': 'Semillas de girasol',
+  psyllium: 'Psyllium',
   potato: 'Papa',
   potatoes: 'Papas',
   spinach: 'Espinaca',
@@ -207,16 +256,18 @@ export function translateIngredientName(
       return es;
     }
 
-    // Si nameEs o nameEn coincide con nuestro mapa de inglés a español
+    // Si nameEs o nameEn coincide exactamente con nuestro mapa de inglés a español
     const lookupCandidate = (es || en).toLowerCase();
     if (EN_TO_ES_MAP[lookupCandidate]) {
       return EN_TO_ES_MAP[lookupCandidate];
     }
 
-    // Buscar si contiene alguna palabra clave en inglés
-    for (const [engKey, esVal] of Object.entries(EN_TO_ES_MAP)) {
-      if (lookupCandidate.includes(engKey)) {
-        return esVal;
+    // Buscar si contiene alguna palabra clave en inglés (ordenadas por longitud descendente con límites de palabra)
+    const sortedEnKeys = Object.keys(EN_TO_ES_MAP).sort((a, b) => b.length - a.length);
+    for (const engKey of sortedEnKeys) {
+      const regex = new RegExp(`\\b${engKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (regex.test(lookupCandidate)) {
+        return EN_TO_ES_MAP[engKey];
       }
     }
 
@@ -233,9 +284,12 @@ export function translateIngredientName(
     return INGREDIENT_DICTIONARY[normalizedEs].en;
   }
 
-  for (const [key, value] of Object.entries(INGREDIENT_DICTIONARY)) {
-    if (normalizedEs.includes(key)) {
-      return value.en;
+  // Buscar coincidencia parcial (ordenada por longitud descendente de clave con límites de palabra para no fragmentar frases compuestas)
+  const sortedDictKeys = Object.keys(INGREDIENT_DICTIONARY).sort((a, b) => b.length - a.length);
+  for (const key of sortedDictKeys) {
+    const regex = new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (regex.test(normalizedEs)) {
+      return INGREDIENT_DICTIONARY[key].en;
     }
   }
 

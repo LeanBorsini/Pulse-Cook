@@ -96,6 +96,29 @@ const PHRASE_DICTIONARY_ES_TO_EN: [RegExp, string][] = [
   [/\bun\s+poco\s+de\b/gi, 'a little'],
 
   // Ingredientes culinarios específicos (evita Spanglish en pechuga, zapallo, cebolla, etc.)
+  [/\bpan\s+de\s+trigo\s+sarraceno\s+con\s+masa\s+madre\b/gi, 'buckwheat sourdough bread'],
+  [/\bpan\s+de\s+trigo\s+serraceno\s+con\s+masa\s+madre\b/gi, 'buckwheat sourdough bread'],
+  [/\bpan\s+de\s+trigo\s+sarraceno\b/gi, 'buckwheat bread'],
+  [/\bpan\s+de\s+trigo\s+serraceno\b/gi, 'buckwheat bread'],
+  [/\bpan\s+de\s+masa\s+madre\b/gi, 'sourdough bread'],
+  [/\bmasa\s+madre\s+de\s+trigo\s+sarraceno\b/gi, 'buckwheat sourdough starter'],
+  [/\bmasa\s+madre\s+de\s+trigo\s+serraceno\b/gi, 'buckwheat sourdough starter'],
+  [/\bharina\s+de\s+trigo\s+sarraceno\b/gi, 'buckwheat flour'],
+  [/\bharina\s+de\s+trigo\s+serraceno\b/gi, 'buckwheat flour'],
+  [/\bmasa\s+madre\b/gi, 'sourdough starter'],
+  [/\bcon\s+masa\s+madre\b/gi, 'with sourdough starter'],
+  [/\btrigo\s+sarraceno\b/gi, 'buckwheat'],
+  [/\btrigo\s+serraceno\b/gi, 'buckwheat'],
+  [/\bpan\s+de\s+molde\b/gi, 'sliced bread'],
+  [/\bpan\s+rallado\b/gi, 'breadcrumbs'],
+  [/\bpan\s+integral\b/gi, 'whole wheat bread'],
+  [/\bpan\s+casero\b/gi, 'homemade bread'],
+  [/\bpan\s+franc[eé]s\b/gi, 'french bread'],
+  [/\bpan\s+pita\b/gi, 'pita bread'],
+  [/\bpanes\b/gi, 'breads'],
+  [/\bpan\b/gi, 'bread'],
+  [/\bagua\s+tibia\b/gi, 'warm water'],
+  [/\bagua\b/gi, 'water'],
   [/\bpechuga\s+de\s+pollo\b/gi, 'chicken breast'],
   [/\bpechugas?\b/gi, 'chicken breast'],
   [/\b(zapallo|calabaza)\s+(anam[aá]|anco|butternut)\b/gi, 'butternut squash'],
@@ -238,8 +261,40 @@ const PHRASE_DICTIONARY_EN_TO_ES: [RegExp, string][] = [
   [/\band\b/gi, 'y'],
   [/\bper\b/gi, 'por'],
   [/\bwater\b/gi, 'agua'],
+  [/\bwarm\s+water\b/gi, 'agua tibia'],
+  // Panes, Masas y Harinas (Inglés a Español)
+  [/\bbuckwheat\s+sourdough\s+bread\b/gi, 'pan de trigo sarraceno con masa madre'],
+  [/\bbuckwheat\s+sourdough\s+starter\b/gi, 'masa madre de trigo sarraceno'],
+  [/\bbuckwheat\s+sourdough\b/gi, 'masa madre de trigo sarraceno'],
+  [/\bbuckwheat\s+bread\b/gi, 'pan de trigo sarraceno'],
+  [/\bbuckwheat\s+flour\b/gi, 'harina de trigo sarraceno'],
+  [/\bsourdough\s+bread\b/gi, 'pan de masa madre'],
+  [/\bsourdough\s+starter\b/gi, 'masa madre'],
+  [/\bsourdough\b/gi, 'masa madre'],
+  [/\bbuckwheat\b/gi, 'trigo sarraceno'],
+  [/\bbreadcrumbs\b/gi, 'pan rallado'],
+  [/\bsliced\s+bread\b/gi, 'pan de molde'],
+  [/\bwhole\s+wheat\s+bread\b/gi, 'pan integral'],
+  [/\bhomemade\s+bread\b/gi, 'pan casero'],
+  [/\bbread\b/gi, 'pan'],
+  [/\bbreads\b/gi, 'panes'],
+  [/\bfresh\s+yeast\b/gi, 'levadura fresca'],
+  [/\bdry\s+yeast\b/gi, 'levadura seca'],
+  [/\byeast\b/gi, 'levadura'],
+  // Utensilios culinarios contextuales (NUNCA traducir la palabra aislada "pan" a sartén)
+  [/\bfrying\s+pan\b/gi, 'sartén'],
+  [/\bsauce\s*pan\b/gi, 'cacerola'],
+  [/\bbread\s+pan\b/gi, 'molde para pan'],
+  [/\bloaf\s+pan\b/gi, 'molde para pan'],
+  [/\bbaking\s+pan\b/gi, 'molde para hornear'],
+  [/\bthe\s+pan\b/gi, 'la sartén'],
+  [/\ba\s+pan\b/gi, 'una sartén'],
+  [/\bin\s+a\s+pan\b/gi, 'en una sartén'],
+  [/\binto\s+a\s+pan\b/gi, 'en una sartén'],
+  [/\bfrom\s+the\s+pan\b/gi, 'de la sartén'],
+  [/\bhot\s+pan\b/gi, 'sartén caliente'],
+  [/\bpreheat\s+a\s+pan\b/gi, 'precalentar una sartén'],
   [/\bskillet\b/gi, 'sartén'],
-  [/\bpan\b/gi, 'sartén'],
   [/\bpot\b/gi, 'olla'],
 
   // Frases compuestas y Spanglish de preparación
@@ -536,7 +591,7 @@ export function translateTextSmart(
 ): string {
   if (!text || !text.trim()) return '';
   if (fromLang === toLang) {
-    return toLang === 'EN' ? cleanToPureEnglish(text) : cleanToPureSpanish(text);
+    return text.trim();
   }
 
   let translated = text;
@@ -626,22 +681,23 @@ export function translateRecipeField(
   if (isApiErrorMessage(en)) en = '';
 
   if (targetLang === 'ES') {
-    // 1. Si existe versión en español y es español genuino
+    // 1. Si existe versión en español y es español genuino sin Spanglish, retornarla TAL CUAL.
+    // NUNCA mutar un texto genuino en español pasándolo por cleanToPureSpanish ni por diccionarios.
     if (es && hasGenuineSpanishDescription(es, en) && !hasSpanglishResidue(es) && !isEnglishCulinaryText(es)) {
-      return cleanToPureSpanish(es);
+      return es;
     }
-    // 2. Si solo tenemos inglés o un texto con residuos, traducimos a español puro
+    // 2. Si solo tenemos inglés o un texto con residuos en inglés, traducimos a español puro
     const candidate = es || en;
     if (!candidate) return '';
     return cleanToPureSpanish(translateTextSmart(candidate, 'EN', 'ES'));
   }
 
   // targetLang === 'EN'
-  // 1. Si existe versión en inglés genuina
+  // 1. Si existe versión en inglés genuina sin Spanglish, retornarla TAL CUAL.
   if (en && hasGenuineEnglishDescription(en, es) && !hasSpanglishResidue(en) && !isSpanishCulinaryText(en)) {
-    return cleanToPureEnglish(en);
+    return en;
   }
-  // 2. Si solo tenemos español o un texto con residuos, traducimos a inglés puro
+  // 2. Si solo tenemos español o un texto con residuos en español, traducimos a inglés puro
   const candidate = en || es;
   if (!candidate) return '';
   return cleanToPureEnglish(translateTextSmart(candidate, 'ES', 'EN'));
@@ -660,12 +716,12 @@ export function translateCommentSmart(message: string, targetLang: 'ES' | 'EN'):
 
   if (targetLang === 'ES') {
     if (msgIsSpanish) {
-      return cleanToPureSpanish(trimmed);
+      return trimmed;
     }
     return cleanToPureSpanish(translateTextSmart(trimmed, 'EN', 'ES'));
   } else {
     if (!msgIsSpanish) {
-      return cleanToPureEnglish(trimmed);
+      return trimmed;
     }
     return cleanToPureEnglish(translateTextSmart(trimmed, 'ES', 'EN'));
   }

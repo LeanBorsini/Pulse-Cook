@@ -554,7 +554,30 @@ create policy "Users can update or delete their own recipe images."
 
 ---
 
-## 🚨 PROTOCOLO PERMANENTE: SINCRONIZACIÓN APP-SUPABASE & ENTREGA DE SCRIPTS SQL
+## 23. Fase 23: Saneamiento Definitivo del Motor de Traducción Culinaria (Resolución de Colisión Pan vs Sartén y Soporte Integral de Panadería/Masas)
+
+### Problema Identificado:
+- En `lib/recipeTranslator.ts`, la regla aislada `[/\bpan\b/gi, 'sartén']` dentro de `PHRASE_DICTIONARY_EN_TO_ES` sustituía indiscriminadamente cualquier aparición de la palabra en español "pan" por "sartén" cada vez que un texto en español pasaba por funciones de saneamiento (`cleanToPureSpanish`).
+- Además, en `translateRecipeField` y `translateCommentSmart`, cuando un texto ya estaba redactado en español genuino, se volvía a pasar innecesariamente por `cleanToPureSpanish`, mutando palabras legítimas del español.
+- En `lib/culinaryDictionary.ts`, faltaban términos esenciales de panadería, masas madre, harinas y agua ("pan", "pan de masa madre", "pan de trigo sarraceno", "harina de trigo sarraceno", "masa madre de trigo sarraceno", "agua", "levadura"). Además, la traducción de ingredientes utilizaba búsquedas por subcadenas no delimitadas, lo que podía provocar falsos positivos.
+
+### Soluciones Implementadas:
+- [x] **Eliminación y Refinamiento Contextual de Reglas en `lib/recipeTranslator.ts`**:
+  - Se eliminó completamente la regla agresiva `[/\bpan\b/gi, 'sartén']`.
+  - Se implementaron reglas contextuales precisas para utensilios culinarios en inglés: `frying pan`, `saucepan`, `bread pan`, `loaf pan`, `baking pan`, `the pan`, `a pan`, `in a pan`, `hot pan`, `preheat a pan`, `skillet` -> `sartén` / `cacerola` / `molde`.
+  - Se añadieron equivalencias bilingües ricas para panadería y masas: `buckwheat sourdough bread`, `sourdough bread`, `buckwheat bread`, `buckwheat flour`, `sourdough starter`, `breadcrumbs`, `sliced bread`, `whole wheat bread`, `homemade bread`, `fresh/dry yeast`, `warm water` <-> `pan de trigo sarraceno con masa madre`, `pan de masa madre`, `harina de trigo sarraceno`, `masa madre`, `pan rallado`, `pan de molde`, `pan integral`, `pan casero`, `levadura fresca/seca`, `agua tibia`.
+- [x] **Preservación Estricta de Textos Originales Genuinos**:
+  - En `translateTextSmart`: si `fromLang === toLang`, retorna el texto recortado de inmediato sin aplicar sustituciones ni filtros.
+  - En `translateRecipeField`: si el idioma destino es español (`targetLang === 'ES'`) y ya existe versión en español genuino (`hasGenuineSpanishDescription`), se retorna TAL CUAL (`return es`), sin mutarla por diccionarios. Análogo para inglés genuino (`return en`).
+  - En `translateCommentSmart`: si el comentario ya está en el idioma destino, se retorna TAL CUAL sin mutación.
+- [x] **Actualización de `lib/culinaryDictionary.ts`**:
+  - Incorporados al `INGREDIENT_DICTIONARY` y `EN_TO_ES_MAP` todos los ingredientes de panadería, masas madre, granos y líquidos con sus nombres canónicos bilingües.
+  - En `translateIngredientName`, la búsqueda de coincidencias ahora ordena las claves por longitud descendente y utiliza límites de palabra (`\b`), garantizando que términos compuestos (ej. *Harina de trigo sarraceno*, *Masa madre de trigo sarraceno*) se resuelvan antes que palabras genéricas (*Harina*, *Pan*).
+- [x] **Clarificación Explícita en la API de Traducción (`app/api/translate/route.ts`)**:
+  - Se instruyó al prompt de Gemini con una directiva obligatoria: en español *"pan"* significa *"bread"*; bajo ninguna circunstancia debe traducirse como sartén o skillet.
+- [x] **Repositorio Git Actualizado**:
+  - Se inicializó y sincronizó la rama principal `main` con el commit exhaustivo de corrección.
+
 
 > **REGLA DE ORO**: Toda modificación en el código o arquitectura que requiera cambios en la base de datos de Supabase **DEBE ir acompañada obligatoriamente de su respectivo script SQL listo para ejecutar**.
 

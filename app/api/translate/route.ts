@@ -186,6 +186,14 @@ CRITICAL REQUIREMENTS:
 2. NO MIXED LANGUAGES OR SPANGLISH: Absolutely ZERO words, phrases, or ingredients may remain in ${sourceLanguageName}.
    - When translating to English: The input might be in Spanish OR may contain an existing corrupted mixture of Spanish and English (Spanglish). You must translate the ENTIRE text so that 100% of it is in natural, fluent English.
    - Specific terms that MUST be translated cleanly:
+     * "pan" in Spanish means "bread". NEVER translate Spanish "pan" as "skillet" or "sartén"! Bakery "pan" is ALWAYS "bread".
+     * "pan de trigo sarraceno con masa madre" -> "buckwheat sourdough bread"
+     * "pan de masa madre" -> "sourdough bread"
+     * "masa madre" -> "sourdough starter" or "sourdough"
+     * "harina de trigo sarraceno" -> "buckwheat flour"
+     * "trigo sarraceno" -> "buckwheat"
+     * "agua" -> "water"
+     * "sartén" -> "skillet" or "frying pan"
      * "pechuga" / "pechuga de pollo" -> "chicken breast"
      * "zapallo" / "calabaza" -> "butternut squash" (or "squash" / "pumpkin")
      * "harina de avena" -> "oat flour"
